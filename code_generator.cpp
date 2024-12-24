@@ -301,6 +301,29 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "return ui::message_result::unseen;\n";
 		}
 		result += "\t" "}\n";
+
+		if(win.wrapped.draggable) {
+			result += "\t" "void on_drag(sys::state& state, int32_t oldx, int32_t oldy, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override {\n";
+			result += "\t"  "\t" "auto location_abs = get_absolute_location(state, *this);\n";
+			result += "\t"  "\t" "if(location_abs.x <= oldx && oldx < base_data.size.x + location_abs.x && location_abs.y <= oldy && oldy < base_data.size.y + location_abs.y) {\n";
+			result += "\t"  "\t"  "\t" "ui::xy_pair new_abs_pos = location_abs;\n";
+			result += "\t"  "\t"  "\t" "new_abs_pos.x += int16_t(x - oldx);\n";
+			result += "\t"  "\t"  "\t" "new_abs_pos.y += int16_t(y - oldy);\n";
+			result += "\t"  "\t"  "\t" "if(ui::ui_width(state) > base_data.size.x)\n";
+			result += "\t"  "\t"  "\t" "\t" "new_abs_pos.x = int16_t(std::clamp(int32_t(new_abs_pos.x), 0, ui::ui_width(state) - base_data.size.x));\n";
+			result += "\t"  "\t"  "\t" "if(ui::ui_height(state) > base_data.size.y)\n";
+			result += "\t"  "\t"  "\t" "\t" "new_abs_pos.y = int16_t(std::clamp(int32_t(new_abs_pos.y), 0, ui::ui_height(state) - base_data.size.y));\n";
+
+			result += "\t"  "\t"  "\t" "if(state.world.locale_get_native_rtl(state.font_collection.get_current_locale())) {\n";
+			result += "\t"  "\t"  "\t" "\t" "base_data.position.x -= int16_t(new_abs_pos.x - location_abs.x);\n";
+			result += "\t"  "\t"  "\t" "} else {\n";
+			result += "\t"  "\t"  "\t" "\t" "base_data.position.x += int16_t(new_abs_pos.x - location_abs.x);\n";
+			result += "\t"  "\t"  "\t" "}\n";
+			result += "\t"  "\t"  "base_data.position.y += int16_t(new_abs_pos.y - location_abs.y);\n";
+			result += "\t" "\t" "}\n";
+			result += "\t"  "}\n";
+		}
+
 		result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 		result += "};\n";
 
@@ -584,6 +607,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		// window functions
 		if(win.wrapped.background != background_type::none) {
 			result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
+			if(win.wrapped.draggable) {
+				result += "\t" "state.ui_state.drag_target = this;\n";
+			}
 			result += "\t" "return ui::message_result::consumed;\n";
 			result += "}\n";
 
@@ -668,7 +694,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		}
 
 		if(win.wrapped.updates_while_hidden) {
-			result += "\t"  "\t"  "ui::element_base::flags |= ui::element_base::wants_update_when_hidden_mask;\n";
+			result += "\t"  "ui::element_base::flags |= ui::element_base::wants_update_when_hidden_mask;\n";
 		}
 
 		result += "\t" "auto name_key = state.lookup_key(\"" + project_name + "::" + win.wrapped.name + "\");\n";
@@ -696,7 +722,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "cptr->base_data.size.y = child_data.y_size;\n";
 
 			if(c.updates_while_hidden) {
-				result += "\t"  "\t"  "cptr->flags |= ui::element_base::wants_update_when_hidden_mask;\n";
+				result += "\t"  "\t"  "\t" "cptr->flags |= ui::element_base::wants_update_when_hidden_mask;\n";
 			}
 
 			if(c.background == background_type::existing_gfx) {

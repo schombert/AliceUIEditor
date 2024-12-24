@@ -778,6 +778,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						case 6: open_project.windows[i].wrapped.orientation = orientation::center; break;
 					}
 					ImGui::Checkbox("Ignore rtl flip", &(open_project.windows[i].wrapped.ignore_rtl));
+					ImGui::Checkbox("Draggable", &(open_project.windows[i].wrapped.draggable));
 
 					ImGui::Text("Member Variables");
 					if(open_project.windows[i].wrapped.members.empty()) {
@@ -1240,7 +1241,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				dragging = false;
 			} else if(control_drag_target != drag_target::none) {
 				control_drag_target = drag_target::none;
-			} else {
+			} else if(!io.WantCaptureMouse) {
 				if(0 <= selected_window && selected_window < int32_t(open_project.windows.size())) {
 					auto& win = open_project.windows[selected_window];
 					selected_control = -1;

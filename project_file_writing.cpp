@@ -55,6 +55,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 			buffer.write(property::no_grid);
 			buffer.write(win.wrapped.no_grid);
 		}
+		if(win.wrapped.draggable) {
+			buffer.write(property::draggable);
+			buffer.write(win.wrapped.draggable);
+		}
 		if(win.wrapped.updates_while_hidden) {
 			buffer.write(property::updates_while_hidden);
 			buffer.write(win.wrapped.updates_while_hidden);
@@ -236,6 +240,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 				optional_section.read(win.wrapped.no_grid);
 			} else if(ptype == property::ignore_rtl) {
 				optional_section.read(win.wrapped.ignore_rtl);
+			} else if(ptype == property::draggable) {
+				optional_section.read(win.wrapped.draggable);
 			} else if(ptype == property::updates_while_hidden) {
 				optional_section.read(win.wrapped.updates_while_hidden);
 			} else if(ptype == property::texture) {

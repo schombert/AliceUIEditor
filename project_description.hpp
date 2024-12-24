@@ -91,6 +91,7 @@ struct window_element_t {
 	bool no_grid = false;
 	bool has_alternate_bg = false;
 	bool updates_while_hidden = false;
+	bool draggable = false;
 	orientation orientation = orientation::upper_left;
 	bool ignore_rtl = false;
 };
@@ -122,6 +123,7 @@ enum class property : uint8_t {
 	has_alternate_bg = 24,
 	alternate_bg = 25,
 	ignore_rtl = 25,
+	draggable = 26,
 };
 struct ui_element_t {
 	std::vector< data_member> members;
