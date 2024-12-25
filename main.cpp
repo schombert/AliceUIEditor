@@ -490,7 +490,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	open_project.grid_size = 10;
 
 	int32_t selected_window = -1;
+	int32_t chosen_window = -1;
+	bool just_chose_window = false;
 	int32_t selected_control = -1;
+	int32_t chosen_control = -1;
+
 	drag_target control_drag_target = drag_target::none;
 
 	int32_t display_w = 0;
@@ -500,6 +504,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			selected_window = i;
 			drag_offset_x = display_w / 2.0f - open_project.windows[i].wrapped.x_pos * ui_scale;
 			drag_offset_y = display_h / 2.0f - open_project.windows[i].wrapped.y_pos * ui_scale - open_project.windows[i].wrapped.y_size * ui_scale / 2.0f;
+			chosen_window = i;
+			just_chose_window = true;
 		} else {
 			selected_window = -1;
 		}
@@ -577,8 +583,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						fs::write_file(open_project.project_directory + open_project.source_path + open_project.project_name + L".cpp", text.c_str(), uint32_t(text.size()));
 					}
 				}
-
-				ImGui::NewLine();
 
 				auto asssets_location = std::string("Source directory: ") + (open_project.source_path.empty() ? std::string("[none]") : fs::native_to_utf8(open_project.source_path));
 				ImGui::Text(asssets_location.c_str());
@@ -666,11 +670,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 			for(uint32_t i = 0; i < open_project.windows.size(); ++i) {
 				ImGui::PushID(int32_t(i));
+				if(chosen_window != -1) {
+					ImGui::SetNextItemOpen(chosen_window == int32_t(i));
+				}
 				if(ImGui::CollapsingHeader(open_project.windows[i].wrapped.name.c_str())) {
-					if(ImGui::Button("Show")) {
+					if(chosen_window == -1 && selected_window != int32_t(i)) {
 						switch_to_window(int32_t(i));
 					}
 
+					if(ImGui::Button("Delete")) {
+						switch_to_window(-1);
+						open_project.windows.erase(open_project.windows.begin() + i);
+					}
 					ImGui::InputText("Name", &(open_project.windows[i].wrapped.temp_name));
 					ImGui::SameLine();
 					if(ImGui::Button("Change Name")) {
@@ -836,7 +847,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					ImGui::PushID(int32_t(j));
 					auto& c = win.children[j];
 
-					if(ImGui::CollapsingHeader(c.name.c_str())) {
+					if(chosen_control != -1) {
+						ImGui::SetNextItemOpen(chosen_control == int32_t(j));
+					}
+					if(ImGui::CollapsingHeader(c.name.c_str(), (selected_control == int32_t(j)) ? ImGuiTreeNodeFlags_Framed : 0)) {
 						if(ImGui::Button("Delete")) {
 							win.children.erase(win.children.begin() + j);
 							ImGui::PopID();
@@ -1013,13 +1027,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			}
 		}
 
-		// Rendering
-		ImGui::Render();
-
-		glfwGetFramebufferSize(window, &display_w, &display_h);
-		glViewport(0, 0, display_w, display_h);
-		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 
 		if(last_scroll_value > 0.0f) {
@@ -1031,7 +1038,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				ui_scale -= 1.0f;
 			last_scroll_value = 0.0f;
 		}
-		
+
+		if(just_chose_window)
+			just_chose_window = false;
+		else
+			chosen_window = -1;
+	
+		chosen_control = -1;
+
 		if(io.MouseDown[0]) {
 			if(!dragging && control_drag_target == drag_target::none && !io.WantCaptureMouse) {
 				selected_control = -1;
@@ -1044,6 +1058,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						auto ct = test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + c.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + c.y_pos * ui_scale + drag_offset_y, c.x_size * ui_scale, c.y_size * ui_scale, ui_scale);
 						if(ct != drag_target::none) {
 							selected_control = int32_t(i);
+							chosen_control = selected_control;
 							control_drag_target = ct;
 
 							drag_start_x = io.MousePos.x;
@@ -1104,27 +1119,27 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								win.wrapped.x_pos = int16_t(win.wrapped.no_grid ? (base_values.x_pos + offset_x) : (base_values.x_pos + offset_x - std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
 								win.wrapped.x_size = int16_t(std::max(0, right - win.wrapped.x_pos));
 							}
-								break;
+							break;
 							case drag_target::right:
 							{
 								auto right = int16_t(win.wrapped.no_grid ? (base_values.x_pos + base_values.x_size + offset_x) : (base_values.x_pos + base_values.x_size + offset_x - std::fmod(base_values.x_pos + base_values.x_size + offset_x, float(open_project.grid_size))));
 								win.wrapped.x_size = int16_t(std::max(0, right - win.wrapped.x_pos));
 							}
-								break;
+							break;
 							case drag_target::top:
 							{
 								auto bottom = win.wrapped.y_pos + win.wrapped.y_size;
 								win.wrapped.y_pos = int16_t(win.wrapped.no_grid ? (base_values.y_pos + offset_y) : (base_values.y_pos + offset_y - std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
 								win.wrapped.y_size = int16_t(std::max(0, bottom - win.wrapped.y_pos));
 							}
-								break;
+							break;
 							case drag_target::bottom:
 							{
-								auto bottom = int16_t(win.wrapped.no_grid ? (base_values.y_pos + base_values.y_size + offset_y) : (base_values.y_pos + base_values.y_size + offset_y- std::fmod(base_values.y_pos + base_values.y_size + offset_y, float(open_project.grid_size))));
+								auto bottom = int16_t(win.wrapped.no_grid ? (base_values.y_pos + base_values.y_size + offset_y) : (base_values.y_pos + base_values.y_size + offset_y - std::fmod(base_values.y_pos + base_values.y_size + offset_y, float(open_project.grid_size))));
 								win.wrapped.y_size = int16_t(std::max(0, bottom - win.wrapped.y_pos));
 							}
-								break;
-							case drag_target::top_left: 
+							break;
+							case drag_target::top_left:
 							{
 								auto right = win.wrapped.x_pos + win.wrapped.x_size;
 								win.wrapped.x_pos = int16_t(win.wrapped.no_grid ? (base_values.x_pos + offset_x) : (base_values.x_pos + offset_x - std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
@@ -1133,8 +1148,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								win.wrapped.y_pos = int16_t(win.wrapped.no_grid ? (base_values.y_pos + offset_y) : (base_values.y_pos + offset_y - std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
 								win.wrapped.y_size = int16_t(std::max(0, bottom - win.wrapped.y_pos));
 							}
-								break;
-							case drag_target::top_right: 
+							break;
+							case drag_target::top_right:
 							{
 								auto right = int16_t(win.wrapped.no_grid ? (base_values.x_pos + base_values.x_size + offset_x) : (base_values.x_pos + base_values.x_size + offset_x - std::fmod(base_values.x_pos + base_values.x_size + offset_x, float(open_project.grid_size))));
 								win.wrapped.x_size = int16_t(std::max(0, right - win.wrapped.x_pos));
@@ -1142,8 +1157,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								win.wrapped.y_pos = int16_t(win.wrapped.no_grid ? (base_values.y_pos + offset_y) : (base_values.y_pos + offset_y - std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
 								win.wrapped.y_size = int16_t(std::max(0, bottom - win.wrapped.y_pos));
 							}
-								break;
-							case drag_target::bottom_left: 
+							break;
+							case drag_target::bottom_left:
 							{
 								auto right = win.wrapped.x_pos + win.wrapped.x_size;
 								win.wrapped.x_pos = int16_t(win.wrapped.no_grid ? (base_values.x_pos + offset_x) : (base_values.x_pos + offset_x - std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
@@ -1151,15 +1166,15 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								auto bottom = int16_t(win.wrapped.no_grid ? (base_values.y_pos + base_values.y_size + offset_y) : (base_values.y_pos + base_values.y_size + offset_y - std::fmod(base_values.y_pos + base_values.y_size + offset_y, float(open_project.grid_size))));
 								win.wrapped.y_size = int16_t(std::max(0, bottom - win.wrapped.y_pos));
 							}
-								break;
-							case drag_target::bottom_right: 
+							break;
+							case drag_target::bottom_right:
 							{
 								auto right = int16_t(win.wrapped.no_grid ? (base_values.x_pos + base_values.x_size + offset_x) : (base_values.x_pos + base_values.x_size + offset_x - std::fmod(base_values.x_pos + base_values.x_size + offset_x, float(open_project.grid_size))));
 								win.wrapped.x_size = int16_t(std::max(0, right - win.wrapped.x_pos));
 								auto bottom = int16_t(win.wrapped.no_grid ? (base_values.y_pos + base_values.y_size + offset_y) : (base_values.y_pos + base_values.y_size + offset_y - std::fmod(base_values.y_pos + base_values.y_size + offset_y, float(open_project.grid_size))));
 								win.wrapped.y_size = int16_t(std::max(0, bottom - win.wrapped.y_pos));
 							}
-								break;
+							break;
 							default: break;
 						}
 					} else {
@@ -1252,17 +1267,29 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						if(ct != drag_target::none) {
 							selected_control = int32_t(i);
 							mouse_to_drag_type(ct);
+							ImGui::SetTooltip(c.name.c_str());
 							break;
 						}
 					}
 
 					if(selected_control == -1) {
 						auto t = test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + drag_offset_y, win.wrapped.x_size * ui_scale, win.wrapped.y_size * ui_scale, ui_scale);
-						mouse_to_drag_type(t);
+						if(t != drag_target::none) {
+							mouse_to_drag_type(t);
+							ImGui::SetTooltip(win.wrapped.name.c_str());
+						}
 					}
 				}
 			}
 		}
+
+		// Rendering
+		ImGui::Render();
+
+		glfwGetFramebufferSize(window, &display_w, &display_h);
+		glViewport(0, 0, display_w, display_h);
+		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 		glUseProgram(ui_shader_program);
 		glUniform1i(glGetUniformLocation(ui_shader_program, "texture_sampler"), 0);

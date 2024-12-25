@@ -221,7 +221,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
 			result += "\t" "\t" "if(type == ui::mouse_probe_type::click) {\n";
-			if(c.background != background_type::none) {
+			if(c.background != background_type::none && (c.left_click_action || c.right_click_action || c.shift_click_action)) {
 				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
 			} else {
 				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
@@ -256,6 +256,18 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "int32_t max_page(); \n";
 			}
 			result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+
+			if(!c.members.empty()) {
+				result += "\t" "void* get_by_name(sys::state& state, std::string_view name) noexcept override {\n";
+				for(auto& m : c.members) {
+					result += "\t" "\t" "if(name == \"" + m.name + "\") {\n";
+					result += "\t" "\t" "\t" "return (void*)(&" + m.name + ");\n";
+					result += "\t" "\t" "}\n";
+				}
+				result += "\t" "\t" "return nullptr;\n";
+				result += "\t" "}\n";
+			}
+
 			result += "};\n";
 		}
 	}
@@ -325,6 +337,18 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		}
 
 		result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+
+		if(!win.wrapped.members.empty()) {
+			result += "\t" "void* get_by_name(sys::state& state, std::string_view name) noexcept override {\n";
+			for(auto& m : win.wrapped.members) {
+				result += "\t" "\t" "if(name == \"" + m.name + "\") {\n";
+				result += "\t" "\t" "\t" "return (void*)(&" + m.name + ");\n";
+				result += "\t" "\t" "}\n";
+			}
+			result += "\t" "\t" "return nullptr;\n";
+			result += "\t" "}\n";
+		}
+
 		result += "};\n";
 
 		result += "std::unique_ptr<ui::element_base> make_" + project_name + "_" + win.wrapped.name + "(sys::state& state);\n";
@@ -395,7 +419,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						result += "// END\n";
 					}
 				}
-				result += "\t" "return ui::message_result::consumed;\n";
+				if(c.left_click_action || c.shift_click_action || c.right_click_action) {
+					result += "\t" "return ui::message_result::consumed;\n";
+				} else {
+					result += "\t" "return ui::message_result::unseen;\n";
+				}
 				result += "}\n";
 
 				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
@@ -412,7 +440,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					}
 					result += "// END\n";
 				}
-				result += "\t" "return ui::message_result::consumed;\n";
+				if(c.left_click_action || c.shift_click_action || c.right_click_action) {
+					result += "\t" "return ui::message_result::consumed;\n";
+				} else {
+					result += "\t" "return ui::message_result::unseen;\n";
+				}
 				result += "}\n";
 			}
 
@@ -541,13 +573,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "auto fill_start = size_t(page) * fill_count;\n";
 				result += "\t" "for(size_t fill_position = 0; fill_position < fill_count; ++fill_position) {\n";
 				result += "\t" "\t" "if(fill_position + fill_start < values.size()) {\n";
-				result += "\t" "\t" "\t" "if( ((" + child_type + "*)visible_items[fill_position])->value != values[fill_position + fill_start] && visible_items[fill_position]->is_visible()) {\n";
-				result += "\t" "\t" "\t"  "\t" "((" + child_type + "*)visible_items[fill_position])->value = values[fill_position + fill_start];\n";
-				result += "\t" "\t" "\t"  "\t" "visible_items[fill_position]->impl_on_update(state);\n";
-				result += "\t" "\t" "\t" "} else {\n";
-				result += "\t" "\t" "\t"  "\t" "((" + child_type + "*)visible_items[fill_position])->value = values[fill_position+ fill_start];\n";
-				result += "\t" "\t" "\t"  "\t" "visible_items[fill_position]->set_visible(state, true);\n";
-				result += "\t" "\t" "\t" "}\n";
+				result += "\t" "\t" "\t" "((" + child_type + "*)visible_items[fill_position])->value = values[fill_position + fill_start];\n";
+				result += "\t" "\t" "\t" "visible_items[fill_position]->flags &= ~ui::element_base::is_invisible_mask;\n";
+				//is_invisible_mask
 				result += "\t" "\t" "} else {\n";
 				result += "\t" "\t" "\t" "visible_items[fill_position]->set_visible(state, false);\n";
 				result += "\t" "\t" "}\n";
