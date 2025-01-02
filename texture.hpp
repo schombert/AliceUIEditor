@@ -10,10 +10,10 @@ public:
 	bool loaded = false;
 
 	texture() { }
-	texture(texture const&) = delete;
+	texture(texture const&) noexcept;
 	texture(texture&& other) noexcept;
 	~texture();
-	texture& operator=(texture const&) = delete;
+	texture& operator=(texture const&) noexcept;
 	texture& operator=(texture&& other) noexcept;
 	void load(std::wstring const& file);
 	void unload();

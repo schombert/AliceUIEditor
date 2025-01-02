@@ -49,7 +49,8 @@ enum class text_type : uint8_t {
 enum class container_type : uint8_t {
 	none,
 	list,
-	grid
+	grid,
+	table
 };
 
 struct color3f {
@@ -65,6 +66,23 @@ struct color3f {
 	}
 	color3f operator*(float v) const noexcept {
 		return color3f{ r * v, b * v, g * v };
+	}
+};
+
+struct color4f {
+	float r = 0.0f;
+	float g = 0.0f;
+	float b = 0.0f;
+	float a = 1.0f;
+
+	bool operator==(color4f const& o) const noexcept {
+		return r == o.r && g == o.g && b == o.b && a == o.a;
+	}
+	bool operator!=(color4f const& o) const noexcept {
+		return !(*this == o);
+	}
+	color4f operator*(float v) const noexcept {
+		return color4f{ r * v, b * v, g * v, a };
 	}
 };
 
@@ -124,9 +142,49 @@ enum class property : uint8_t {
 	alternate_bg = 25,
 	ignore_rtl = 25,
 	draggable = 26,
+	table_highlight_color = 27,
+	ascending_sort_icon = 28,
+	descending_sort_icon = 29,
+	row_background_a = 30,
+	row_background_b = 31,
+	row_height = 32,
+	table_insert = 33,
+	table_display_column_data = 34,
+	table_internal_column_data = 35,
+	table_divider_color = 36,
+	table_has_per_section_headers = 37,
+};
+enum class table_cell_type : uint8_t {
+	spacer = 0, text = 1, container = 2,
+};
+struct table_internal_column {
+	std::string column_name;
+	std::string container;
+	table_cell_type cell_type = table_cell_type::spacer;
+	bool has_dy_header_tooltip = false;
+	bool has_dy_cell_tooltip = false;
+	bool sortable = false;
+	bool header_background = false;
+	aui_text_alignment decimal_alignment = aui_text_alignment::center; // center == none
+};
+struct table_display_column {
+	std::string header_key;
+	std::string header_tooltip_key;
+	std::string header_texture;
+	std::string cell_tooltip_key;
+	int16_t width = 0;
+	text_color cell_text_color = text_color::black;
+	text_color header_text_color = text_color::black;
+	aui_text_alignment text_alignment = aui_text_alignment::center;
+};
+struct full_col_data {
+	table_internal_column internal_data;
+	table_display_column display_data;
 };
 struct ui_element_t {
 	std::vector< data_member> members;
+	std::vector< std::string> table_inserts;
+	std::vector< full_col_data> table_columns;
 	std::string name;
 	std::string temp_name;
 	std::string texture;
@@ -135,9 +193,16 @@ struct ui_element_t {
 	std::string child_window;
 	std::string list_content;
 	std::string alternate_bg;
+	std::string ascending_sort_icon;
+	std::string descending_sort_icon;
+	std::string row_background_a;
+	std::string row_background_b;
+	color4f table_highlight_color{ 0.0f, 0.0f, 0.0f, 0.0f };
 	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };
+	color3f table_divider_color{ 0.0f, 0.0f, 0.0f };
 	ogl::texture ogl_texture;
 	float text_scale = 1.0f;
+	float row_height = 2.0f;
 	int16_t x_size = 0;
 	int16_t y_size = 0;
 	int16_t x_pos = 0;
@@ -159,6 +224,8 @@ struct ui_element_t {
 	bool dynamic_text = false;
 	bool has_alternate_bg = false;
 	bool ignore_rtl = false;
+	bool has_table_highlight_color = false;
+	bool table_has_per_section_headers = false;
 };
 
 struct window_element_wrapper_t {

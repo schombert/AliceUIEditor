@@ -39,6 +39,8 @@ texture::texture(texture&& other) noexcept {
 	other.loaded = false;
 	other.texture_handle = 0;
 }
+texture::texture(texture const& other) noexcept {
+}
 texture& texture::operator=(texture&& other) noexcept {
 	loaded = other.loaded;
 	texture_handle = other.texture_handle;
@@ -46,7 +48,9 @@ texture& texture::operator=(texture&& other) noexcept {
 	other.texture_handle = 0;
 	return *this;
 }
-
+texture& texture::operator=(texture const& other) noexcept {
+	return *this;
+}
 void texture::load(std::wstring const& file_name) {
 	fs::file tex{ file_name };
 	auto content = tex.content();
