@@ -228,6 +228,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 				buffer.write(property::has_alternate_bg);
 				buffer.write(c.has_alternate_bg);
 			}
+			if(c.animation_type != animation_type::none) {
+				buffer.write(property::animation_type);
+				buffer.write(c.animation_type);
+			}
 			for(auto& dm : c.members) {
 				buffer.write(property::data_member);
 				buffer.write(dm.type);
@@ -415,6 +419,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 					optional_child_section.read(c.list_content);
 				} else if(ptype == property::has_alternate_bg) {
 					optional_child_section.read(c.has_alternate_bg);
+				} else if(ptype == property::animation_type) {
+					optional_child_section.read(c.animation_type);
 				} else if(ptype == property::data_member) {
 					data_member m;
 					optional_child_section.read(m.type);

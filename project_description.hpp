@@ -53,6 +53,13 @@ enum class container_type : uint8_t {
 	table
 };
 
+enum class animation_type : uint8_t {
+	none,
+	page_left,
+	page_right,
+	page_up
+};
+
 struct color3f {
 	float r = 0.0f;
 	float g = 0.0f;
@@ -153,6 +160,7 @@ enum class property : uint8_t {
 	table_internal_column_data = 35,
 	table_divider_color = 36,
 	table_has_per_section_headers = 37,
+	animation_type = 38,
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -214,6 +222,7 @@ struct ui_element_t {
 	container_type container_type = container_type::none;
 	bool no_grid = false;
 	aui_text_alignment text_align = aui_text_alignment::left;
+	animation_type animation_type = animation_type::none;
 	bool dynamic_element = false;
 	bool dynamic_tooltip = false;
 	bool can_disable = false;

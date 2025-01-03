@@ -617,7 +617,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						result += "\t" "" + col.internal_data.column_name + "_cached_text = text::produce_simple_string(state, " + col.internal_data.column_name + "_text_key);\n";
 						result += "\t" " " + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
 						result += "\t" " " + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
-						result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, " + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 3) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + ", static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
+						result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 3) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
 						result += "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
 						result += "\t" "}\n";
 					}
@@ -971,8 +971,34 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "}\n";
 
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::change_page(sys::state & state, int32_t new_page){\n";
+				if(c.animation_type != animation_type::none) {
+					std::string aninam;
+					switch(c.animation_type) {
+						case animation_type::page_left: aninam = "page_flip_left"; break;
+						case animation_type::page_right: aninam = "page_flip_right"; break;
+						case animation_type::page_up: aninam = "page_flip_up"; break;
+						default: break;
+					}
+
+					result += "\t""bool lflip = new_page < page && page > 0;\n";
+					result += "\t""bool rflip = new_page > page && page < max_page();\n";
+					result += "\t""if(rflip) {\n";
+					result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
+					result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam  + ", 200); \n";
+					result += "\t" "} else if(lflip) {\n";
+					result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
+					result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + "_rev, 200);\n";
+					result += "\t" "}\n";
+				}
 				result += "\t" "impl_change_page(state, new_page);";
 				result += "\t" "for(auto c : children) c->impl_on_update(state);\n";
+				result += "\t" "state.game_state_updated.store(true, std::memory_order::release);\n";
+
+				if(c.animation_type != animation_type::none) {
+					result += "\t""if(rflip || lflip) {\n";
+					result += "\t" "\t" "state.ui_animation.post_update_frame(state);\n";
+					result += "\t" "}\n";
+				}
 				result += "}\n";
 
 				result += "int32_t " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::max_page(){\n";
@@ -1087,7 +1113,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "\t" "do {\n";
 				result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<value_option>(values[i])) val_temp.push_back(std::get<value_option>(values[i]).value);\n";
 				result += "\t" "\t" "\t" "\t" "++i;\n";
-				result += "\t" "\t" "\t" "} while(i < values.size() && std::holds_alternative<value_option>(values[i]) || std::holds_alternative<std::monostate>(values[i]));\n";
+				result += "\t" "\t" "\t" "} while(i < values.size() && (std::holds_alternative<value_option>(values[i]) || std::holds_alternative<std::monostate>(values[i])));\n";
 				// do sort
 				for(auto& col : c.table_columns) {
 					if(col.internal_data.sortable) {
@@ -1285,8 +1311,34 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "return int32_t(values.size() - 1) / int32_t(visible_items.size());\n";
 					result += "}\n";
 					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::change_page(sys::state & state, int32_t new_page) {\n";
+					if(c.animation_type != animation_type::none) {
+						std::string aninam;
+						switch(c.animation_type) {
+							case animation_type::page_left: aninam = "page_flip_left"; break;
+							case animation_type::page_right: aninam = "page_flip_right"; break;
+							case animation_type::page_up: aninam = "page_flip_up"; break;
+							default: break;
+						}
+
+						result += "\t""bool lflip = new_page < page && page > 0;\n";
+						result += "\t""bool rflip = new_page > page && page < max_page();\n";
+						result += "\t""if(rflip) {\n";
+						result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
+						result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + ", 200); \n";
+						result += "\t" "} else if(lflip) {\n";
+						result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
+						result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + "_rev, 200);\n";
+						result += "\t" "}\n";
+					}
 					result += "\t" "page = std::clamp(new_page, 0, max_page());\n";
 					result += "\t" "state.game_state_updated.store(true, std::memory_order::release);\n";
+
+					if(c.animation_type != animation_type::none) {
+						result += "\t""if(rflip || lflip) {\n";
+						result += "\t" "\t" "impl_on_update(state);\n";
+						result += "\t" "\t" "state.ui_animation.post_update_frame(state);\n";
+						result += "\t" "}\n";
+					}
 					result += "}\n";
 				}
 

@@ -1001,6 +1001,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::Checkbox("Right-click action", &(c.right_click_action));
 							ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
 						} else { // container only
+							{
+								const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
+								temp = int32_t(c.animation_type);
+								ImGui::Combo("Animation", &temp, items, 4);
+								c.animation_type = animation_type(temp);
+							}
+
 							if(c.container_type == container_type::list || c.container_type == container_type::grid) {
 								ImGui::InputText("Child window", &(c.child_window));
 								ImGui::InputText("List content", &(c.list_content));
