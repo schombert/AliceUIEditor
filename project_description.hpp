@@ -6,7 +6,7 @@
 #include "texture.hpp"
 
 enum class background_type : uint8_t {
-	none, texture, bordered_texture, existing_gfx
+	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart
 }; 
 enum class aui_text_alignment : uint8_t {
 	left, right, center
@@ -161,6 +161,8 @@ enum class property : uint8_t {
 	table_divider_color = 36,
 	table_has_per_section_headers = 37,
 	animation_type = 38,
+	datapoints = 39,
+	other_color = 40,
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -206,6 +208,7 @@ struct ui_element_t {
 	std::string row_background_a;
 	std::string row_background_b;
 	color4f table_highlight_color{ 0.0f, 0.0f, 0.0f, 0.0f };
+	color4f other_color{ 0.0f, 0.0f, 0.0f, 0.0f };
 	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };
 	color3f table_divider_color{ 0.0f, 0.0f, 0.0f };
 	ogl::texture ogl_texture;
@@ -216,6 +219,7 @@ struct ui_element_t {
 	int16_t x_pos = 0;
 	int16_t y_pos = 0;
 	int16_t border_size = 0;
+	int16_t datapoints = 100;
 	text_color text_color = text_color::black;
 	text_type text_type = text_type::body;
 	background_type background = background_type::none;

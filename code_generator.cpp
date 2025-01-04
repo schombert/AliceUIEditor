@@ -334,7 +334,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t"  "std::string_view gfx_key;\n";
 				result += "\t"  "dcon::gfx_object_id background_gid;\n";
 				result += "\t"  "int32_t frame = 0;\n";
-			} else if(c.background != background_type::none) {
+			} else if(c.background == background_type::texture || c.background == background_type::bordered_texture) {
 				result += "\t"  "std::string_view texture_key;\n";
 				if(c.has_alternate_bg) {
 					result += "\t"  "std::string_view alt_texture_key;\n";
@@ -345,6 +345,15 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				if(c.background == background_type::bordered_texture) {
 					result += "\t"  "int16_t border_size = 0;\n";
 				}
+			} else if(c.background == background_type::linechart) {
+				result += "\t" "ogl::lines lines{ " + std::to_string(c.datapoints) + " };\n";
+				result += "\t" "ogl::color4f line_color{ " + std::to_string(c.other_color.r) + "f, " + std::to_string(c.other_color.g) + "f, " + std::to_string(c.other_color.b) + "f, " + std::to_string(c.other_color.a) + "f };\n";
+				result += "\t" "void set_data_points(sys::state& state, std::vector<float> const& datapoints, float min, float max);\n";
+			} else if(c.background == background_type::stackedbarchart) {
+				result += "\t" "ogl::data_texture data_texture{ " + std::to_string(c.datapoints) + ", 3 };\n";
+				result += "\t" "struct graph_entry {" + c.list_content + " key; ogl::color3f color; float amount; };\n";
+				result += "\t" "std::vector<graph_entry> graph_content;\n";
+				result += "\t" "void update_chart(sys::state& state);\n";
 			}
 
 			if(c.can_disable) {
@@ -375,7 +384,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
 			if(c.dynamic_tooltip) {
-				result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+				if(c.background != background_type::stackedbarchart && c.background != background_type::linechart)
+					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+				else
+					result += "\t" "\t" "return ui::tooltip_behavior::position_sensitive_tooltip;\n";
 			} else if(c.tooltip_text_key.length() > 0) {
 				result += "\t" "\t" "return ui::tooltip_behavior::tooltip;\n";
 			} else {
@@ -1211,16 +1223,77 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "}\n";
 			}
 
+			// SPECIAL
+			if(c.background == background_type::linechart) {
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::set_data_points(sys::state& state, std::vector<float> const& datapoints, float min, float max) {\n";
+				
+				result += "\t" "assert(datapoints.size() ==  " + std::to_string(c.datapoints) + ");\n";
+				result += "\t" "float y_height = max - min;\n";
+				result += "\t" "std::vector<float> scaled_datapoints = std::vector<float>(" + std::to_string(c.datapoints) + ");\n";
+				result += "\t" "if(y_height == 0.f) {\n";
+				result += "\t" "\t" "for(size_t i = 0; i < " + std::to_string(c.datapoints) + "; i++) {\n";
+				result += "\t" "\t" "\t" "scaled_datapoints[i] = .5f;\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "} else {\n";
+				result += "\t" "\t" "for(size_t i = 0; i < " + std::to_string(c.datapoints) + "; i++) {\n";
+				result += "\t" "\t" "\t" "scaled_datapoints[i] = (datapoints[i] - min) / y_height;\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "}\n";
+				result += "\t" "lines.set_y(scaled_datapoints.data());\n";
+				
+				result += "}\n";
+			} else if(c.background == background_type::stackedbarchart) {
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_chart(sys::state& state) {\n";
+				
+				result += "\t" "std::sort(graph_content.begin(), graph_content.end(), [](auto const& a, auto const& b) { return a.amount > b.amount; });\n";
+				result += "\t" "float total = 0.0f;\n";
+				result += "\t" "for(auto& e : graph_content) { total += e.amount; }\n";
+				result += "\t" "if(total <= 0.0f) {\n";
+					result += "\t" "\t" "for(int32_t k = 0; k < " + std::to_string(c.datapoints) + "; k++) {\n";
+						result += "\t" "\t" "\t" "data_texture.data[k * 3] = uint8_t(0);\n";
+						result += "\t" "\t" "\t""data_texture.data[k * 3 + 1] = uint8_t(0);\n";
+						result += "\t" "\t" "\t" "data_texture.data[k * 3 + 2] = uint8_t(0);\n";
+					result += "\t" "\t" "}\n";
+					result += "\t" "\t" "return;\n";
+				result += "\t" "}\n";
+				result += "\t" "int32_t index = 0;\n";
+				result += "\t" "float offset = 0.0f;\n";
+				result += "\t" "for(int32_t k = 0; k < " + std::to_string(c.datapoints) + "; k++) {\n";
+				result += "\t" "\t" "if(graph_content[index].amount + offset < (float(k) + 0.5f) * total /  float(" + std::to_string(c.datapoints) + ")) {\n";
+				result += "\t" "\t" "\t" "offset += graph_content[index].amount;\n";
+				result += "\t" "\t" "\t" "++index;\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "\t" "data_texture.data[k * 3] = uint8_t(graph_content[index].color.r * 255.0f);\n";
+				result += "\t" "\t" "data_texture.data[k * 3 + 1] = uint8_t(graph_content[index].color.g * 255.0f);\n";
+				result += "\t" "\t""data_texture.data[k * 3 + 2] = uint8_t(graph_content[index].color.b * 255.0f);\n";
+				result += "\t" "}\n";
+				result += "\t" "data_texture.data_updated = true;\n";
+				
+				result += "}\n";
+			}
+
 			// TOOLTIP
 			if(c.dynamic_tooltip) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
 				make_parent_var_text();
+				if(c.background == background_type::stackedbarchart) {
+					result += "\t" "float temp_total = 0.0f;\n";
+					result += "\t" "for(auto& p : graph_content) { temp_total += p.amount; }\n";
+					result += "\t" "float temp_offset = temp_total * float(x) / float(base_data.size.x);\n";
+					result += "\t" "int32_t temp_index = 0;\n";
+					result += "\t" "for(auto& p : graph_content) { if(temp_offset <= p.amount) break; temp_offset -= p.amount; ++temp_index; }\n";
+					result += "\t" "if(temp_index < int32_t(graph_content.size())) {\n";
+					result += "\t" "\t" "auto& selected_key = graph_content[temp_index].key;\n";
+				}
 				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
 				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
 					it->second.used = true;
 					result += it->second.text;
 				}
 				result += "// END\n";
+				if(c.background == background_type::stackedbarchart) {
+					result += "\t" "}\n";
+				}
 				result += "}\n";
 			} else if(c.tooltip_text_key.length() > 0) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
@@ -1286,6 +1359,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					} else {
 						result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 					}
+				} else if(c.background == background_type::linechart) {
+					result += "\t" "ogl::render_linegraph(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, line_color.r, line_color.g, line_color.b, line_color.a, lines);\n";
+				} else if(c.background == background_type::stackedbarchart) {
+					result += "\t" "ogl::render_piechart(state, ogl::color_modification::none, float(x), float(y), float(base_data.size.x), float(base_data.size.y), data_texture);\n";
 				}
 
 				if(c.text_key.length() > 0 || c.dynamic_text) {
@@ -1515,7 +1592,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "if(auto it = state.ui_state.gfx_by_name.find(state.lookup_key(gfx_key)); it != state.ui_state.gfx_by_name.end()) {\n";
 			result += "\t" "\t" "background_gid = it->second;\n";
 			result += "\t" "}\n";
-		} else if(win.wrapped.background != background_type::none) {
+		} else if(win.wrapped.background == background_type::texture || win.wrapped.background == background_type::bordered_texture) {
 			result += "\t"   "texture_key = win_data.texture;\n";
 			if(win.wrapped.background == background_type::bordered_texture) {
 				result += "\t"  "\t"  "border_size = win_data.border_size;\n";
@@ -1559,7 +1636,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			if(c.background == background_type::existing_gfx) {
 				result += "\t" "\t" "\t"  "cptr->gfx_key = child_data.texture;\n";
-			} else if(c.background != background_type::none) {
+			} else if(c.background == background_type::texture || c.background == background_type::bordered_texture) {
 				result += "\t" "\t" "\t"  "cptr->texture_key = child_data.texture;\n";
 				if(c.background == background_type::bordered_texture) {
 					result += "\t" "\t" "\t"  "cptr->border_size = child_data.border_size;\n";
@@ -1580,7 +1657,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			if(c.tooltip_text_key.length() > 0) {
 				result += "\t" "\t" "\t"  "cptr->tooltip_key = state.lookup_key(child_data.tooltip_text_key);\n";
 			}
-
+			if(c.background == background_type::linechart) {
+				result += "\t" "\t" "\t"  "cptr->line_color = child_data.table_highlight_color;\n";
+			}
 			if(c.container_type == container_type::table) {
 				int32_t cindex = 0;
 				result += "\t" "\t" "\t" "int16_t col_sz_used = 0;\n";

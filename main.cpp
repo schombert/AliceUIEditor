@@ -921,15 +921,15 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::Checkbox("Ignore grid", &(c.no_grid));
 
 						{
-							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX" };
+							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart" };
 							temp = int32_t(c.background);
-							ImGui::Combo("Background", &temp, items, 4);
+							ImGui::Combo("Background", &temp, items, 6);
 							c.background = background_type(temp);
 						}
 
 						if(c.background == background_type::existing_gfx) {
 							ImGui::InputText("Texture", &(c.texture));
-						} else if(c.background != background_type::none) {
+						} else if(c.background == background_type::texture || c.background == background_type::bordered_texture) {
 							std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
 							ImGui::Text(tex.c_str());
 							ImGui::SameLine();
@@ -950,6 +950,24 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 									c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
 								}
 							}
+						} else if(c.background == background_type::linechart) {
+							temp = c.datapoints;
+							ImGui::InputInt("Data points", &temp);
+							c.datapoints = int16_t(temp);
+							{
+								ImVec4 ccolor{ c.other_color.r, c.other_color.b, c.other_color.g, c.other_color.a };
+								ImGui::ColorEdit4("line color", (float*)&ccolor);
+								c.other_color.r = ccolor.x;
+								c.other_color.g = ccolor.z;
+								c.other_color.b = ccolor.y;
+								c.other_color.a = ccolor.w;
+							}
+						} else if(c.background == background_type::stackedbarchart) {
+							temp = c.datapoints;
+							ImGui::InputInt("Data points", &temp);
+							c.datapoints = int16_t(temp);
+
+							ImGui::InputText("Data key", &c.list_content);
 						}
 						if(c.background == background_type::bordered_texture) {
 							temp = c.border_size;
@@ -1494,7 +1512,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			auto& win = open_project.windows[selected_window];
 			bool highlightwin = selected_control == -1 && (test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + drag_offset_y, win.wrapped.x_size * ui_scale, win.wrapped.y_size * ui_scale, ui_scale) != drag_target::none || control_drag_target != drag_target::none);
 			
-			if(win.wrapped.background == background_type::none || win.wrapped.background == background_type::existing_gfx || win.wrapped.texture.empty()) {
+			if(win.wrapped.background == background_type::none || win.wrapped.background == background_type::existing_gfx || win.wrapped.texture.empty() || win.wrapped.background == background_type::linechart || win.wrapped.background == background_type::stackedbarchart) {
 				render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
 			} else if(win.wrapped.background == background_type::texture) {
 				if(win.wrapped.ogl_texture.loaded == false) {

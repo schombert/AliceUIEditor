@@ -118,7 +118,7 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 				buffer.write(property::alternate_bg);
 				buffer.write(c.alternate_bg);
 			}
-			if(c.has_table_highlight_color) {
+			if(c.has_table_highlight_color && c.container_type == container_type::table) {
 				buffer.write(property::table_highlight_color);
 				buffer.write(c.table_highlight_color);
 			}
@@ -145,6 +145,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 			if(c.table_divider_color != color3f{ 0.0f, 0.0f, 0.0f}) {
 				buffer.write(property::table_divider_color);
 				buffer.write(c.table_divider_color);
+			}
+			if(c.other_color != color4f{ 0.0f, 0.0f, 0.0f, 0.0f } && c.container_type != container_type::table) {
+				buffer.write(property::other_color);
+				buffer.write(c.other_color);
 			}
 			for(auto& tc : c.table_columns) {
 				buffer.write(property::table_display_column_data);
@@ -215,6 +219,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 			if(c.container_type != container_type::none) {
 				buffer.write(property::container_type);
 				buffer.write(c.container_type);
+			}
+			if(c.datapoints != 100) {
+				buffer.write(property::datapoints);
+				buffer.write(c.datapoints);
 			}
 			if(c.child_window.size() > 0) {
 				buffer.write(property::child_window);
@@ -365,6 +373,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 					essential_child_section.read(c.row_height);
 				} else if(ptype == property::table_divider_color) {
 					essential_child_section.read(c.table_divider_color);
+				} else if(ptype == property::other_color) {
+					essential_child_section.read(c.other_color);
 				} else if(ptype == property::table_display_column_data) {
 					table_display_column tc;
 					essential_child_section.read(tc.header_key);
@@ -421,6 +431,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 					optional_child_section.read(c.has_alternate_bg);
 				} else if(ptype == property::animation_type) {
 					optional_child_section.read(c.animation_type);
+				} else if(ptype == property::datapoints) {
+					optional_child_section.read(c.datapoints);
 				} else if(ptype == property::data_member) {
 					data_member m;
 					optional_child_section.read(m.type);
