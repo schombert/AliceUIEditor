@@ -397,7 +397,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
 			result += "\t" "\t" "if(type == ui::mouse_probe_type::click) {\n";
-			if(c.background != background_type::none && (c.left_click_action || c.right_click_action || c.shift_click_action)) {
+			if(c.background != background_type::none && (c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation)) {
 				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
 			} else {
 				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
@@ -426,6 +426,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			if(c.background != background_type::none) {
 				result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
+			}
+			if(c.hover_activation) {
+				result += "\t"  "void on_hover(sys::state& state) noexcept override;\n";
+				result += "\t"  "void on_hover_end(sys::state& state) noexcept override;\n";
 			}
 			if(c.dynamic_tooltip || c.tooltip_text_key.length() > 0) {
 				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
@@ -1165,6 +1169,27 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "}\n";
 			} // END TABLE
 
+			//HOVER
+			if(c.hover_activation) {
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_hover(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_hover_end(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover_end\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover_end"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+			}
 			// MOUSE
 			if(c.background != background_type::none) {
 				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
@@ -1333,31 +1358,31 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t""\t" "auto& gfx_def = state.ui_defs.gfx[background_gid];\n";
 					result += "\t" "\t" "if(gfx_def.primary_texture_handle) {\n";
 					result += "\t"  "\t" "\t" "if(gfx_def.get_object_type() == ui::object_type::bordered_rect) {\n";
-					result += "\t" "\t" "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), gfx_def.type_dependent, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "\t" "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), gfx_def.type_dependent, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 					result += "\t""\t" "\t" "} else if(gfx_def.number_of_frames > 1) {\n";
-					result += "\t" "\t" "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), frame, gfx_def.number_of_frames, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "\t" "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), frame, gfx_def.number_of_frames, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 					result += "\t" "\t" "\t" "} else {\n";
-					result += "\t" "\t" "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "\t" "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 					result += "\t" "\t" "\t" "}\n";
 					result += "\t" "\t" "}\n";
 					result += "\t" "}\n";
 				} else if(c.background == background_type::texture) {
 					if(c.has_alternate_bg) {
 						result += "\t"  "if(is_active)\n";
-						result += "\t"   "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t"   "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 						result += "\t"  "else\n";
-						result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+						result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
 					} else {
-						result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") +");\n";
+						result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") +");\n";
 					}
 				} else if(c.background == background_type::bordered_texture) {
 					if(c.has_alternate_bg) {
 						result += "\t" "if(is_active)\n";
-						result += "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 						result += "\t" "else\n";
-						result += "\t"  "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t"  "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 					} else {
-						result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 					}
 				} else if(c.background == background_type::linechart) {
 					result += "\t" "ogl::render_linegraph(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, line_color.r, line_color.g, line_color.b, line_color.a, lines);\n";
@@ -1371,7 +1396,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t"  "auto linesz = state.font_collection.line_height(state, fh); \n";
 					result += "\t" "if(linesz == 0.0f) return;\n";
 					result += "\t"  "auto ycentered = (base_data.size.y - linesz) / 2;\n";
-					result += "\t"  "auto cmod = ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action) ? "true" : "false") + "); \n";
+					result += "\t"  "auto cmod = ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "); \n";
 					result += "\t"  "for(auto& t : internal_layout.contents) {\n";
 					result += "\t"  "\t" "ui::render_text_chunk(state, t, float(x) + t.x, float(y + int32_t(ycentered)),  fh, ui::get_text_color(state, text_color), cmod);\n";
 					result += "\t"  "}\n";

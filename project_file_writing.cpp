@@ -212,6 +212,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 				buffer.write(property::shift_click_action);
 				buffer.write(c.shift_click_action);
 			}
+			if(c.hover_activation) {
+				buffer.write(property::hover_activation);
+				buffer.write(c.hover_activation);
+			}
 			if(c.dynamic_text) {
 				buffer.write(property::dynamic_text);
 				buffer.write(c.dynamic_text);
@@ -419,6 +423,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 					optional_child_section.read(c.right_click_action);
 				} else if(ptype == property::shift_click_action) {
 					optional_child_section.read(c.shift_click_action);
+				} else if(ptype == property::hover_activation) {
+					optional_child_section.read(c.hover_activation);
 				} else if(ptype == property::dynamic_text) {
 					optional_child_section.read(c.dynamic_text);
 				} else if(ptype == property::container_type) {

@@ -163,6 +163,7 @@ enum class property : uint8_t {
 	animation_type = 38,
 	datapoints = 39,
 	other_color = 40,
+	hover_activation = 41,
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -239,6 +240,7 @@ struct ui_element_t {
 	bool ignore_rtl = false;
 	bool has_table_highlight_color = false;
 	bool table_has_per_section_headers = false;
+	bool hover_activation = false;
 };
 
 struct window_element_wrapper_t {

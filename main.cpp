@@ -955,11 +955,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::InputInt("Data points", &temp);
 							c.datapoints = int16_t(temp);
 							{
-								ImVec4 ccolor{ c.other_color.r, c.other_color.b, c.other_color.g, c.other_color.a };
+								ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
 								ImGui::ColorEdit4("line color", (float*)&ccolor);
 								c.other_color.r = ccolor.x;
-								c.other_color.g = ccolor.z;
-								c.other_color.b = ccolor.y;
+								c.other_color.g = ccolor.y;
+								c.other_color.b = ccolor.z;
 								c.other_color.a = ccolor.w;
 							}
 						} else if(c.background == background_type::stackedbarchart) {
@@ -1018,6 +1018,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::Checkbox("Left-click action", &(c.left_click_action));
 							ImGui::Checkbox("Right-click action", &(c.right_click_action));
 							ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+							ImGui::Checkbox("Hover activation", &(c.hover_activation));
 						} else { // container only
 							{
 								const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
@@ -1034,11 +1035,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 								ImGui::Checkbox("Highlight contents following mouse", &(c.has_table_highlight_color));
 								if(c.has_table_highlight_color) {
-									ImVec4 ccolor{ c.table_highlight_color.r, c.table_highlight_color.b, c.table_highlight_color.g, c.table_highlight_color.a };
+									ImVec4 ccolor{ c.table_highlight_color.r, c.table_highlight_color.g, c.table_highlight_color.b, c.table_highlight_color.a };
 									ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
 									c.table_highlight_color.r = ccolor.x;
-									c.table_highlight_color.g = ccolor.z;
-									c.table_highlight_color.b = ccolor.y;
+									c.table_highlight_color.g = ccolor.y;
+									c.table_highlight_color.b = ccolor.z;
 									c.table_highlight_color.a = ccolor.w;
 								}
 
