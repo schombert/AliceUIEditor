@@ -1279,6 +1279,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						result += "\t" "\t" "\t""data_texture.data[k * 3 + 1] = uint8_t(0);\n";
 						result += "\t" "\t" "\t" "data_texture.data[k * 3 + 2] = uint8_t(0);\n";
 					result += "\t" "\t" "}\n";
+					result += "\t" "\t" "data_texture.data_updated = true;\n";
 					result += "\t" "\t" "return;\n";
 				result += "\t" "}\n";
 				result += "\t" "int32_t index = 0;\n";
@@ -1387,7 +1388,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				} else if(c.background == background_type::linechart) {
 					result += "\t" "ogl::render_linegraph(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, line_color.r, line_color.g, line_color.b, line_color.a, lines);\n";
 				} else if(c.background == background_type::stackedbarchart) {
-					result += "\t" "ogl::render_piechart(state, ogl::color_modification::none, float(x), float(y), float(base_data.size.x), float(base_data.size.y), data_texture);\n";
+					result += "\t" "ogl::render_stripchart(state, ogl::color_modification::none, float(x), float(y), float(base_data.size.x), float(base_data.size.y), data_texture);\n";
 				}
 
 				if(c.text_key.length() > 0 || c.dynamic_text) {
