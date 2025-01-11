@@ -164,6 +164,7 @@ enum class property : uint8_t {
 	datapoints = 39,
 	other_color = 40,
 	hover_activation = 41,
+	hotkey = 42,
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -208,6 +209,7 @@ struct ui_element_t {
 	std::string descending_sort_icon;
 	std::string row_background_a;
 	std::string row_background_b;
+	std::string hotkey;
 	color4f table_highlight_color{ 0.0f, 0.0f, 0.0f, 0.0f };
 	color4f other_color{ 0.0f, 0.0f, 0.0f, 0.0f };
 	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };

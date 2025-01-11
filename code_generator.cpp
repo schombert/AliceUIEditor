@@ -426,6 +426,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			if(c.background != background_type::none) {
 				result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
+				if(c.hotkey.size() > 0) {
+					result += "\t" "ui::message_result on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept override;\n";
+				}
 			}
 			if(c.hover_activation) {
 				result += "\t"  "void on_hover(sys::state& state) noexcept override;\n";
@@ -1246,6 +1249,16 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "return ui::message_result::unseen;\n";
 				}
 				result += "}\n";
+
+				if(c.hotkey.size() > 0) {
+					result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept {\n";
+					result += "\t" "if(key == sys::virtual_key::" + c.hotkey + std::string(c.can_disable ? " && !disabled" : "") + ") {\n";
+					result += "\t" "\t" "on_lbutton_down(state, 0, 0, mods);\n";
+					result += "\t" "\t" "return ui::message_result::consumed;\n";
+					result += "\t" "}\n";
+					result += "\t" "return ui::message_result::unseen;\n";
+					result += "}\n";
+				}
 			}
 
 			// SPECIAL

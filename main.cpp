@@ -1018,6 +1018,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::Checkbox("Left-click action", &(c.left_click_action));
 							ImGui::Checkbox("Right-click action", &(c.right_click_action));
 							ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+							if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+								ImGui::InputText("Hotkey", &(c.hotkey));
+							}
 							ImGui::Checkbox("Hover activation", &(c.hover_activation));
 						} else { // container only
 							{

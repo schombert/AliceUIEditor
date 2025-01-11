@@ -228,6 +228,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 				buffer.write(property::datapoints);
 				buffer.write(c.datapoints);
 			}
+			if(c.hotkey.size() > 0) {
+				buffer.write(property::hotkey);
+				buffer.write(c.hotkey);
+			}
 			if(c.child_window.size() > 0) {
 				buffer.write(property::child_window);
 				buffer.write(c.child_window);
@@ -439,6 +443,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 					optional_child_section.read(c.animation_type);
 				} else if(ptype == property::datapoints) {
 					optional_child_section.read(c.datapoints);
+				} else if(ptype == property::hotkey) {
+					optional_child_section.read(c.hotkey);
 				} else if(ptype == property::data_member) {
 					data_member m;
 					optional_child_section.read(m.type);
