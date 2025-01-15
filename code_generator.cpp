@@ -1021,7 +1021,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "}\n";
 
 				result += "int32_t " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::max_page(){\n";
-				result += "\t" "return (open_page ? 1 : 0) + ((page_starts.size() <= 2) ? 0 : int32_t(page_starts.size() - 2)); \n";
+				result += "\t" "return open_page ? std::max(int32_t(page_starts.size()) - 1, 0) : std::max(int32_t(page_starts.size()) - 2, 0);\n";
 				result += "}\n";
 
 
