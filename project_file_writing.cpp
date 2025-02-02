@@ -5,6 +5,238 @@
 #include "stools.hpp"
 #include "filesystem.hpp"
 
+/*
+
+enum class layout_type : uint8_t {
+	single_horizontal,
+	single_vertical,
+	overlapped_horizontal,
+	overlapped_vertical,
+	mulitline_horizontal,
+	multiline_vertical
+};
+enum class layout_line_alignment : uint8_t {
+	leading, trailing, centered
+};
+enum class glue_type : uint8_t {
+	standard,
+	at_least,
+	line_break,
+	page_break,
+	glue_don_t_break
+};
+
+struct layout_control_t {
+	std::string name;
+	int16_t cached_index = -1;
+	int16_t abs_x = 0;
+	int16_t abs_y = 0;
+	bool absolute_position = false;
+};
+struct layout_window_t {
+	std::string name;
+	int16_t cached_index = -1;
+	int16_t abs_x = 0;
+	int16_t abs_y = 0;
+	bool absolute_position = false;
+};
+struct layout_glue_t {
+	glue_type type = glue_type::standard;
+	int16_t amount = 0;
+};
+
+struct generator_item {
+	std::string name;
+	std::string header;
+	int16_t cached_index = -1;
+	bool sortable;
+};
+struct generator_t {
+	std::string name;
+	std::vector<generator_item> inserts;
+	int16_t inter_item_space = 0;
+};
+struct layout_level_t;
+struct sub_layout_t {
+	std::unique_ptr<layout_level_t> layout;
+
+	sub_layout_t() noexcept = default;
+	sub_layout_t(sub_layout_t const& o) noexcept {
+		std::abort();
+	}
+	sub_layout_t(sub_layout_t&& o) noexcept = default;
+	sub_layout_t& operator=(sub_layout_t&& o) noexcept = default;
+	~sub_layout_t() = default;
+};
+
+using layout_item = std::variant<std::monostate, layout_control_t, layout_window_t, layout_glue_t, generator_t, sub_layout_t>;
+
+struct layout_level_t {
+	std::vector<layout_item> contents;
+	std::vector<int32_t> page_starts;
+	int16_t size_x = -1;
+	int16_t size_y = -1;
+	int16_t margin_top = 0;
+	int16_t margin_bottom = -1;
+	int16_t margin_left = -1;
+	int16_t margin_right = -1;
+	layout_line_alignment line_alignment = layout_line_alignment::leading;
+	layout_line_alignment line_internal_alignment = layout_line_alignment::leading;
+	text_color page_display_color = text_color::black;
+	layout_type type = layout_type::single_horizontal;
+	animation_type page_animation = animation_type::none;
+	uint8_t interline_spacing = 0;
+	bool paged = false;
+};
+*/
+
+enum class layout_item_types : uint8_t {
+	control, window, glue, generator, layout
+};
+
+void layout_to_bytes(layout_level_t const& layout, serialization::out_buffer& buffer) {
+	buffer.start_section();
+	buffer.write(layout.size_x);
+	buffer.write(layout.size_y);
+	buffer.write(layout.margin_top);
+	buffer.write(layout.margin_bottom);
+	buffer.write(layout.margin_left);
+	buffer.write(layout.margin_right);
+	buffer.write(layout.line_alignment);
+	buffer.write(layout.line_internal_alignment);
+	buffer.write(layout.type);
+	buffer.write(layout.page_animation);
+	buffer.write(layout.interline_spacing);
+	buffer.write(layout.paged);
+
+	buffer.start_section(); // optional section
+	// nothing here yet
+	buffer.finish_section();
+
+	for(auto& m : layout.contents) {
+		if(holds_alternative<layout_control_t>(m)) {
+			auto& i = get<layout_control_t>(m);
+
+			buffer.write(layout_item_types::control);
+			buffer.write(i.name);
+			buffer.write(i.abs_x);
+			buffer.write(i.abs_y);
+			buffer.write(i.absolute_position);
+		} else if(holds_alternative<layout_window_t>(m)) {
+			auto& i = get<layout_window_t>(m);
+
+			buffer.write(layout_item_types::window);
+			buffer.write(i.name);
+			buffer.write(i.abs_x);
+			buffer.write(i.abs_y);
+			buffer.write(i.absolute_position);
+		} else if(holds_alternative<layout_glue_t>(m)) {
+			auto& i = get<layout_glue_t>(m);
+
+			buffer.write(layout_item_types::glue);
+			buffer.write(i.type);
+			buffer.write(i.amount);
+		} else if(holds_alternative<generator_t>(m)) {
+			auto& i = get<generator_t>(m);
+
+			buffer.write(layout_item_types::generator);
+			buffer.write(i.name);
+
+			buffer.start_section();
+			for(auto& j : i.inserts) {
+				buffer.write(j.name);
+				buffer.write(j.header);
+				buffer.write(j.inter_item_space);
+				buffer.write(j.glue);
+				buffer.write(j.sortable);
+			}
+			buffer.finish_section();
+
+		} else if(holds_alternative<sub_layout_t>(m)) {
+			auto& i = get<sub_layout_t>(m);
+
+			buffer.write(layout_item_types::layout);
+			layout_to_bytes(*i.layout, buffer);
+		}
+	}
+	buffer.finish_section();
+}
+
+void bytes_to_layout(layout_level_t& layout, serialization::in_buffer& buffer) {
+	auto main_section = buffer.read_section();
+	main_section.read(layout.size_x);
+	main_section.read(layout.size_y);
+	main_section.read(layout.margin_top);
+	main_section.read(layout.margin_bottom);
+	main_section.read(layout.margin_left);
+	main_section.read(layout.margin_right);
+	main_section.read(layout.line_alignment);
+	main_section.read(layout.line_internal_alignment);
+	main_section.read(layout.type);
+	main_section.read(layout.page_animation);
+	main_section.read(layout.interline_spacing);
+	main_section.read(layout.paged);
+
+	auto optional_section = main_section.read_section(); // nothing
+
+	while(main_section) {
+		layout_item_types t;
+		main_section.read(t);
+		switch(t) {
+			case layout_item_types::control:
+			{
+				layout_control_t temp;
+				main_section.read(temp.name);
+				main_section.read(temp.abs_x);
+				main_section.read(temp.abs_y);
+				main_section.read(temp.absolute_position);
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+			case layout_item_types::window:
+			{
+				layout_window_t temp;
+				main_section.read(temp.name);
+				main_section.read(temp.abs_x);
+				main_section.read(temp.abs_y);
+				main_section.read(temp.absolute_position);
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+			case layout_item_types::glue:
+			{
+				layout_glue_t temp;
+				main_section.read(temp.type);
+				main_section.read(temp.amount);
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+			case layout_item_types::generator:
+			{
+				generator_t temp;
+
+				main_section.read(temp.name);
+
+				auto contents = main_section.read_section();
+				while(contents) {
+					temp.inserts.emplace_back();
+					contents.read(temp.inserts.back().name);
+					contents.read(temp.inserts.back().header);
+					contents.read(temp.inserts.back().inter_item_space);
+					contents.read(temp.inserts.back().glue);
+					contents.read(temp.inserts.back().sortable);
+				}
+
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+			case layout_item_types::layout:
+			{
+				sub_layout_t temp;
+				temp.layout = std::make_unique<layout_level_t>();
+				bytes_to_layout(*temp.layout, main_section);
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+		}
+	}
+}
+
 void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer) {
 	buffer.start_section(); // header
 	buffer.write(p.grid_size);
@@ -33,6 +265,16 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 		if(win.wrapped.alternate_bg.size() > 0) {
 			buffer.write(property::alternate_bg);
 			buffer.write(win.wrapped.alternate_bg);
+		}
+		if(win.wrapped.page_left_texture.size() > 0 || win.wrapped.page_right_texture.size() > 0) {
+			buffer.write(property::page_button_textures);
+			buffer.write(win.wrapped.page_left_texture);
+			buffer.write(win.wrapped.page_right_texture);
+			buffer.write(win.wrapped.page_text_color);
+		}
+		if(win.layout.contents.size() > 0) {
+			buffer.write(property::layout_information);
+			layout_to_bytes(win.layout, buffer);
 		}
 		buffer.finish_section();
 
@@ -66,6 +308,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 		if(win.wrapped.ignore_rtl) {
 			buffer.write(property::ignore_rtl);
 			buffer.write(win.wrapped.ignore_rtl);
+		}
+		if(win.wrapped.share_table_highlight) {
+			buffer.write(property::share_table_highlight);
+			buffer.write(win.wrapped.share_table_highlight);
 		}
 		for(auto& dm : win.wrapped.members) {
 			buffer.write(property::data_member);
@@ -300,6 +546,12 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 				essential_window_section.read(win.wrapped.texture);
 			} else if(ptype == property::alternate_bg) {
 				essential_window_section.read(win.wrapped.alternate_bg);
+			} else if(ptype == property::page_button_textures) {
+				essential_window_section.read(win.wrapped.page_left_texture);
+				essential_window_section.read(win.wrapped.page_right_texture);
+				essential_window_section.read(win.wrapped.page_text_color);
+			} else if(ptype == property::layout_information) {
+				bytes_to_layout(win.layout, essential_window_section);
 			} else {
 				abort();
 			}
@@ -326,6 +578,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 				optional_section.read(win.wrapped.texture);
 			} else if(ptype == property::has_alternate_bg) {
 				optional_section.read(win.wrapped.has_alternate_bg);
+			} else if(ptype == property::share_table_highlight) {
+				optional_section.read(win.wrapped.share_table_highlight);
 			} else if(ptype == property::data_member) {
 				data_member m;
 				optional_section.read(m.type);

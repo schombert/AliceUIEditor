@@ -133,6 +133,52 @@ std::string alignment_to_name(aui_text_alignment t) {
 	}
 }
 
+std::vector<generator_t*> make_generators_list(layout_level_t& lvl) {
+	std::vector<generator_t*> result;
+	for(auto& m : lvl.contents) {
+		if(std::holds_alternative<generator_t>(m)) {
+			result.push_back(&(std::get<generator_t>(m)));
+		}
+		if(std::holds_alternative<sub_layout_t>(m)) {
+			auto subr = make_generators_list(*(get<sub_layout_t>(m).layout));
+			result.insert(result.end(), subr.begin(), subr.end());
+		}
+	}
+	return result;
+}
+
+bool any_layout_paged(layout_level_t& lvl) {
+	if(lvl.paged)
+		return true;
+	for(auto& m : lvl.contents) {
+		if(holds_alternative<sub_layout_t>(m)) {
+			auto r = any_layout_paged(*get<sub_layout_t>(m).layout);
+			if(r) return true;
+		}
+	}
+	return false;
+}
+bool any_layout_contains_window(layout_level_t& lvl, std::string const& window_name) {
+	for(auto& m : lvl.contents) {
+		if(holds_alternative<layout_window_t>(m)) {
+			if(get<layout_window_t>(m).name == window_name)
+				return true;
+		} else if(holds_alternative<generator_t>(m)) {
+			auto& i = get<generator_t>(m);
+			for(auto& j : i.inserts) {
+				if(j.name == window_name)
+					return true;
+				if(j.header == window_name)
+					return true;
+			}
+		} else if(holds_alternative<sub_layout_t>(m)) {
+			auto r = any_layout_contains_window(*get<sub_layout_t>(m).layout, window_name);
+			if(r) return true;
+		}
+	}
+	return false;
+}
+
 std::string generate_project_code(open_project_t& proj, code_snippets& old_code) {
 	// fix parents
 	for(auto& win : proj.windows) {
@@ -141,8 +187,15 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				for(auto& winb : proj.windows) {
 					if(winb.wrapped.name == c.child_window) {
 						winb.wrapped.parent = win.wrapped.name;
+						winb.wrapped.parent_is_layout = false;
 					}
 				}
+			}
+		}
+		for(auto& owin : proj.windows) {
+			if(owin.wrapped.name != win.wrapped.name && any_layout_contains_window(owin.layout, win.wrapped.name)) {
+				win.wrapped.parent = owin.wrapped.name;
+				win.wrapped.parent_is_layout = true;
 			}
 		}
 	}
@@ -287,6 +340,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "struct " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t : public " + base_type + " {\n";
 
+			result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::variables\n";
+			if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::variables"); it != old_code.found_code.end()) {
+				it->second.used = true;
+				result += it->second.text;
+			}
+			result += "// END\n";
+
 			for(auto& dm : c.members) {
 				result += "\t" + dm.type + " " + dm.name + ";\n";
 			}
@@ -349,11 +409,15 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "ogl::lines lines{ " + std::to_string(c.datapoints) + " };\n";
 				result += "\t" "ogl::color4f line_color{ " + std::to_string(c.other_color.r) + "f, " + std::to_string(c.other_color.g) + "f, " + std::to_string(c.other_color.b) + "f, " + std::to_string(c.other_color.a) + "f };\n";
 				result += "\t" "void set_data_points(sys::state& state, std::vector<float> const& datapoints, float min, float max);\n";
+			} else if(c.background == background_type::colorsquare) {
+				result += "\t" "ogl::color4f color{ " + std::to_string(c.other_color.r) + "f, " + std::to_string(c.other_color.g) + "f, " + std::to_string(c.other_color.b) + "f, " + std::to_string(c.other_color.a) + "f };\n";
 			} else if(c.background == background_type::stackedbarchart) {
 				result += "\t" "ogl::data_texture data_texture{ " + std::to_string(c.datapoints) + ", 3 };\n";
 				result += "\t" "struct graph_entry {" + c.list_content + " key; ogl::color3f color; float amount; };\n";
 				result += "\t" "std::vector<graph_entry> graph_content;\n";
 				result += "\t" "void update_chart(sys::state& state);\n";
+			} else if(c.background == background_type::flag) {
+				result += "\t" "std::variant<std::monostate, dcon::national_identity_id, dcon::rebel_faction_id, dcon::nation_id> flag;\n";
 			}
 
 			if(c.can_disable) {
@@ -388,6 +452,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
 				else
 					result += "\t" "\t" "return ui::tooltip_behavior::position_sensitive_tooltip;\n";
+			} else if( c.background == background_type::flag) {
+				result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
 			} else if(c.tooltip_text_key.length() > 0) {
 				result += "\t" "\t" "return ui::tooltip_behavior::tooltip;\n";
 			} else {
@@ -403,7 +469,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
 			}
 			result += "\t" "\t" "} else if(type == ui::mouse_probe_type::tooltip) {\n";
-			if(c.dynamic_tooltip || c.tooltip_text_key.length() > 0) {
+			if(c.dynamic_tooltip || c.tooltip_text_key.length() > 0 || c.background == background_type::flag) {
 				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
 			} else {
 				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
@@ -434,7 +500,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t"  "void on_hover(sys::state& state) noexcept override;\n";
 				result += "\t"  "void on_hover_end(sys::state& state) noexcept override;\n";
 			}
-			if(c.dynamic_tooltip || c.tooltip_text_key.length() > 0) {
+			if(c.dynamic_tooltip || c.tooltip_text_key.length() > 0 || c.background == background_type::flag) {
 				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
 			}
 			if(c.container_type != container_type::none) {
@@ -477,16 +543,83 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "};\n";
 		}
+
+		auto gens = make_generators_list(win.layout);
+		for(auto g : gens) {
+			result += "struct " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t : public layout_generator {\n";
+			result += "// BEGIN " + win.wrapped.name + "::" + g->name + "::variables\n";
+			if(auto it = old_code.found_code.find(win.wrapped.name + "::" + g->name + "::variables"); it != old_code.found_code.end()) {
+				it->second.used = true;
+				result += it->second.text;
+			}
+			result += "// END\n";
+
+			std::string insert_types;
+			std::string insert_params;
+			std::vector<std::string> header_list;
+			for(auto& inserts : g->inserts) {
+				insert_params.clear();
+				for(auto& window : proj.windows) {
+					if(window.wrapped.name == inserts.name) {
+						insert_types += ", " + inserts.name + "_option";
+						result += "\t" "struct " + inserts.name + "_option { ";
+						for(auto& dm : window.wrapped.members) {
+							insert_params += " " + dm.type + " " + dm.name + ", ";
+							result += dm.type + " " + dm.name + "; ";
+						}
+						result += "};\n";
+					}
+				}
+				if(inserts.header.size() > 0 && std::find(header_list.begin(), header_list.end(), inserts.header) == header_list.end()) {
+					header_list.push_back(inserts.header);
+				}
+				result += "\t" "std::vector<std::unique_ptr<ui::element_base>> " + inserts.name + "_pool;\n";
+				result += "\t" "int32_t " + inserts.name + "_pool_used = 0;\n";
+				if(insert_params.size() >= 2) {
+					insert_params.pop_back();
+					insert_params.pop_back();
+				}
+				result += "\t" "void add_" + inserts.name + "(" + insert_params + ");\n";
+			}
+			for(auto& h : header_list) {
+				result += "\t" "std::vector<std::unique_ptr<ui::element_base>> " + h + "_pool;\n";
+				result += "\t" "int32_t " + h + "_pool_used = 0;\n";
+			}
+
+			result += "\t" "std::vector<std::variant<std::monostate" + insert_types + ">> values;\n";
+
+			result += "\t" "void on_create(sys::state& state, layout_window_element* container);\n";
+			result += "\t" "void update(sys::state& state, layout_window_element* container);\n";
+			result += "\t" "measure_result place_item(sys::state& state, ui::non_owning_container_base* destination, size_t index, int32_t x, int32_t y, bool first_in_section, bool& alternate) override;\n";
+			result += "\t" "size_t item_count() override { return values.size(); };\n";
+			result += "\t" "void reset_pools() override;\n";
+			result += "};\n";
+		}
 	}
 	for(auto& win : proj.windows) {
-		result += "struct " + project_name + "_" + win.wrapped.name + "_t : public ui::container_base {\n";
+		if(win.layout.contents.empty())
+			result += "struct " + project_name + "_" + win.wrapped.name + "_t : public ui::non_owning_container_base {\n";
+		else
+			result += "struct " + project_name + "_" + win.wrapped.name + "_t : public layout_window_element {\n";
+
+		result += "// BEGIN " + win.wrapped.name + "::variables\n";
+		if(auto it = old_code.found_code.find(win.wrapped.name + "::variables"); it != old_code.found_code.end()) {
+			it->second.used = true;
+			result += it->second.text;
+		}
+		result += "// END\n";
 
 		for(auto& dm : win.wrapped.members) {
 			result += "\t" + dm.type + " " + dm.name + ";\n";
 		}
 		for(auto& c : win.children) {
-			result += "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t* " + c.name + " = nullptr;\n";
+			result += "\t" "std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t> " + c.name + ";\n";
 		}
+		auto gens = make_generators_list(win.layout);
+		for(auto g : gens) {
+			result += "\t" + project_name + "_" + win.wrapped.name + "_" + g->name + "_t " + g->name + ";\n";
+		}
+		result += "std::vector<std::unique_ptr<ui::element_base>> gui_inserts;\n";
 
 		if(win.wrapped.background == background_type::existing_gfx) {
 			result += "\t"  "std::string_view gfx_key;\n";
@@ -505,6 +638,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 		}
 
+		if(win.layout.contents.size() > 0)
+			result += "\t" "void create_layout_level(sys::state& state, layout_level& lvl, char const* ldata, size_t sz);\n";
 		result += "\t" "void on_create(sys::state& state) noexcept override;\n";
 
 		if(win.wrapped.background != background_type::none) {
@@ -515,7 +650,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 		result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
 		if(win.wrapped.background != background_type::none) {
-			result += "\t" "\t" "return (type == ui::mouse_probe_type::scroll ? ui::message_result::unseen : ui::message_result::consumed);\n";
+			if(any_layout_paged(win.layout))
+				result += "\t" "\t" "return ui::message_result::consumed;\n";
+			else
+				result += "\t" "\t" "return (type == ui::mouse_probe_type::scroll ? ui::message_result::unseen : ui::message_result::consumed);\n";
 		} else {
 			result += "\t" "\t" "return ui::message_result::unseen;\n";
 		}
@@ -574,6 +712,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				}
 				if(w->parent.size() > 0) {
 					bool found = false;
+					bool from_layout = w->parent_is_layout;
 					for(auto& wwin : proj.windows) {
 						if(wwin.wrapped.name == w->parent) {
 							w = &wwin.wrapped;
@@ -583,7 +722,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					}
 					if(!found)
 						w = nullptr;
-					if(skip_self) {
+					if(skip_self || from_layout) {
 						skip_self = false;
 						parent_string += "->parent";
 					} else {
@@ -605,6 +744,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				
 				if(w->parent.size() > 0) {
 					bool found = false;
+					bool from_layout = w->parent_is_layout;
 					for(auto& wwin : proj.windows) {
 						if(wwin.wrapped.name == w->parent) {
 							w = &wwin.wrapped;
@@ -615,12 +755,180 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					if(!found)
 						w = nullptr;
 					
-					parent_string += "->parent->parent";
+					if( from_layout) {
+						parent_string += "->parent";
+					} else {
+						parent_string += "->parent->parent";
+					}
 				} else {
 					w = nullptr;
 				}
 			}
 		};
+
+		// generator functions
+		auto gens = make_generators_list(win.layout);
+
+		for(auto g : gens) {
+			std::string insert_params;
+			std::string insert_vals;
+			for(auto& inserts : g->inserts) {
+				insert_vals.clear();
+				insert_params.clear();
+				for(auto& window : proj.windows) {
+					if(window.wrapped.name == inserts.name) {
+						for(auto& dm : window.wrapped.members) {
+							insert_params += dm.type + " " + dm.name + ", ";
+							insert_vals += dm.name + ", ";
+						}
+					}
+				}
+				if(insert_params.size() > 2) {
+					insert_params.pop_back();
+					insert_params.pop_back();
+				}
+				if(insert_vals.size() > 2) {
+					insert_vals.pop_back();
+					insert_vals.pop_back();
+				}
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::add_" + inserts.name + "(" + insert_params + ") {\n";
+				result += "\t" "values.emplace_back(" + inserts.name + "_option{" + insert_vals + "});\n";
+				result += "}\n";
+			}
+
+			result += "void  " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::on_create(sys::state& state, layout_window_element* parent) {\n";
+			make_parent_var_text();
+			result += "// BEGIN " + win.wrapped.name + "::" + g->name + "::on_create\n";
+			if(auto it = old_code.found_code.find(win.wrapped.name + "::" + g->name + "::on_create"); it != old_code.found_code.end()) {
+				it->second.used = true;
+				result += it->second.text;
+			}
+			result += "// END\n";
+			result += "}\n";
+
+			result += "void  " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::update(sys::state& state, layout_window_element* parent) {\n";
+			make_parent_var_text();
+			result += "// BEGIN " + win.wrapped.name + "::" + g->name + "::update\n";
+			if(auto it = old_code.found_code.find(win.wrapped.name + "::" + g->name + "::update"); it != old_code.found_code.end()) {
+				it->second.used = true;
+				result += it->second.text;
+			}
+			result += "// END\n";
+			result += "}\n";
+
+			result += "measure_result  " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::place_item(sys::state& state, ui::non_owning_container_base* destination, size_t index, int32_t x, int32_t y, bool first_in_section, bool& alternate) {\n";
+
+			auto special_type_to_str = [](glue_type t) {
+				switch(t) {
+					case glue_type::standard: return "none";
+					case glue_type::at_least: return "space_consumer";
+					case glue_type::line_break: return "end_line";
+					case glue_type::page_break: return "end_page";
+					case glue_type::glue_don_t_break: return "no_break";
+				}
+				return "none";
+			};
+
+			result += "\t" "if(index >= values.size()) return measure_result{0,0,measure_result::special::none};\n";
+			for(auto& inserts : g->inserts) {
+				std::string shared_header_test;
+				for(auto& oinserts : g->inserts) {
+					if(oinserts.header == inserts.header) {
+						shared_header_test += " && !std::holds_alternative<" + oinserts.name + "_option>(values[index - 1])";
+					}
+				}
+
+				result += "\t" "if(std::holds_alternative<" + inserts.name + "_option>(values[index])) {\n";
+				if(inserts.header.size() > 0)
+					result += "\t" "\t" "if(" + inserts.header + "_pool.empty()) " + inserts.header + "_pool.emplace_back(make_" + project_name + "_" + inserts.header + "(state));\n";
+				result += "\t" "\t" "if(" + inserts.name + "_pool.empty()) " + inserts.name + "_pool.emplace_back(make_" + project_name + "_" + inserts.name + "(state));\n";
+
+				if(inserts.header.size() > 0) {
+					result += "\t" "\t" "if(index == 0 || first_in_section || (true" + shared_header_test + ")) {\n";
+					result += "\t" "\t" "\t" "if(destination) {\n";
+					
+					result += "\t" "\t" "\t" "\t" "if(" + inserts.header + "_pool.size() <= size_t(" + inserts.header + "_pool_used)) " + inserts.header + "_pool.emplace_back(make_" + project_name + "_" + inserts.header + "(state));\n";
+					result += "\t" "\t" "\t" "\t" "if(" + inserts.name + "_pool.size() <= size_t(" + inserts.name + "_pool_used)) " + inserts.name + "_pool.emplace_back(make_" + project_name + "_" + inserts.name + "(state));\n";
+
+					result += "\t" "\t" "\t" "\t" + inserts.header + "_pool[" + inserts.header + "_pool_used]->base_data.position.x = int16_t(x);\n";
+					result += "\t" "\t" "\t" "\t" + inserts.header + "_pool[" + inserts.header + "_pool_used]->base_data.position.y = int16_t(y);\n";
+					result += "\t" "\t" "\t" "\t" + inserts.header + "_pool[" + inserts.header + "_pool_used]->parent = destination;\n";
+					result += "\t" "\t" "\t" "\t" "destination->children.push_back(" + inserts.header + "_pool[" + inserts.header + "_pool_used].get());\n";
+
+					for(auto& window : proj.windows) {
+						if(window.wrapped.name == inserts.header) {
+							if(window.wrapped.has_alternate_bg) {
+								result += "\t" "\t" "\t" "((" + project_name + "_" + inserts.header + "_t*)(" + inserts.header + "_pool[" + inserts.header + "_pool_used].get()))->is_active = alternate;\n";
+							}
+						}
+					}
+
+					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.x = int16_t(x);\n";
+					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.y = int16_t(y +  " + inserts.header + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ");\n";
+					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->parent = destination;\n";
+					result += "\t" "\t" "\t" "\t" "destination->children.push_back(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get());\n";
+
+					for(auto& window : proj.windows) {
+						if(window.wrapped.name == inserts.name) {
+							for(auto& dm : window.wrapped.members) {
+								result += "\t" "\t" "\t"  "\t" "((" + project_name + "_" + inserts.name + "_t*)(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get()))->" + dm.name + " = std::get<" + inserts.name + "_option>(values[index])." + dm.name + ";\n";
+							}
+							if(window.wrapped.has_alternate_bg) {
+								result += "\t" "\t" "\t" "((" + project_name + "_" + inserts.name + "_t*)(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get()))->is_active = !alternate;\n";
+							}
+						}
+					}
+					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->impl_on_update(state);\n";
+					
+
+					result += "\t" "\t" "\t" "\t" + inserts.header + "_pool_used++;\n";
+					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool_used++;\n";
+					result += "\t" "\t" "\t" "}\n";
+
+					result += "\t" "\t" "\t" "return measure_result{std::max(" + inserts.header + "_pool[0]->base_data.size.x, " + inserts.name + "_pool[0]->base_data.size.x), " + inserts.header + "_pool[0]->base_data.size.y + " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space * 2) + ", measure_result::special::" + std::string(special_type_to_str(inserts.glue)) + "};\n";
+					result += "\t" "\t" "}\n";
+				}
+				
+				result += "\t" "\t" "if(destination) {\n";
+
+				result += "\t" "\t" "\t" "if(" + inserts.name + "_pool.size() <= size_t(" + inserts.name + "_pool_used)) " + inserts.name + "_pool.emplace_back(make_" + project_name + "_" + inserts.name + "(state));\n";
+
+				result += "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.x = int16_t(x);\n";
+				result += "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.y = int16_t(y);\n";
+				result += "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->parent = destination;\n";
+				result += "\t" "\t" "\t" "destination->children.push_back(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get());\n";
+
+				for(auto& window : proj.windows) {
+					if(window.wrapped.name == inserts.name) {
+						for(auto& dm : window.wrapped.members) {
+							result += "\t" "\t" "\t" "((" + project_name + "_" + inserts.name + "_t*)(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get()))->" + dm.name + " = std::get<" + inserts.name + "_option>(values[index])." + dm.name + ";\n";
+						}
+						if(window.wrapped.has_alternate_bg) {
+							result += "\t" "\t" "\t" "((" + project_name + "_" + inserts.name + "_t*)(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get()))->is_active = alternate;\n";
+						}
+					}
+				}
+				result += "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->impl_on_update(state);\n";
+
+				result += "\t" "\t" "\t" + inserts.name + "_pool_used++;\n";
+
+				// add header and body
+				result += "\t" "\t" "}\n";
+				result += "\t" "\t" "alternate = !alternate;\n";
+				result += "\t" "\t" "return measure_result{ " + inserts.name + "_pool[0]->base_data.size.x, " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ", measure_result::special::" + std::string(special_type_to_str(inserts.glue)) + "};\n";
+				result += "\t" "}\n";
+			}
+			result += "\t" "return measure_result{0,0,measure_result::special::none};\n";
+			result += "}\n";
+
+			result += "void  " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::reset_pools() {\n";
+			for(auto& inserts : g->inserts) {
+				if(inserts.header.size() > 0)
+					result += "\t" + inserts.header + "_pool_used = 0;\n";
+				result += "\t" + inserts.name + "_pool_used = 0;\n";
+			}
+			result += "}\n";
+		}
 
 		for(auto& c : win.children) { // child functions
 
@@ -657,7 +965,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					if(col.internal_data.cell_type == table_cell_type::text) {
 						if(c.has_table_highlight_color) {
 							result += "\t" "if(col_um_" + col.internal_data.column_name + ") {\n";
-							result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + " + col.internal_data.column_name + "_column_start), float(y), float(" + col.internal_data.column_name + "_column_width), float(base_data.size.y),"  + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
+							result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + " + col.internal_data.column_name + "_column_start), float(y), float(" + col.internal_data.column_name + "_column_width), float(base_data.size.y)," + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
 							result += "\t" "}\n";
 						}
 
@@ -778,9 +1086,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, row_background_texture, row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
 				result += "\t" "}\n";
 
-				result += "\t" "if(this == state.ui_state.under_mouse) {\n";
-				result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x ), float(y), float(base_data.size.x), float(base_data.size.y), " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
-				result += "\t" "}\n";
+				if(c.has_table_highlight_color) {
+					result += "\t" "if(this == state.ui_state.under_mouse) {\n";
+					result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x ), float(y), float(base_data.size.x), float(base_data.size.y), " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
+					result += "\t" "}\n";
+				}
 
 				for(auto& col : c.table_columns) {
 					result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= " + hprefix + col.internal_data.column_name + "_column_start && rel_mouse_x < (" + hprefix + col.internal_data.column_name + "_column_start + " + hprefix + col.internal_data.column_name + "_column_width);\n";
@@ -954,14 +1264,24 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					for(auto& window : proj.windows) {
 						if(window.wrapped.name == insert) {
 							for(auto& dm : window.wrapped.members) {
-								result += "\t" "\t" "\t" "((" + project_name  + "_" + insert + "_t*)(" + insert + "_pool[" + insert + "_pool_used].get()))->" + dm.name + " = std::get<" + insert + "_option>(values[i])." + dm.name + ";\n";
+								result += "\t" "\t" "\t" "((" + project_name + "_" + insert + "_t*)(" + insert + "_pool[" + insert + "_pool_used].get()))->" + dm.name + " = std::get<" + insert + "_option>(values[i])." + dm.name + ";\n";
 							}
 						}
 					}
 					result += "\t" "\t" "\t" + insert + "_pool[" + insert + "_pool_used]->base_data.position.y = vert_used;\n";
-					result += "\t" "\t" "\t" "vert_used += "+ insert + "_pool[" + insert + "_pool_used]->base_data.size.y;\n";
+					result += "\t" "\t" "\t" "vert_used += " + insert + "_pool[" + insert + "_pool_used]->base_data.size.y;\n";
+					for(auto& window : proj.windows) {
+						if(window.wrapped.name == insert) {
+							if(window.wrapped.has_alternate_bg) {
+								result += "\t" "\t" "\t" "((" + project_name + "_" + insert + "_t*)(" + insert + "_pool[" + insert + "_pool_used].get()))->is_active = alt_bg;\n";
+								result += "\t" "\t" "\t" "alt_bg  = !alt_bg;\n";
+							} else {
+								result += "\t" "\t" "\t" "alt_bg  = false;\n";
+							}
+							break;
+						}
+					}
 					result += "\t" "\t" "\t" "++" + insert + "_pool_used;\n";
-					result += "\t" "\t" "\t" "alt_bg  = false;\n";
 					result += "\t" "\t" "}\n";
 				}
 				result += "\t" "\t" "if(std::holds_alternative<value_option>(values[i])) {\n";
@@ -1003,7 +1323,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t""bool rflip = new_page > page && page < max_page();\n";
 					result += "\t""if(rflip) {\n";
 					result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
-					result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam  + ", 200); \n";
+					result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + ", 200); \n";
 					result += "\t" "} else if(lflip) {\n";
 					result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
 					result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + "_rev, 200);\n";
@@ -1039,16 +1359,21 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "open_page = true;\n";
 				result += "\t" "}\n";
 
-				result += "\t" "if(values.empty() || !std::holds_alternative<value_option>(values.back())) {\n";
 				if(c.table_has_per_section_headers) {
+					result += "\t" "if(values.empty() || !std::holds_alternative<value_option>(values.back())) {\n";
 					result += "\t" "\t" "if(base_data.size.y - layout_space <= 2 * int32_t(row_height * " + std::to_string(proj.grid_size) + ")) {\n"; // new page
 					result += "\t" "\t" "\t" "page_starts.push_back(int32_t(values.size()));\n";
 					result += "\t" "\t" "\t" "layout_space = 0;\n";
 					result += "\t" "\t" "}\n";
 					result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
 					result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
+					result += "\t" "}\n";
+				} else {
+					result += "\t" "if(values.empty()) {\n";
+					result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
+					result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
+					result += "\t" "}\n";
 				}
-				result += "\t" "}\n";
 
 				result += "\t"  "if(base_data.size.y - layout_space <= int32_t(row_height * " + std::to_string(proj.grid_size) + ")) {\n"; // new page
 				result += "\t" "\t" "page_starts.push_back(int32_t(values.size()));\n";
@@ -1078,6 +1403,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "page_starts.push_back(0);\n";
 					result += "\t" "\t" "open_page = true;\n";
 					result += "\t" "}\n";
+
+					if(!c.table_has_per_section_headers) {
+						result += "\t" "if(values.empty()) {\n";
+						result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
+						result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
+						result += "\t" "}\n";
+					}
 
 					result += "\t"  "if(base_data.size.y - layout_space <=  " + inserts + "_pool[0]->base_data.size.y) {\n"; // new page
 					result += "\t" "\t" "page_starts.push_back(int32_t(values.size()));\n";
@@ -1127,12 +1459,38 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "size_t i = 0;\n";
 				result += "\t" "while(i < values.size()) {\n";
 				// get section
-				result += "\t" "\t" "if(std::holds_alternative<value_option>(values[i])) {\n";
+				std::string additional_sortables;
+				for(auto& ins : c.table_inserts) {
+					for(auto& window : proj.windows) {
+						if(window.wrapped.name == ins) {
+							for(auto& dm : window.wrapped.members) {
+								if(dm.name == "value" && dm.type == c.list_content) {
+									additional_sortables += " || std::holds_alternative<" + ins + "_option>(values[i])";
+									break;
+								}
+							}
+						}
+					}
+				}
+
+				result += "\t" "\t" "if(std::holds_alternative<value_option>(values[i])" + additional_sortables +") {\n";
 				result += "\t" "\t" "\t" "auto start_pos = i;\n";
 				result += "\t" "\t" "\t" "do {\n";
 				result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<value_option>(values[i])) val_temp.push_back(std::get<value_option>(values[i]).value);\n";
+				for(auto& ins : c.table_inserts) {
+					for(auto& window : proj.windows) {
+						if(window.wrapped.name == ins) {
+							for(auto& dm : window.wrapped.members) {
+								if(dm.name == "value" && dm.type == c.list_content) {
+									result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<" + ins + "_option>(values[i])) val_temp.push_back(std::get<" + ins + "_option>(values[i]).value);\n";
+									break;
+								}
+							}
+						}
+					}
+				}
 				result += "\t" "\t" "\t" "\t" "++i;\n";
-				result += "\t" "\t" "\t" "} while(i < values.size() && (std::holds_alternative<value_option>(values[i]) || std::holds_alternative<std::monostate>(values[i])));\n";
+				result += "\t" "\t" "\t" "} while(i < values.size() && (std::holds_alternative<value_option>(values[i])" + additional_sortables + " || std::holds_alternative<std::monostate>(values[i])));\n";
 				// do sort
 				for(auto& col : c.table_columns) {
 					if(col.internal_data.sortable) {
@@ -1156,6 +1514,21 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "\t" "\t" "\t" "std::get<value_option>(values[start_pos]).value = val_temp.back();\n";
 				result += "\t" "\t" "\t" "\t" "\t" "val_temp.pop_back();\n";
 				result += "\t" "\t" "\t" "\t" "}\n";
+				for(auto& ins : c.table_inserts) {
+					for(auto& window : proj.windows) {
+						if(window.wrapped.name == ins) {
+							for(auto& dm : window.wrapped.members) {
+								if(dm.name == "value" && dm.type == c.list_content) {
+									result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<" + ins + "_option>(values[start_pos])) {\n";
+									result += "\t" "\t" "\t" "\t" "\t" "std::get<" + ins + "_option>(values[start_pos]).value = val_temp.back();\n";
+									result += "\t" "\t" "\t" "\t" "\t" "val_temp.pop_back();\n";
+									result += "\t" "\t" "\t" "\t" "}\n";
+									break;
+								}
+							}
+						}
+					}
+				}
 				result += "\t" "\t" "\t" "\t" "++start_pos;\n";
 				result += "\t" "\t" "\t" "}\n";
 				result += "\t" "\t" "\t" "val_temp.clear();\n";
@@ -1224,6 +1597,23 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				}
 				if(c.left_click_action || c.shift_click_action || c.right_click_action) {
 					result += "\t" "return ui::message_result::consumed;\n";
+				} else if(c.background == background_type::flag) {
+					if(c.can_disable) {
+						result += "\t" "if(disabled) return ui::message_result::consumed;\n";
+					}
+					result += "\t" "if(std::holds_alternative<dcon::nation_id>(flag)) {\n";
+					result += "\t" "\t" "if(std::get<dcon::nation_id>(flag) && state.world.nation_get_owned_province_count(std::get<dcon::nation_id>(flag)) > 0) {\n";
+					result += "\t" "\t" "\t" "sound::play_interface_sound(state, sound::get_click_sound(state), state.user_settings.interface_volume* state.user_settings.master_volume);\n";
+					result += "\t" "\t" "\t" "state.open_diplomacy(std::get<dcon::nation_id>(flag));\n";
+					result += "\t" "\t" "} \n";
+					result += "\t" "} else if(std::holds_alternative<dcon::national_identity_id>(flag)) {\n";
+					result += "\t" "\t" "auto n_temp = state.world.national_identity_get_nation_from_identity_holder(std::get<dcon::national_identity_id>(flag));\n";
+					result += "\t" "\t" "if(n_temp && state.world.nation_get_owned_province_count(n_temp) > 0) {\n";
+					result += "\t" "\t" "\t" "sound::play_interface_sound(state, sound::get_click_sound(state), state.user_settings.interface_volume* state.user_settings.master_volume);\n";
+					result += "\t" "\t" "\t" "state.open_diplomacy(n_temp);\n";
+					result += "\t" "\t" "} \n";
+					result += "\t" "} \n";
+					result += "\t" "return ui::message_result::consumed;\n";
 				} else {
 					result += "\t" "return ui::message_result::unseen;\n";
 				}
@@ -1283,7 +1673,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			} else if(c.background == background_type::stackedbarchart) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_chart(sys::state& state) {\n";
 				
-				result += "\t" "std::sort(graph_content.begin(), graph_content.end(), [](auto const& a, auto const& b) { return a.amount > b.amount; });\n";
+				if(c.has_alternate_bg == false)
+					result += "\t" "std::sort(graph_content.begin(), graph_content.end(), [](auto const& a, auto const& b) { return a.amount > b.amount; });\n";
 				result += "\t" "float total = 0.0f;\n";
 				result += "\t" "for(auto& e : graph_content) { total += e.amount; }\n";
 				result += "\t" "if(total <= 0.0f) {\n";
@@ -1337,6 +1728,18 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			} else if(c.tooltip_text_key.length() > 0) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
 				result += "\t" "text::add_line(state, contents, tooltip_key);\n";
+				result += "}\n";
+			} else if(c.background == background_type::flag) {
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+				result += "\t" "if(std::holds_alternative<dcon::nation_id>(flag)) {\n";
+				result += "\t" "\t" "text::add_line(state, contents, text::get_name(state, std::get<dcon::nation_id>(flag)));\n";
+				result += "\t" "} else if(std::holds_alternative<dcon::national_identity_id>(flag)) {\n";
+				result += "\t" "\t" "text::add_line(state, contents, nations::name_from_tag(state, std::get<dcon::national_identity_id>(flag)));\n";
+				result += "\t" "} else if(std::holds_alternative<dcon::rebel_faction_id>(flag)) {\n";
+				result += "\t" "\t" "auto box = text::open_layout_box(contents, 0);\n";
+				result += "\t" "\t" "text::add_to_layout_box(state, contents, box, rebel::rebel_name(state, std::get<dcon::rebel_faction_id>(flag)));\n";
+				result += "\t" "\t" "text::close_layout_box(contents, box);\n";
+				result += "\t" "} \n";
 				result += "}\n";
 			}
 			
@@ -1402,6 +1805,49 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "ogl::render_linegraph(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, line_color.r, line_color.g, line_color.b, line_color.a, lines);\n";
 				} else if(c.background == background_type::stackedbarchart) {
 					result += "\t" "ogl::render_stripchart(state, ogl::color_modification::none, float(x), float(y), float(base_data.size.x), float(base_data.size.y), data_texture);\n";
+				} else if(c.background == background_type::colorsquare) {
+					result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x ), float(y), float(base_data.size.x), float(base_data.size.y), color.r, color.g, color.b, color.a);\n";
+				} else if(c.background == background_type::flag) {
+					result += "\t" "if(std::holds_alternative<dcon::nation_id>(flag)) {\n";
+					result += "\t" "\t" "culture::flag_type flag_type = culture::flag_type{};\n";
+					result += "\t" "\t" "auto h_temp = state.world.nation_get_identity_from_identity_holder(std::get<dcon::nation_id>(flag));\n";
+					result += "\t" "\t" "if(bool(std::get<dcon::nation_id>(flag)) && state.world.nation_get_owned_province_count(std::get<dcon::nation_id>(flag)) != 0) {\n";
+					result += "\t"  "\t" "\t" "flag_type = culture::get_current_flag_type(state, std::get<dcon::nation_id>(flag));\n";
+					result += "\t" "\t" "} else {\n";
+					result += "\t"  "\t" "\t" "flag_type = culture::get_current_flag_type(state, h_temp);\n";
+					result += "\t" "\t" "}\n";
+					result += "\t" "\t" "auto flag_texture_handle = ogl::get_flag_handle(state, h_temp, flag_type);\n";
+					result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", true), float(x), float(y), float(base_data.size.x), float(base_data.size.y), flag_texture_handle, base_data.get_rotation(), false,  false);\n";
+
+					result += "\t" "} else if(std::holds_alternative<dcon::national_identity_id>(flag)) {\n";
+					result += "\t" "\t" "culture::flag_type flag_type = culture::flag_type{};\n";
+					result += "\t" "\t" "auto n_temp = state.world.national_identity_get_nation_from_identity_holder(std::get<dcon::national_identity_id>(flag));\n";
+					result += "\t" "\t" "if(bool(n_temp) && state.world.nation_get_owned_province_count(n_temp) != 0) {\n";
+					result += "\t"  "\t" "\t" "flag_type = culture::get_current_flag_type(state, n_temp);\n";
+					result += "\t" "\t" "} else {\n";
+					result += "\t"  "\t" "\t" "flag_type = culture::get_current_flag_type(state, std::get<dcon::national_identity_id>(flag));\n";
+					result += "\t" "\t" "}\n";
+					result += "\t" "\t" "auto flag_texture_handle = ogl::get_flag_handle(state, std::get<dcon::national_identity_id>(flag), flag_type);\n";
+					result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", true), float(x), float(y), float(base_data.size.x), float(base_data.size.y), flag_texture_handle, base_data.get_rotation(), false,  false);\n";
+
+					result += "\t" "} else if(std::holds_alternative<dcon::rebel_faction_id>(flag)) {\n";
+					result += "\t" "\t" "dcon::rebel_faction_id rf_temp = std::get<dcon::rebel_faction_id>(flag);\n";
+					result += "\t" "\t" "if(state.world.rebel_faction_get_type(rf_temp).get_independence() != uint8_t(culture::rebel_independence::none) && state.world.rebel_faction_get_defection_target(rf_temp)) {\n";
+					result += "\t" "\t" "\t" "culture::flag_type flag_type = culture::flag_type{};\n";
+					result += "\t" "\t" "\t" "auto h_temp = state.world.rebel_faction_get_defection_target(rf_temp);\n";
+					result += "\t" "\t" "\t" "auto n_temp = state.world.national_identity_get_nation_from_identity_holder(h_temp);\n";
+					result += "\t" "\t"  "\t" "if(bool(n_temp) && state.world.nation_get_owned_province_count(n_temp) != 0) {\n";
+					result += "\t"  "\t" "\t"  "\t" "flag_type = culture::get_current_flag_type(state, n_temp);\n";
+					result += "\t" "\t"  "\t" "} else {\n";
+					result += "\t"  "\t"  "\t" "\t" "flag_type = culture::get_current_flag_type(state, h_temp);\n";
+					result += "\t" "\t"  "\t" "}\n";
+					result += "\t" "\t"  "\t" "auto flag_texture_handle = ogl::get_flag_handle(state, h_temp, flag_type);\n";
+					result += "\t" "\t"  "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, " + std::string(c.can_disable ? "disabled" : "false") + ", false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), flag_texture_handle, base_data.get_rotation(), false,  false);\n";
+					result += "\t" "\t"  "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, " + std::string(c.can_disable ? "disabled" : "false") + ", false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_rebel_flag_overlay(state), base_data.get_rotation(), false,  false);\n";
+					result += "\t" "\t" "return;\n";
+					result += "\t" "\t" "}\n";
+					result += "\t" "\t"  "ogl::render_textured_rect(state, ui::get_color_modification(false, " + std::string(c.can_disable ? "disabled" : "false") + ", false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_rebel_flag_handle(state, rf_temp), base_data.get_rotation(), false,  false);\n";
+					result += "\t" "} \n";
 				}
 
 				if(c.text_key.length() > 0 || c.dynamic_text) {
@@ -1599,6 +2045,36 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				}
 			}
 			
+			if(win.wrapped.share_table_highlight) {
+				for(auto& ow : proj.windows) {
+					for(auto& c : ow.children) {
+						for(auto& ins : c.table_inserts) {
+							if(c.has_table_highlight_color && ins == win.wrapped.name) {
+								std::string hprefix = project_name + "_" + ow.wrapped.name + "_" + c.name + "_header_t::";
+
+								result += "\t" "auto under_mouse = [&](){auto p = state.ui_state.under_mouse; while(p){ if(p == this) return true; p = p->parent; } return false;}();\n";
+								result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - ui::get_absolute_location(state, *this).x;\n";
+
+								result += "\t" "if(under_mouse) {\n";
+								result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x), float(y), float(base_data.size.x), float(base_data.size.y), " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
+								result += "\t" "}\n";
+
+								for(auto& col : c.table_columns) {
+									result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= " + hprefix + col.internal_data.column_name + "_column_start && rel_mouse_x < (" + hprefix + col.internal_data.column_name + "_column_start + " + hprefix + col.internal_data.column_name + "_column_width);\n";
+									if(col.internal_data.cell_type == table_cell_type::text) {
+										result += "\t" "if(col_um_" + col.internal_data.column_name + " && !under_mouse) {\n";
+										result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + " + hprefix + col.internal_data.column_name + "_column_start), float(y), float(" + hprefix + col.internal_data.column_name + "_column_width), float(base_data.size.y), " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + ow.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
+										result += "\t" "}\n";
+									}
+								}
+								break;
+							}
+						}
+					}
+				}
+
+			}
+
 			result += "}\n";
 		}
 
@@ -1611,7 +2087,109 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += it->second.text;
 		}
 		result += "// END\n";
+
+		for(auto g : gens) {
+			result += "\t" + g->name + ".update(state, this);\n";
+		}
+		if(win.layout.contents.size() > 0)
+			result += "\t" "remake_layout(state, true);\n";
 		result += "}\n";
+
+
+		if(win.layout.contents.size() > 0) {
+			result += "void " + project_name + "_" + win.wrapped.name + "_t::create_layout_level(sys::state& state, layout_level& lvl, char const* ldata, size_t sz) {\n";
+			result += "\t" "serialization::in_buffer buffer(ldata, sz);\n";
+			result += "\t" "buffer.read(lvl.size_x); \n";
+			result += "\t" "buffer.read(lvl.size_y); \n";
+			result += "\t" "buffer.read(lvl.margin_top); \n";
+			result += "\t" "buffer.read(lvl.margin_bottom); \n";
+			result += "\t" "buffer.read(lvl.margin_left); \n";
+			result += "\t" "buffer.read(lvl.margin_right); \n";
+			result += "\t" "buffer.read(lvl.line_alignment); \n";
+			result += "\t" "buffer.read(lvl.line_internal_alignment); \n";
+			result += "\t" "buffer.read(lvl.type); \n";
+			result += "\t" "buffer.read(lvl.page_animation); \n";
+			result += "\t" "buffer.read(lvl.interline_spacing); \n";
+			result += "\t" "buffer.read(lvl.paged); \n";
+			result += "\t" "if(lvl.paged) {\n";
+			result += "\t" "\t" "lvl.page_controls = std::make_unique<page_buttons>();\n";
+			result += "\t" "\t" "lvl.page_controls->for_layout = &lvl;\n";
+			result += "\t" "\t" "lvl.page_controls->parent = this;\n";
+			result += "\t" "\t" "lvl.page_controls->base_data.size.x = int16_t(" + std::to_string(proj.grid_size * 10)  + ");\n";
+			result += "\t" "\t" "lvl.page_controls->base_data.size.y = int16_t(" + std::to_string(proj.grid_size * 2) + ");\n";
+			result += "\t" "}\n";
+			result += "\t" "auto optional_section = buffer.read_section(); // nothing\n";
+			result += "\t" "while(buffer) {\n";
+			result += "\t" "\t" "layout_item_types t;\n";
+			result += "\t" "\t" "buffer.read(t);\n";
+			result += "\t" "\t" "switch(t) {\n";
+
+			result += "\t" "\t" "\t" "case layout_item_types::control:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "layout_control temp;\n";
+			result += "\t" "\t" "\t" "\t" "std::string_view cname = buffer.read<std::string_view>();\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_x);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_y);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.absolute_position);\n";
+			result += "\t" "\t" "\t" "\t" "temp.ptr = nullptr;\n";
+			for(auto& c : win.children) {
+				result += "\t" "\t" "\t" "\t" "if(cname == \"" + c.name + "\") {\n";
+				result += "\t" "\t" "\t" "\t" "\t" "temp.ptr = " + c.name +".get();\n";
+				result += "\t" "\t" "\t" "\t" "}\n";
+			}
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
+
+			result += "\t" "\t" "\t" "case layout_item_types::window:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "layout_window temp;\n";
+			result += "\t" "\t" "\t" "\t" "std::string_view cname = buffer.read<std::string_view>();\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_x);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_y);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.absolute_position);\n";
+			for(auto& c : proj.windows) {
+				result += "\t" "\t" "\t" "\t" "if(cname == \"" + c.wrapped.name + "\") {\n";
+				result += "\t" "\t" "\t" "\t" "\t" "temp.ptr = make_" + project_name + "_" + c.wrapped.name + "(state);\n";
+				result += "\t" "\t" "\t" "\t" "}\n";
+			}
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
+
+			result += "\t" "\t" "\t" "case layout_item_types::glue:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "layout_glue temp;\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.type);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.amount);\n";
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
+
+			result += "\t" "\t" "\t" "case layout_item_types::generator:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "generator_instance temp;\n";
+			result += "\t" "\t" "\t" "\t" "std::string_view cname = buffer.read<std::string_view>();\n";
+			result += "\t" "\t" "\t" "\t"  "auto gen_details = buffer.read_section(); // ignored\n";
+			for(auto g : gens) {
+				result += "\t" "\t" "\t" "\t" "if(cname == \"" + g->name + "\") {\n";
+				result += "\t" "\t" "\t" "\t" "\t" "temp.generator = &" + g->name + ";\n";
+				result += "\t" "\t" "\t" "\t" "}\n";
+			}
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
+
+			result += "\t" "\t" "\t" "case layout_item_types::layout:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "sub_layout temp;\n";
+			result += "\t" "\t" "\t" "\t" "temp.layout = std::make_unique<layout_level>();\n";
+			result += "\t" "\t" "\t" "\t"  "auto layout_section = buffer.read_section();\n";
+			result += "\t" "\t" "\t" "\t" "create_layout_level(state, *temp.layout, layout_section.view_data() + layout_section.view_read_position(), layout_section.view_size() - layout_section.view_read_position());\n";
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
+
+			result += "\t" "\t" "}\n"; // end switch
+
+			result += "\t" "}\n"; // end loop over contents
+			result += "}\n";
+		}
 
 		//ON CREATE
 		result += "void " + project_name + "_" + win.wrapped.name + "_t::on_create(sys::state& state) noexcept {\n";
@@ -1651,6 +2229,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		result += "\t" "\t" "\t" "auto ch_res = ui::make_element_immediate(state, ex.child);\n";
 		result += "\t" "\t" "\t" "if(ch_res) {\n";
 		result += "\t" "\t" "\t" "\t" "this->add_child_to_back(std::move(ch_res));\n";
+		result += "\t" "\t" "\t" "\t" "children.push_back(ch_res.get());\n";
+		result += "\t" "\t" "\t" "\t" "gui_inserts.push_back(std::move(ch_res));\n";
 		result += "\t" "\t" "\t" "}\n";
 		result += "\t" "\t" "}\n";
 		result += "\t" "}\n";
@@ -1660,9 +2240,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		result += "\t" "\t" "pending_children.pop_back();\n";
 		for(auto& c : win.children) {
 			result += "\t" "\t" "if(child_data.name == \"" + c.name + "\") {\n";
-			result += "\t" "\t" "\t" "auto cptr = std::make_unique<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t>();\n";
-			result += "\t" "\t" "\t" "cptr->parent = this;\n";
-			result += "\t" "\t" "\t" + c.name + " = cptr.get();\n";
+			result += "\t" "\t" "\t" + c.name + " = std::make_unique<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t>();\n";
+			result += "\t" "\t" "\t" + c.name + "->parent = this;\n";
+			result += "\t" "\t" "\t" "auto cptr = " + c.name + ".get();\n";
 
 			result += "\t" "\t" "\t" "cptr->base_data.position.x = child_data.x_pos;\n";
 			result += "\t" "\t" "\t" "cptr->base_data.position.y = child_data.y_pos;\n";
@@ -1698,6 +2278,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 			if(c.background == background_type::linechart) {
 				result += "\t" "\t" "\t"  "cptr->line_color = child_data.table_highlight_color;\n";
+			}
+			if(c.background == background_type::colorsquare) {
+				result += "\t" "\t" "\t"  "cptr->color = child_data.table_highlight_color;\n";
 			}
 			if(c.container_type == container_type::table) {
 				int32_t cindex = 0;
@@ -1739,12 +2322,24 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color = child_data.table_highlight_color;\n";
 			}
 
+			result += "\t" "\t" "\t" "cptr->parent = this;\n";
 			result += "\t" "\t" "\t" "cptr->on_create(state);\n";
-			result += "\t" "\t" "\t" "this->add_child_to_back(std::move(cptr));\n";
+			result += "\t" "\t" "\t" "children.push_back(cptr);\n";
 			result += "\t" "\t" "continue;\n";
 			result += "\t" "\t" "}\n";
 		}
 		result += "\t" "}\n";
+
+		for(auto g : gens) {
+			result += "\t" + g->name + ".on_create(state, this);\n";
+		}
+
+		if(win.layout.contents.size() > 0) {
+			result += "\t" "page_left_texture_key = win_data.page_left_texture;\n";
+			result += "\t" "page_right_texture_key = win_data.page_right_texture;\n";
+			result += "\t" "page_text_color = win_data.page_text_color;\n";
+			result += "\t" "create_layout_level(state, layout, win_data.layout_data, win_data.layout_data_size);\n";
+		}
 
 		result += "// BEGIN " + win.wrapped.name + "::create\n";
 		if(auto it = old_code.found_code.find(win.wrapped.name + "::create"); it != old_code.found_code.end()) {
@@ -1773,7 +2368,6 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				auto line = analyze_line(s.second.text.c_str(), read_position, s.second.text.size());
 				result += "//" + std::string(line.line);
 			}
-			result += s.second.text;
 			result += "// END\n";
 		}
 		result += old_code.lost_code;

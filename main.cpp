@@ -122,6 +122,13 @@ void load_shaders() {
 				"return vec4(inner_color.r, inner_color.g, inner_color.b, 1.0f);\n"
 			"return vec4(inner_color.r, inner_color.g, inner_color.b, 0.25f);\n"
 		"}\n"
+		"vec4 hollow_rect(vec2 tc) {\n"
+			"float realx = tc.x * d_rect.z;\n"
+			"float realy = tc.y * d_rect.w;\n"
+			"if(realx <= 4 || realy <= 4 || realx >= (d_rect.z -4) || realy >= (d_rect.w -4))\n"
+			"return vec4(inner_color.r, inner_color.g, inner_color.b, 1.0f);\n"
+			"return vec4(inner_color.r, inner_color.g, inner_color.b, 0.0f);\n"
+		"}\n"
 		"vec4 grid_texture(vec2 tc) {\n"
 			"float realx = grid_off.x + tc.x * d_rect.z;\n"
 			"float realy = grid_off.y + tc.y * d_rect.w;\n"
@@ -164,6 +171,7 @@ void load_shaders() {
 				"\tcase 2: return direct_texture(tc);\n"
 				"\tcase 3: return frame_stretch(tc);\n"
 				"\tcase 4: return grid_texture(tc);\n"
+				"\tcase 5: return hollow_rect(tc);\n"
 				"\tdefault: break;\n"
 			"\t}\n"
 			"\treturn vec4(1.0f,1.0f,1.0f,1.0f);\n"
@@ -253,7 +261,7 @@ void load_global_squares() {
 }
 
 
-void render_textured_rect(color3f color, int32_t ix, int32_t iy, int32_t iwidth, int32_t iheight, GLuint texture_handle) {
+void render_textured_rect(color3f color, float ix, float iy, int32_t iwidth, int32_t iheight, GLuint texture_handle) {
 	float x = float(ix);
 	float y = float(iy);
 	float width = float(iwidth);
@@ -275,7 +283,7 @@ void render_textured_rect(color3f color, int32_t ix, int32_t iy, int32_t iwidth,
 
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
-void render_stretch_textured_rect(color3f color, int32_t ix, int32_t iy, int32_t iwidth, int32_t iheight, float border_size, GLuint texture_handle) {
+void render_stretch_textured_rect(color3f color, float ix, float iy, int32_t iwidth, int32_t iheight, float border_size, GLuint texture_handle) {
 	float x = float(ix);
 	float y = float(iy);
 	float width = float(iwidth);
@@ -292,13 +300,13 @@ void render_stretch_textured_rect(color3f color, int32_t ix, int32_t iy, int32_t
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture_handle);
 
-	GLuint subroutines[2] = { 2, 0 };
+	GLuint subroutines[2] = { 3, 0 };
 	glUniform2ui(glGetUniformLocation(ui_shader_program, "subroutines_index"), subroutines[0], subroutines[1]);
 	//glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 2, subroutines); // must set all subroutines in one call
 
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
-void render_empty_rect(color3f color, int32_t ix, int32_t iy, int32_t iwidth, int32_t iheight) {
+void render_empty_rect(color3f color, float ix, float iy, int32_t iwidth, int32_t iheight) {
 	float x = float(ix);
 	float y = float(iy);
 	float width = float(iwidth);
@@ -312,6 +320,25 @@ void render_empty_rect(color3f color, int32_t ix, int32_t iy, int32_t iwidth, in
 	glUniform3f(glGetUniformLocation(ui_shader_program, "inner_color"), color.r, color.g, color.b);
 
 	GLuint subroutines[2] = { 1, 0 };
+	glUniform2ui(glGetUniformLocation(ui_shader_program, "subroutines_index"), subroutines[0], subroutines[1]);
+	//glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 2, subroutines); // must set all subroutines in one call
+
+	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+}
+void render_hollow_rect(color3f color, float ix, float iy, int32_t iwidth, int32_t iheight) {
+	float x = float(ix);
+	float y = float(iy);
+	float width = float(iwidth);
+	float height = float(iheight);
+
+	glBindVertexArray(global_square_vao);
+
+	glBindVertexBuffer(0, global_square_buffer, 0, sizeof(GLfloat) * 4);
+
+	glUniform4f(glGetUniformLocation(ui_shader_program, "d_rect"), x, y, width, height);
+	glUniform3f(glGetUniformLocation(ui_shader_program, "inner_color"), color.r, color.g, color.b);
+
+	GLuint subroutines[2] = { 5, 0 };
 	glUniform2ui(glGetUniformLocation(ui_shader_program, "subroutines_index"), subroutines[0], subroutines[1]);
 	//glUniformSubroutinesuiv(GL_FRAGMENT_SHADER, 2, subroutines); // must set all subroutines in one call
 
@@ -386,6 +413,1381 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	last_scroll_value += float(yoffset);
 }
 
+open_project_t open_project;
+float drag_offset_x = 0.0f;
+float drag_offset_y = 0.0f;
+int32_t selected_window = -1;
+int32_t chosen_window = -1;
+bool just_chose_window = false;
+int32_t selected_control = -1;
+int32_t chosen_control = -1;
+
+void update_cached_control(std::string_view name, window_element_wrapper_t& window, int16_t& index) {
+	bool update = false;
+	if(index < 0 || int16_t(window.children.size()) <= index)
+		update = true;
+	if(!update && window.children[index].name != name)
+		update = true;
+	if(update) {
+		for(auto i = window.children.size(); i-- > 0; ) {
+			if(window.children[i].name == name) {
+				index = int16_t(i);
+				return;
+			}
+		}
+		index = int16_t(-1);
+	}
+}
+void update_cached_window(std::string_view name, int16_t& index) {
+	bool update = false;
+	if(index < 0 || int16_t(open_project.windows.size()) <= index)
+		update = true;
+	if(!update && open_project.windows[index].wrapped.name != name)
+		update = true;
+	if(update) {
+		for(auto i = open_project.windows.size(); i-- > 0; ) {
+			if(open_project.windows[i].wrapped.name == name) {
+				index = int16_t(i);
+				return;
+			}
+		}
+		index = int16_t(-1);
+	}
+}
+
+void render_layout(window_element_wrapper_t& window, layout_level_t& layout, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale);
+
+void render_window(window_element_wrapper_t& win, float x, float y, bool highlightwin, float ui_scale) {
+	// bg
+	if(win.wrapped.background == background_type::none || win.wrapped.background == background_type::existing_gfx || win.wrapped.texture.empty() || win.wrapped.background == background_type::linechart || win.wrapped.background == background_type::stackedbarchart || win.wrapped.background == background_type::colorsquare) {
+		render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
+	} else if(win.wrapped.background == background_type::texture) {
+		if(win.wrapped.ogl_texture.loaded == false) {
+			win.wrapped.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(win.wrapped.texture));
+		}
+		if(win.wrapped.ogl_texture.texture_handle == 0) {
+			render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
+		} else {
+			render_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.ogl_texture.texture_handle);
+		}
+	} else if(win.wrapped.background == background_type::bordered_texture) {
+		if(win.wrapped.ogl_texture.loaded == false) {
+			win.wrapped.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(win.wrapped.texture));
+		}
+		if(win.wrapped.ogl_texture.texture_handle == 0) {
+			render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
+		} else {
+			render_stretch_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.border_size * ui_scale, win.wrapped.ogl_texture.texture_handle);
+		}
+	}
+
+	// layout
+	render_layout(win, win.layout, x, y, win.wrapped.x_size, win.wrapped.y_size, win.wrapped.rectangle_color, ui_scale);
+}
+
+void render_control(ui_element_t& c, float x, float y, bool highlighted, float ui_scale) {
+	if(c.container_type == container_type::table) {
+		if(c.table_columns.empty()) {
+			c.x_size = int16_t(open_project.grid_size);
+		} else {
+			int16_t sum = 0;
+			for(auto& col : c.table_columns) {
+				sum += col.display_data.width;
+			}
+			c.x_size = sum;
+		}
+	}
+
+	if(c.background != background_type::texture && c.background != background_type::bordered_texture) {
+		if(c.container_type != container_type::table || c.table_columns.empty()) {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+	} else if(c.background == background_type::texture) {
+		if(c.ogl_texture.loaded == false) {
+			c.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(c.texture));
+		}
+		if(c.ogl_texture.texture_handle == 0) {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_textured_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)), c.ogl_texture.texture_handle);
+		}
+	} else if(c.background == background_type::bordered_texture) {
+		if(c.ogl_texture.loaded == false) {
+			c.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(c.texture));
+		}
+		if(c.ogl_texture.texture_handle == 0) {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_stretch_textured_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)), c.border_size * ui_scale, c.ogl_texture.texture_handle);
+		}
+	}
+
+	if(c.container_type == container_type::table) {
+		int16_t sum = 0;
+		for(auto& col : c.table_columns) {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(col.display_data.width * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+			sum += col.display_data.width;
+		}
+	}
+}
+
+struct measure_result {
+	int32_t x_space;
+	int32_t y_space;
+	enum class special {
+		none, space_consumer, end_line, end_page, no_break
+	} other;
+};
+
+struct index_result {
+	layout_item* result = nullptr;
+	int32_t sub_index = 0;
+};
+
+struct layout_iterator {
+	std::vector<layout_item>& backing;
+	int32_t index = 0;
+	int32_t sub_index = 0;
+
+	layout_iterator(std::vector<layout_item>& backing) : backing(backing) { }
+
+	bool current_is_glue() {
+		return has_more() && std::holds_alternative<layout_glue_t>(backing[index]);
+	}
+	measure_result measure_current(window_element_wrapper_t& window, bool glue_horizontal, int32_t max_crosswise) {
+		if(!has_more())
+			return measure_result{ 0, 0, measure_result::special::none};
+		auto& m = backing[index];
+
+		if(std::holds_alternative< layout_control_t>(m)) {
+			auto& i = std::get<layout_control_t>(m);
+			update_cached_control(i.name, window, i.cached_index);
+
+			if(i.absolute_position) {
+				return  measure_result{ 0, 0, measure_result::special::none };
+			}
+			if(i.cached_index != -1) {
+				return  measure_result{ window.children[i.cached_index].x_size, window.children[i.cached_index].y_size, measure_result::special::none };
+			}
+		} else if(std::holds_alternative<layout_window_t>(m)) {
+			auto& i = std::get<layout_window_t>(m);
+			update_cached_window(i.name, i.cached_index);
+			if(i.absolute_position) {
+				return  measure_result{ 0, 0, measure_result::special::none };
+			}
+			if(i.cached_index != -1) {
+				return  measure_result{ open_project.windows[i.cached_index].wrapped.x_size, open_project.windows[i.cached_index].wrapped.y_size, measure_result::special::none };
+			}
+		} else if(std::holds_alternative<layout_glue_t>(m)) {
+			auto& i = std::get<layout_glue_t>(m);
+			if(glue_horizontal) {
+				switch(i.type) {
+					case glue_type::standard: return measure_result{ i.amount, 0, measure_result::special::none };
+					case glue_type::at_least: return measure_result{ i.amount, 0, measure_result::special::space_consumer };
+					case glue_type::line_break: return measure_result{ 0, 0, measure_result::special::end_line };
+					case glue_type::page_break: return measure_result{ 0, 0, measure_result::special::end_page };
+					case glue_type::glue_don_t_break: return measure_result{ i.amount, 0, measure_result::special::no_break };
+				}
+			} else {
+				switch(i.type) {
+					case glue_type::standard: return measure_result{ 0, i.amount, measure_result::special::none };
+					case glue_type::at_least: return measure_result{ 0, i.amount, measure_result::special::space_consumer };
+					case glue_type::line_break: return measure_result{ 0, 0, measure_result::special::end_line };
+					case glue_type::page_break: return measure_result{ 0, 0, measure_result::special::end_page };
+					case glue_type::glue_don_t_break: return measure_result{ 0, i.amount, measure_result::special::no_break };
+				}
+			}
+		} else if(std::holds_alternative<generator_t>(m)) {
+			auto& i = std::get<generator_t>(m);
+			for(auto& j : i.inserts) {
+				update_cached_window(j.name, j.cached_index);
+			}
+			if(sub_index < int32_t(i.inserts.size()) && i.inserts[sub_index].cached_index != -1) {
+				return measure_result{ open_project.windows[i.inserts[sub_index].cached_index].wrapped.x_size, open_project.windows[i.inserts[sub_index].cached_index].wrapped.y_size, measure_result::special::none };
+			} else {
+				return measure_result{ 0, 0, measure_result::special::none };
+			}
+		} else if(std::holds_alternative< sub_layout_t>(m)) {
+			auto& i = std::get<sub_layout_t>(m);
+			int32_t x = 0;
+			int32_t y = 0;
+			bool consume_fill = false;
+			if(i.layout->size_x != -1)
+				x = i.layout->size_x;
+			else {
+				if(glue_horizontal)
+					consume_fill = true;
+				else
+					x = max_crosswise;
+			}
+			if(i.layout->size_y != -1)
+				y = i.layout->size_y;
+			else {
+				if(!glue_horizontal)
+					consume_fill = true;
+				else
+					y = max_crosswise;
+			}
+
+			return measure_result{ x, y, consume_fill ? measure_result::special::space_consumer : measure_result::special::none };
+		}
+		return measure_result{ 0, 0, measure_result::special::none };
+	}
+	void render_current(window_element_wrapper_t& window, float x, float y, int32_t lsz_x, int32_t lsz_y, color3f outline_color, float scale) {
+		if(!has_more())
+			return;
+		auto& m = backing[index];
+
+		if(std::holds_alternative< layout_control_t>(m)) {
+			auto& i = std::get<layout_control_t>(m);
+			if(i.cached_index != -1) {
+				render_control(window.children[i.cached_index], x, y, i.cached_index == selected_control, scale);
+				window.children[i.cached_index].x_pos = int16_t(x * scale);
+				window.children[i.cached_index].y_pos = int16_t(y * scale);
+			}
+		} else if(std::holds_alternative<layout_window_t>(m)) {
+			auto& i = std::get<layout_window_t>(m);
+			if(i.cached_index != -1)
+				render_window(open_project.windows[i.cached_index], x, y, false, scale);
+		} else if(std::holds_alternative<layout_glue_t>(m)) {
+			
+		} else if(std::holds_alternative<generator_t>(m)) {
+			auto& i = std::get<generator_t>(m);
+			for(auto& j : i.inserts) {
+				update_cached_window(j.name, j.cached_index);
+			}
+			if(sub_index < int32_t(i.inserts.size()) && i.inserts[sub_index].cached_index != -1) {
+				render_window(open_project.windows[i.inserts[sub_index].cached_index], x, y, false, scale);
+			}
+		} else if(std::holds_alternative< sub_layout_t>(m)) {
+			auto& i = std::get<sub_layout_t>(m);
+			render_layout(window, *(i.layout), x, y, lsz_x, lsz_y, outline_color, scale);
+		}
+	}
+	void move_position(int32_t n) {
+		while(n > 0 && has_more()) {
+			if(std::holds_alternative<generator_t>(backing[index])) {
+				auto& g = std::get<generator_t>(backing[index]);
+				++sub_index;
+				--n;
+				if(sub_index >= int32_t(g.inserts.size())) {
+					sub_index = 0;
+					++index;
+				}
+			} else {
+				++index;
+				--n;
+			}
+		}
+		while(n < 0 && index >= 0) {
+			if(std::holds_alternative<generator_t>(backing[index])) {
+				auto& g = std::get<generator_t>(backing[index]);
+				--sub_index;
+				++n;
+				if(sub_index < 0) {
+					sub_index = 0;
+					--index;
+				} else {
+					continue; // to avoid resetting sub index
+				}
+			} else {
+				--index;
+				if(index < 0) {
+					index = 0; return;
+				}
+				++n;
+			}
+
+			if(index < 0) {
+				index = 0; return;
+			}
+			if(std::holds_alternative<generator_t>(backing[index])) {
+				auto& g = std::get<generator_t>(backing[index]);
+				sub_index = std::max(int32_t(g.inserts.size()) - 1, 0);
+			}
+		}
+	}
+	bool has_more() {
+		return index < int32_t(backing.size());
+	}
+	void reset() {
+		index = 0;
+		sub_index = 0;
+	}
+};
+
+index_result nth_layout_child(layout_level_t& m, int32_t index) {
+	int32_t i = 0;
+	for(auto& li : m.contents) {
+		if(std::holds_alternative<generator_t>(li)) {
+			auto& g = std::get<generator_t>(li);
+			if(int32_t(i + g.inserts.size()) >= index) {
+				return index_result{ &li, index - i };
+			}
+			i += int32_t(g.inserts.size());
+		} else {
+			if(i == index)
+				return index_result{ &li, 0 };
+			++i;
+		}
+	}
+	return index_result{ nullptr, 0 };
+}
+
+void render_layout(window_element_wrapper_t& window, layout_level_t& layout, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale) {
+	auto base_x_size = layout.size_x != -1 ? int32_t(layout.size_x) : width;
+	auto base_y_size = layout.size_y != -1 ? int32_t(layout.size_y) : height;
+	auto top_margin = int32_t(layout.margin_top);
+	auto bottom_margin = layout.margin_bottom != -1 ? int32_t(layout.margin_bottom) : top_margin;
+	auto left_margin = layout.margin_left != -1 ? int32_t(layout.margin_left) : bottom_margin;
+	auto right_margin = layout.margin_right != -1 ? int32_t(layout.margin_right) : left_margin;
+	auto effective_x_size = base_x_size - (left_margin + right_margin);
+	auto effective_y_size = base_y_size - (top_margin + bottom_margin);
+	if(layout.paged) {
+		effective_y_size -= int32_t(2 * open_project.grid_size);
+	}
+
+	render_hollow_rect(outline_color * 0.8f, ((x + left_margin) * scale), ((y + top_margin) * scale), std::max(1, int32_t(effective_x_size * scale)), std::max(1, int32_t(effective_y_size * scale)));
+
+	switch(layout.type) {
+		case layout_type::single_horizontal:
+		{
+			float space_used = 0;
+			int32_t fill_consumer_count = 0;
+
+			layout_iterator it(layout.contents);
+			
+			// measure loop
+			layout.page_starts.clear();
+
+			int32_t page_counter = 0;
+			while(it.has_more()) {
+				auto mr = it.measure_current(window, true, effective_y_size);
+				if(layout.paged && (space_used + mr.x_space > effective_x_size || mr.other == measure_result::special::end_page)) {
+					if(it.current_is_glue()) {
+						++page_counter;
+					}
+					layout.page_starts.push_back(page_counter);
+					//check if previous was glue, and erase
+					if(it.index != 0) {
+						it.move_position(-1);
+						if(it.current_is_glue()) {
+							space_used -= it.measure_current(window, true, effective_y_size).x_space;
+						}
+						it.move_position(1);
+					}
+					if(it.current_is_glue()) {
+						it.move_position(1);
+						// normally: break here
+					}
+					break; // only layout one page
+				}
+
+				if(mr.other == measure_result::special::space_consumer)
+					++fill_consumer_count;
+				space_used += mr.x_space;
+
+				it.move_position(1);
+				++page_counter;
+			}
+			it.reset();
+
+			if(layout.paged) {
+				layout.page_starts.push_back( page_counter);
+			}
+			// place / render
+
+			int32_t extra_runlength = int32_t(effective_x_size - space_used);
+			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+			int32_t extra_lead = 0;
+			switch(layout.line_alignment) {
+				case layout_line_alignment::leading: break;
+				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
+				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+			}
+			space_used = x + extra_lead + left_margin;
+			page_counter = 0;
+			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
+				auto mr = it.measure_current(window, true, effective_y_size);
+				float yoff = 0;
+				float xoff = space_used;
+				switch(layout.line_internal_alignment) {
+					case layout_line_alignment::leading: yoff = y + top_margin; break;
+					case layout_line_alignment::trailing: yoff = y + top_margin + effective_y_size - mr.y_space; break;
+					case layout_line_alignment::centered: yoff = y + top_margin + (effective_y_size - mr.y_space) / 2;  break;
+				}
+				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+					}
+				} else if(std::holds_alternative< layout_window_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_window_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+					}
+				}
+				it.render_current(window, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+
+				space_used += mr.x_space;
+				if(mr.other == measure_result::special::space_consumer) {
+					space_used += per_fill_consumer;
+				}
+				it.move_position(1);
+				++page_counter;
+			}
+		} break;
+		case layout_type::single_vertical:
+		{
+			float space_used = 0;
+			int32_t fill_consumer_count = 0;
+
+			layout_iterator it(layout.contents);
+
+			// measure loop
+			layout.page_starts.clear();
+
+			int32_t page_counter = 0;
+			while(it.has_more()) {
+				auto mr = it.measure_current(window, false, effective_x_size);
+				if(layout.paged && (space_used + mr.y_space > effective_y_size || mr.other == measure_result::special::end_page)) {
+					if(it.current_is_glue()) {
+						++page_counter;
+					}
+					layout.page_starts.push_back(page_counter);
+					//check if previous was glue, and erase
+					if(it.index != 0) {
+						it.move_position(-1);
+						if(it.current_is_glue()) {
+							space_used -= it.measure_current(window, false, effective_x_size).y_space;
+						}
+						it.move_position(1);
+					}
+					if(it.current_is_glue()) {
+						it.move_position(1);
+						// normally: break here
+					}
+					break; // only layout one page
+				}
+
+				if(mr.other == measure_result::special::space_consumer)
+					++fill_consumer_count;
+				space_used += mr.y_space;
+
+				it.move_position(1);
+				++page_counter;
+			}
+			it.reset();
+
+			if(layout.paged) {
+				layout.page_starts.push_back(page_counter);
+			}
+			// place / render
+
+			int32_t extra_runlength = int32_t(effective_y_size - space_used);
+			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+			int32_t extra_lead = 0;
+			switch(layout.line_alignment) {
+				case layout_line_alignment::leading: break;
+				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
+				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+			}
+			space_used = y + extra_lead + top_margin;
+			page_counter = 0;
+			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
+				auto mr = it.measure_current(window, false, effective_x_size);
+				float xoff = 0;
+				float yoff = space_used;
+				switch(layout.line_internal_alignment) {
+					case layout_line_alignment::leading: xoff = x + left_margin; break;
+					case layout_line_alignment::trailing: xoff = x + left_margin + effective_x_size - mr.x_space; break;
+					case layout_line_alignment::centered: xoff = x + left_margin + (effective_x_size - mr.x_space) / 2;  break;
+				}
+				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+					}
+				} else if(std::holds_alternative< layout_window_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_window_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+					}
+				}
+				it.render_current(window, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+
+				space_used += mr.y_space;
+				if(mr.other == measure_result::special::space_consumer) {
+					space_used += per_fill_consumer;
+				}
+				it.move_position(1);
+				++page_counter;
+			}
+		} break;
+		case layout_type::overlapped_horizontal:
+		{
+			float space_used = 0;
+			int32_t fill_consumer_count = 0;
+
+			layout_iterator it(layout.contents);
+
+			// measure loop
+			layout.page_starts.clear();
+
+			int32_t page_counter = 0;
+			int32_t non_glue_count = 0;
+			while(it.has_more()) {
+				auto mr = it.measure_current(window, true, effective_y_size);
+				if(layout.paged && mr.other == measure_result::special::end_page) {
+					if(it.current_is_glue()) {
+						++page_counter;
+					}
+					layout.page_starts.push_back(page_counter);
+					//check if previous was glue, and erase
+					if(it.index != 0) {
+						it.move_position(-1);
+						if(it.current_is_glue()) {
+							space_used -= it.measure_current(window, true, effective_y_size).x_space;
+						}
+						it.move_position(1);
+					}
+					if(it.current_is_glue()) {
+						it.move_position(1);
+						// normally: break here
+					}
+					break; // only layout one page
+				}
+				if(!it.current_is_glue()) {
+					if((std::holds_alternative<layout_control_t>(it.backing[it.index]) && std::get<layout_control_t>(it.backing[it.index]).absolute_position)
+						|| (std::holds_alternative<layout_window_t>(it.backing[it.index]) && std::get<layout_window_t>(it.backing[it.index]).absolute_position)) {
+
+					} else {
+						++non_glue_count;
+					}
+				}
+
+				if(mr.other == measure_result::special::space_consumer)
+					++fill_consumer_count;
+				space_used += mr.x_space;
+
+				it.move_position(1);
+				++page_counter;
+			}
+			it.reset();
+
+			if(layout.paged) {
+				layout.page_starts.push_back(page_counter);
+			}
+			// place / render
+
+			int32_t extra_runlength = std::max(0, int32_t(effective_x_size - space_used));
+			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+			int32_t extra_lead = 0;
+			switch(layout.line_alignment) {
+				case layout_line_alignment::leading: break;
+				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
+				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+			}
+			int32_t overlap_subtraction = (non_glue_count > 1 && space_used > effective_x_size) ? int32_t(space_used - effective_x_size) / (non_glue_count - 1) : 0;
+			space_used = x + extra_lead + left_margin;
+			page_counter = 0;
+			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
+				auto mr = it.measure_current(window, true, effective_y_size);
+				float yoff = 0;
+				float xoff = space_used;
+				switch(layout.line_internal_alignment) {
+					case layout_line_alignment::leading: yoff = y + top_margin; break;
+					case layout_line_alignment::trailing: yoff = y + top_margin + effective_y_size - mr.y_space; break;
+					case layout_line_alignment::centered: yoff = y + top_margin + (effective_y_size - mr.y_space) / 2;  break;
+				}
+				bool was_abs = false;
+				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+						was_abs = true;
+					}
+				} else if(std::holds_alternative< layout_window_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_window_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+						was_abs = true;
+					}
+				}
+				it.render_current(window, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+
+				space_used += mr.x_space;
+				if(mr.other == measure_result::special::space_consumer) {
+					space_used += per_fill_consumer;
+				}
+				if(!it.current_is_glue() && !was_abs)
+					space_used -= overlap_subtraction;
+
+				it.move_position(1);
+				++page_counter;
+			}
+		} break;
+		case layout_type::overlapped_vertical:
+		{
+			float space_used = 0;
+			int32_t fill_consumer_count = 0;
+
+			layout_iterator it(layout.contents);
+
+			// measure loop
+			layout.page_starts.clear();
+
+			int32_t page_counter = 0;
+			int32_t non_glue_count = 0;
+			while(it.has_more()) {
+				auto mr = it.measure_current(window, false, effective_x_size);
+				if(layout.paged && mr.other == measure_result::special::end_page) {
+					if(it.current_is_glue()) {
+						++page_counter;
+					}
+					layout.page_starts.push_back(page_counter);
+					//check if previous was glue, and erase
+					if(it.index != 0) {
+						it.move_position(-1);
+						if(it.current_is_glue()) {
+							space_used -= it.measure_current(window, false, effective_x_size).y_space;
+						}
+						it.move_position(1);
+					}
+					if(it.current_is_glue()) {
+						it.move_position(1);
+						// normally: break here
+					}
+					break; // only layout one page
+				}
+				if(!it.current_is_glue()) {
+					if((std::holds_alternative<layout_control_t>(it.backing[it.index]) && std::get<layout_control_t>(it.backing[it.index]).absolute_position)
+						|| (std::holds_alternative<layout_window_t>(it.backing[it.index]) && std::get<layout_window_t>(it.backing[it.index]).absolute_position)) {
+
+					} else {
+						++non_glue_count;
+					}
+				}
+
+				if(mr.other == measure_result::special::space_consumer)
+					++fill_consumer_count;
+				space_used += mr.y_space;
+
+				it.move_position(1);
+				++page_counter;
+			}
+			it.reset();
+
+			if(layout.paged) {
+				layout.page_starts.push_back(page_counter);
+			}
+			// place / render
+
+			int32_t extra_runlength = std::max(0, int32_t(effective_y_size - space_used));
+			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+			int32_t extra_lead = 0;
+			switch(layout.line_alignment) {
+				case layout_line_alignment::leading: break;
+				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
+				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+			}
+			int32_t overlap_subtraction = (non_glue_count > 1 && space_used > effective_y_size) ? int32_t(space_used - effective_y_size) / (non_glue_count - 1) : 0;
+			space_used = y + extra_lead + top_margin;
+			page_counter = 0;
+			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
+				auto mr = it.measure_current(window, false, effective_x_size);
+				float xoff = 0;
+				float yoff = space_used;
+				switch(layout.line_internal_alignment) {
+					case layout_line_alignment::leading: xoff = x + left_margin; break;
+					case layout_line_alignment::trailing: xoff = x + left_margin + effective_x_size - mr.x_space; break;
+					case layout_line_alignment::centered: xoff = x + left_margin + (effective_x_size - mr.x_space) / 2;  break;
+				}
+				bool was_abs = false;
+				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+						was_abs = true;
+					}
+				} else if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
+					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
+					if(i.absolute_position) {
+						xoff = x + i.abs_x;
+						yoff = y + i.abs_y;
+						was_abs = true;
+					}
+				}
+				it.render_current(window, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+
+				space_used += mr.y_space;
+				if(mr.other == measure_result::special::space_consumer) {
+					space_used += per_fill_consumer;
+				}
+				if(!it.current_is_glue() && !was_abs)
+					space_used -= overlap_subtraction;
+
+				it.move_position(1);
+				++page_counter;
+			}
+		} break;
+		case layout_type::mulitline_horizontal:
+		{
+			layout_iterator it(layout.contents);
+
+			layout.page_starts.clear();
+
+			int32_t page_counter = 0;
+			int32_t crosswise_used = 0;
+
+			// loop for page
+			while(it.has_more()) {
+				auto line_start = it;
+				int32_t max_crosswise = 0;
+				float space_used = 0;
+				int32_t fill_consumer_count = 0;
+
+				// loop for line
+				bool page_ended = false;
+				while(it.has_more()) {
+					auto mr = it.measure_current(window, true, effective_y_size - crosswise_used);
+					if((space_used > 0 && (space_used + mr.x_space > effective_x_size || mr.other == measure_result::special::end_line)) || (space_used > 0 && mr.other == measure_result::special::end_page) || (crosswise_used > 0 && mr.other == measure_result::special::end_page) || (layout.paged && crosswise_used + mr.y_space > effective_y_size && crosswise_used > 0)) {
+						if(it.current_is_glue()) {
+							++page_counter;
+						}
+						if(mr.other == measure_result::special::end_page || (crosswise_used + mr.y_space > effective_y_size && crosswise_used > 0)) {
+							page_ended = true;
+						}
+						
+						//check if previous was glue, and erase
+						if(it.index != 0) {
+							it.move_position(-1);
+							if(it.current_is_glue()) {
+								space_used -= it.measure_current(window, true, effective_y_size - crosswise_used).x_space;
+							}
+							it.move_position(1);
+						}
+						if(it.current_is_glue()) {
+							it.move_position(1);
+							// normally: break here
+						}
+						break; // only one line
+					}
+
+					max_crosswise = std::max(max_crosswise, mr.y_space);
+					if(mr.other == measure_result::special::space_consumer)
+						++fill_consumer_count;
+					space_used += mr.x_space;
+
+					it.move_position(1);
+					++page_counter;
+				}
+
+				// position/render line
+				int32_t extra_runlength = int32_t(effective_x_size - space_used);
+				int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+				int32_t extra_lead = 0;
+				switch(layout.line_alignment) {
+					case layout_line_alignment::leading: break;
+					case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
+					case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+				}
+				space_used = x + extra_lead + left_margin;
+				page_counter = 0;
+
+				while(line_start.index < it.index || line_start.sub_index < it.sub_index) {
+					auto mr = line_start.measure_current(window, true, effective_y_size);
+					float yoff = 0;
+					float xoff = space_used;
+					switch(layout.line_internal_alignment) {
+						case layout_line_alignment::leading: yoff = y + crosswise_used + top_margin; break;
+						case layout_line_alignment::trailing: yoff = y + crosswise_used + top_margin + max_crosswise - mr.y_space; break;
+						case layout_line_alignment::centered: yoff = y + crosswise_used + top_margin + (max_crosswise - mr.y_space) / 2;  break;
+					}
+					if(std::holds_alternative< layout_control_t>(layout.contents[line_start.index])) {
+						auto& i = std::get<layout_control_t>(layout.contents[line_start.index]);
+						if(i.absolute_position) {
+							xoff = x + i.abs_x;
+							yoff = y + i.abs_y;
+						}
+					} else if(std::holds_alternative< layout_window_t>(layout.contents[line_start.index])) {
+						auto& i = std::get<layout_window_t>(layout.contents[line_start.index]);
+						if(i.absolute_position) {
+							xoff = x + i.abs_x;
+							yoff = y + i.abs_y;
+						}
+					}
+					line_start.render_current(window, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+
+					space_used += mr.x_space;
+					if(mr.other == measure_result::special::space_consumer) {
+						space_used += per_fill_consumer;
+					}
+					line_start.move_position(1);
+				}
+
+				crosswise_used += max_crosswise;
+				crosswise_used += int32_t(layout.interline_spacing);
+
+				if(layout.paged && (crosswise_used >= effective_y_size || page_ended)) {
+					layout.page_starts.push_back(page_counter);
+					// normally, make new page here ...
+					break;
+				}
+			}
+			// last page, if not added
+			if(layout.paged) {
+				if(layout.page_starts.empty() || layout.page_starts.back() != page_counter)
+					layout.page_starts.push_back(page_counter);
+			}
+		} break;
+		case layout_type::multiline_vertical:
+		{
+			layout_iterator it(layout.contents);
+
+			layout.page_starts.clear();
+
+			int32_t page_counter = 0;
+			int32_t crosswise_used = 0;
+
+			// loop for page
+			while(it.has_more()) {
+				auto line_start = it;
+				int32_t max_crosswise = 0;
+				float space_used = 0;
+				int32_t fill_consumer_count = 0;
+
+				// loop for line
+				bool page_ended = false;
+				while(it.has_more()) {
+					auto mr = it.measure_current(window, false, effective_x_size - crosswise_used);
+					if((space_used > 0 && (space_used + mr.y_space > effective_y_size || mr.other == measure_result::special::end_line)) || (space_used > 0 && mr.other == measure_result::special::end_page) || (crosswise_used > 0 && mr.other == measure_result::special::end_page) || (layout.paged && crosswise_used + mr.x_space > effective_x_size && crosswise_used > 0)) {
+						if(it.current_is_glue()) {
+							++page_counter;
+						}
+						if(mr.other == measure_result::special::end_page || (crosswise_used + mr.x_space > effective_x_size && crosswise_used > 0)) {
+							page_ended = true;
+						}
+
+						//check if previous was glue, and erase
+						if(it.index != 0) {
+							it.move_position(-1);
+							if(it.current_is_glue()) {
+								space_used -= it.measure_current(window, false, effective_x_size - crosswise_used).y_space;
+							}
+							it.move_position(1);
+						}
+						if(it.current_is_glue()) {
+							it.move_position(1);
+							// normally: break here
+						}
+						break; // only one line
+					}
+
+					max_crosswise = std::max(max_crosswise, mr.x_space);
+					if(mr.other == measure_result::special::space_consumer)
+						++fill_consumer_count;
+					space_used += mr.y_space;
+
+					it.move_position(1);
+					++page_counter;
+				}
+
+				// position/render line
+				int32_t extra_runlength = int32_t(effective_y_size - space_used);
+				int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+				int32_t extra_lead = 0;
+				switch(layout.line_alignment) {
+					case layout_line_alignment::leading: break;
+					case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
+					case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+				}
+				space_used = y + extra_lead + top_margin;
+				page_counter = 0;
+
+				while(line_start.index < it.index || line_start.sub_index < it.sub_index) {
+					auto mr = line_start.measure_current(window, false, effective_x_size);
+					float xoff = 0;
+					float yoff = space_used;
+					switch(layout.line_internal_alignment) {
+						case layout_line_alignment::leading: xoff = x + crosswise_used + left_margin; break;
+						case layout_line_alignment::trailing: xoff = x + crosswise_used + left_margin + max_crosswise - mr.x_space; break;
+						case layout_line_alignment::centered: xoff = x + crosswise_used + left_margin + (max_crosswise - mr.x_space) / 2;  break;
+					}
+					if(std::holds_alternative< layout_control_t>(layout.contents[line_start.index])) {
+						auto& i = std::get<layout_control_t>(layout.contents[line_start.index]);
+						if(i.absolute_position) {
+							xoff = x + i.abs_x;
+							yoff = y + i.abs_y;
+						}
+					} else if(std::holds_alternative< layout_window_t>(layout.contents[line_start.index])) {
+						auto& i = std::get<layout_window_t>(layout.contents[line_start.index]);
+						if(i.absolute_position) {
+							xoff = x + i.abs_x;
+							yoff = y + i.abs_y;
+						}
+					}
+					line_start.render_current(window, xoff, yoff, mr.x_space , mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+
+					space_used += mr.y_space;
+					if(mr.other == measure_result::special::space_consumer) {
+						space_used += per_fill_consumer;
+					}
+					line_start.move_position(1);
+				}
+
+				crosswise_used += max_crosswise;
+				crosswise_used += int32_t(layout.interline_spacing);
+
+				if(layout.paged && (crosswise_used >= effective_x_size || page_ended)) {
+					layout.page_starts.push_back(page_counter);
+					// normally, make new page here ...
+					break;
+				}
+			}
+			// last page, if not added
+			if(layout.paged) {
+				if(layout.page_starts.empty() || layout.page_starts.back() != page_counter)
+					layout.page_starts.push_back(page_counter);
+			}
+		} break;
+	}
+}
+
+void rename_window(layout_level_t& layout, std::string const& old_name, std::string const& new_name) {
+	for(auto& m : layout.contents) {
+		if(std::holds_alternative< layout_control_t>(m)) {
+			auto& i = std::get<layout_control_t>(m);
+			
+		} else if(std::holds_alternative<layout_window_t>(m)) {
+			auto& i = std::get<layout_window_t>(m);
+			if(i.name == old_name)
+				i.name = new_name;
+		} else if(std::holds_alternative<layout_glue_t>(m)) {
+			
+		} else if(std::holds_alternative<generator_t>(m)) {
+			auto& i = std::get<generator_t>(m);
+			for(auto& p : i.inserts) {
+				if(p.name == old_name)
+					p.name = new_name;
+				if(p.header == old_name)
+					p.header = new_name;
+			}
+		} else if(std::holds_alternative< sub_layout_t>(m)) {
+			auto& i = std::get<sub_layout_t>(m);
+			rename_window(*i.layout, old_name, new_name);
+		}
+	}
+}
+void rename_control(layout_level_t& layout, std::string const& old_name, std::string const& new_name) {
+	for(auto& m : layout.contents) {
+		if(std::holds_alternative< layout_control_t>(m)) {
+			auto& i = std::get<layout_control_t>(m);
+			if(i.name == old_name)
+				i.name = new_name;
+		} else if(std::holds_alternative<layout_window_t>(m)) {
+
+		} else if(std::holds_alternative<layout_glue_t>(m)) {
+
+		} else if(std::holds_alternative<generator_t>(m)) {
+
+		} else if(std::holds_alternative< sub_layout_t>(m)) {
+			auto& i = std::get<sub_layout_t>(m);
+			rename_control(*i.layout, old_name, new_name);
+		}
+	}
+}
+
+void imgui_layout_contents(layout_level_t& layout) {
+	ImGui::PushID(&layout);
+
+	int32_t temp = 0;
+	{
+		const char* items[] = { "horizontal", "vertical", "overlapped horizontal", "overlapped vertical", "multiline", "multicolumn" };
+		temp = int32_t(layout.type);
+		ImGui::Combo("Layout type", &temp, items, 6);
+		layout.type = layout_type(temp);
+	}
+
+	temp = layout.size_x;
+	ImGui::InputInt("Width (-1 for maximal)", &temp);
+	layout.size_x = int16_t(temp);
+
+	temp = layout.size_y;
+	ImGui::InputInt("Height (-1 for maximal)", &temp);
+	layout.size_y = int16_t(temp);
+
+	temp = layout.margin_top;
+	ImGui::InputInt("Top margin", &temp);
+	layout.margin_top = int16_t(temp);
+
+	temp = layout.margin_bottom;
+	ImGui::InputInt("Bottom margin", &temp);
+	layout.margin_bottom = int16_t(temp);
+
+	temp = layout.margin_left;
+	ImGui::InputInt("Left margin", &temp);
+	layout.margin_left = int16_t(temp);
+
+	temp = layout.margin_right;
+	ImGui::InputInt("Right margin", &temp);
+	layout.margin_right = int16_t(temp);
+
+	{
+		const char* items[] = { "leading", "trailing", "centered" };
+		temp = int32_t(layout.line_alignment);
+		ImGui::Combo("Line alignment", &temp, items, 3);
+		layout.line_alignment = layout_line_alignment(temp);
+	}
+	{
+		const char* items[] = { "leading", "trailing", "centered" };
+		temp = int32_t(layout.line_internal_alignment);
+		ImGui::Combo("Internal line alignment", &temp, items, 3);
+		layout.line_internal_alignment = layout_line_alignment(temp);
+	}
+	if(layout.type == layout_type::mulitline_horizontal || layout.type == layout_type::multiline_vertical) {
+		temp = layout.interline_spacing;
+		ImGui::InputInt("Interline spacing", &temp);
+		layout.interline_spacing = uint8_t(temp);
+	}
+
+	ImGui::Checkbox("Paged", &(layout.paged));
+	if(layout.paged) {
+		{
+			const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
+			temp = int32_t(layout.page_animation);
+			ImGui::Combo("Animation", &temp, items, 4);
+			layout.page_animation = animation_type(temp);
+		}
+		/* {
+			const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+			temp = int32_t(layout.page_display_color);
+			ImGui::Combo("Page numbering color", &temp, items, 16);
+			layout.page_display_color = text_color(temp);
+		} */
+	}
+
+	int32_t id = 0;
+	ImGui::Text("Contents:");
+	ImGui::Indent();
+	ImGui::Separator();
+
+	for(auto& m : layout.contents) {
+		ImGui::PushID(id);
+
+		if(std::holds_alternative< layout_control_t>(m)) {
+			auto& i = std::get<layout_control_t>(m);
+			if(ImGui::TreeNodeEx("Control", ImGuiTreeNodeFlags_SpanFullWidth)) {
+				if(ImGui::Button("Delete")) {
+					layout.contents.erase(layout.contents.begin() + id);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+				if(id > 0) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move up")) {
+						std::swap(layout.contents[id - 1], layout.contents[id]);
+					}
+				}
+				if(id + 1 < layout.contents.size()) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move down")) {
+						std::swap(layout.contents[id + 1], layout.contents[id]);
+					}
+				}
+
+				std::vector<char const*> control_names;
+				control_names.push_back("[none]");
+				int32_t selection = (i.name == "" ? 0 : -1);
+				for(auto& c : open_project.windows[selected_window].children) {
+					control_names.push_back(c.name.c_str());
+					if(c.name == i.name) {
+						selection = int32_t(control_names.size() - 1);
+					}
+				}
+
+				temp = selection;
+				ImGui::Combo("Name", &selection, control_names.data(), int32_t(control_names.size()));
+				if(temp != selection) {
+					if(selection == 0)
+						i.name = "";
+					else
+						i.name = open_project.windows[selected_window].children[selection -1].name;
+				}
+
+				ImGui::Checkbox("Absolute position", &(i.absolute_position));
+				if(i.absolute_position) {
+					temp = i.abs_x;
+					ImGui::InputInt("Absolute x position", &temp);
+					i.abs_x = int16_t(temp);
+
+					temp = i.abs_y;
+					ImGui::InputInt("Absolute y position", &temp);
+					i.abs_y = int16_t(temp);
+				}
+				ImGui::TreePop();
+			}
+		} else if(std::holds_alternative<layout_window_t>(m)) {
+			auto& i = std::get<layout_window_t>(m);
+			if(ImGui::TreeNodeEx("Sub window", ImGuiTreeNodeFlags_SpanFullWidth)) {
+				if(ImGui::Button("Delete")) {
+					layout.contents.erase(layout.contents.begin() + id);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+				if(id > 0) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move up")) {
+						std::swap(layout.contents[id - 1], layout.contents[id]);
+					}
+				}
+				if(id + 1 < layout.contents.size()) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move down")) {
+						std::swap(layout.contents[id + 1], layout.contents[id]);
+					}
+				}
+
+				std::vector<char const*> window_names;
+				window_names.push_back("[none]");
+				int32_t selection = (i.name == "" ? 0 : -1);
+				for(auto& win : open_project.windows) {
+					window_names.push_back(win.wrapped.name.c_str());
+					if(win.wrapped.name == i.name) {
+						selection = int32_t(window_names.size() - 1);
+					}
+				}
+
+				temp = selection;
+				ImGui::Combo("Name", &selection, window_names.data(), int32_t(window_names.size()));
+				if(temp != selection && selection != selected_window) {
+					if(selection == 0)
+						i.name = "";
+					else
+						i.name = open_project.windows[selection - 1].wrapped.name;
+				}
+
+				ImGui::Checkbox("Absolute position", &(i.absolute_position));
+				if(i.absolute_position) {
+					temp = i.abs_x;
+					ImGui::InputInt("Absolute x position", &temp);
+					i.abs_x = int16_t(temp);
+
+					temp = i.abs_y;
+					ImGui::InputInt("Absolute y position", &temp);
+					i.abs_y = int16_t(temp);
+				}
+				ImGui::TreePop();
+			}
+		} else if(std::holds_alternative<layout_glue_t>(m)) {
+			auto& i = std::get<layout_glue_t>(m);
+			if(ImGui::TreeNodeEx("Glue", ImGuiTreeNodeFlags_SpanFullWidth)) {
+				if(ImGui::Button("Delete")) {
+					layout.contents.erase(layout.contents.begin() + id);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+				if(id > 0) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move up")) {
+						std::swap(layout.contents[id - 1], layout.contents[id]);
+					}
+				}
+				if(id + 1 < layout.contents.size()) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move down")) {
+						std::swap(layout.contents[id + 1], layout.contents[id]);
+					}
+				}
+
+				{
+					const char* items[] = { "standard", "at least", "line break", "page break", "don't break" };
+					temp = int32_t(i.type);
+					ImGui::Combo("Glue type", &temp, items, 5);
+					i.type = glue_type(temp);
+				}
+				if(i.type == glue_type::standard || i.type == glue_type::at_least || i.type == glue_type::glue_don_t_break) {
+					temp = i.amount;
+					ImGui::InputInt("Glue amount", &temp);
+					i.amount = int16_t(temp);
+				}
+				ImGui::TreePop();
+			}
+		} else if(std::holds_alternative<generator_t>(m)) {
+			auto& i = std::get<generator_t>(m);
+			if(ImGui::TreeNodeEx("Generator", ImGuiTreeNodeFlags_SpanFullWidth)) {
+				if(ImGui::Button("Delete")) {
+					layout.contents.erase(layout.contents.begin() + id);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+				if(id > 0) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move up")) {
+						std::swap(layout.contents[id - 1], layout.contents[id]);
+					}
+				}
+				if(id + 1 < layout.contents.size()) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move down")) {
+						std::swap(layout.contents[id + 1], layout.contents[id]);
+					}
+				}
+
+				ImGui::InputText("Name", &(i.name));
+				
+				ImGui::Text("Generated items:");
+				int32_t id2 = 4000;
+				for(auto& win : open_project.windows) {
+					if(win.wrapped.name == open_project.windows[selected_window].wrapped.name)
+						continue;
+
+					ImGui::PushID(id2);
+					auto list_it = std::find_if(i.inserts.begin(), i.inserts.end(), [&](auto& p) { return p.name == win.wrapped.name; });
+					bool already_in_list = list_it != i.inserts.end();
+					bool temp_option = already_in_list;
+
+					ImGui::Checkbox(win.wrapped.name.c_str(), &temp_option);
+
+					if(temp_option && !already_in_list) {
+						i.inserts.push_back(generator_item{ win.wrapped.name, "", -1, false });
+					} else if(!temp_option && already_in_list) {
+						i.inserts.erase(list_it);
+						ImGui::PopID();
+						break;
+					}
+					if(already_in_list && temp_option) {
+						ImGui::Indent();
+
+						temp = list_it->inter_item_space;
+						ImGui::InputInt("Inter-item space", &temp);
+						list_it->inter_item_space = int16_t(temp);
+
+						{
+							const char* items[] = { "standard", "at least", "line break", "page break", "don't break" };
+							temp = int32_t(list_it->glue);
+							ImGui::Combo("Glue type", &temp, items, 5);
+							list_it->glue = glue_type(temp);
+						}
+
+						ImGui::Checkbox("Sortable", &(list_it->sortable));
+
+						std::vector<char const*> window_names;
+						window_names.push_back("[none]");
+						int32_t selection = (list_it->header == "" ? 0 : -1);
+						for(auto& win : open_project.windows) {
+							window_names.push_back(win.wrapped.name.c_str());
+							if(win.wrapped.name == list_it->header) {
+								selection = int32_t(window_names.size() - 1);
+							}
+						}
+
+						temp = selection;
+						ImGui::Combo("Header", &selection, window_names.data(), int32_t(window_names.size()));
+						if(temp != selection && selection != selected_window) {
+							if(selection == 0)
+								list_it->header = "";
+							else
+								list_it->header = open_project.windows[selection - 1].wrapped.name;
+						}
+
+						ImGui::Unindent();
+					}
+					ImGui::PopID();
+					++id2;
+				}
+				ImGui::TreePop();
+			}
+		} else if(std::holds_alternative< sub_layout_t>(m)) {
+			auto& i = std::get<sub_layout_t>(m);
+			if(ImGui::TreeNodeEx("Sub layout", ImGuiTreeNodeFlags_SpanFullWidth)) {
+				if(ImGui::Button("Delete")) {
+					layout.contents.erase(layout.contents.begin() + id);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+				if(id > 0) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move up")) {
+						std::swap(layout.contents[id - 1], layout.contents[id]);
+					}
+				}
+				if(id + 1 < layout.contents.size()) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move down")) {
+						std::swap(layout.contents[id + 1], layout.contents[id]);
+					}
+				}
+
+				imgui_layout_contents(*i.layout);
+				ImGui::TreePop();
+			}
+		}
+
+		ImGui::Separator();
+
+		ImGui::PopID();
+		++id;
+	}
+	// new content button
+	//
+	static int32_t new_content_choice = 0;
+	{
+		const char* items[] = { "Control", "Window", "Glue", "Generator", "Layout" };
+		ImGui::Combo("Type", &new_content_choice, items, 5);
+	}
+	ImGui::SameLine();
+	if(ImGui::Button("Add")) {
+		switch(new_content_choice) {
+			case 0:
+				layout.contents.emplace_back(layout_control_t{ });
+				break;
+			case 1:
+				layout.contents.emplace_back(layout_window_t{ });
+				break;
+			case 2:
+				layout.contents.emplace_back(layout_glue_t{ });
+				break;
+			case 3:
+				layout.contents.emplace_back(generator_t{ });
+				break;
+			case 4:
+				layout.contents.emplace_back(sub_layout_t{ });
+				std::get<sub_layout_t>(layout.contents.back()).layout = std::make_unique<layout_level_t>();
+				break;
+		}
+	}
+	ImGui::Unindent();
+	ImGui::PopID();
+}
+
+layout_control_t* find_control(layout_level_t& lvl, int32_t index) {
+	for(auto& m : lvl.contents) {
+		if(std::holds_alternative<layout_control_t>(m)) {
+			auto& i = get<layout_control_t>(m);
+			if(i.cached_index == int16_t(index))
+				return &i;
+		} else if(holds_alternative<sub_layout_t>(m)) {
+			auto& i = get<sub_layout_t>(m);
+			auto r = find_control(*i.layout, index);
+			if(r)
+				return r;
+		}
+	}
+	return nullptr;
+}
 
 // Main code
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
@@ -405,6 +1807,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	// Create window with graphics context
 	GLFWwindow* window = glfwCreateWindow(1280, 720, "Alice UI Editor", nullptr, nullptr);
 	glfwSetScrollCallback(window, scroll_callback);
+	glfwMaximizeWindow(window);
 
 	if(window == nullptr)
 		return 1;
@@ -473,8 +1876,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 	float ui_scale = std::max(1.0f, std::floor(text_scale + 0.5f));
-	float drag_offset_x = 0.0f;
-	float drag_offset_y = 0.0f;
+	
 
 	float drag_start_x = 0.0f;
 	float drag_start_y = 0.0f;
@@ -486,14 +1888,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	} base_values;
 	bool dragging = false;
 
-	open_project_t open_project;
+	
 	open_project.grid_size = 10;
-
-	int32_t selected_window = -1;
-	int32_t chosen_window = -1;
-	bool just_chose_window = false;
-	int32_t selected_control = -1;
-	int32_t chosen_control = -1;
 
 	drag_target control_drag_target = drag_target::none;
 
@@ -681,6 +2077,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					if(ImGui::Button("Delete")) {
 						switch_to_window(-1);
 						open_project.windows.erase(open_project.windows.begin() + i);
+						ImGui::PopID();
+						break;
+					}
+					ImGui::SameLine();
+					if(ImGui::Button("Copy container")) {
+						open_project.windows.push_back(open_project.windows[i]);
+						open_project.windows.back().wrapped.name += "_copy";
 					}
 					ImGui::InputText("Name", &(open_project.windows[i].wrapped.temp_name));
 					ImGui::SameLine();
@@ -698,6 +2101,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							if(found) {
 								MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
 							} else {
+								for(auto& ow : open_project.windows)
+									rename_window(ow.layout, open_project.windows[i].wrapped.name, open_project.windows[i].wrapped.temp_name);
+
 								open_project.windows[i].wrapped.name = open_project.windows[i].wrapped.temp_name;
 							}
 						}
@@ -764,6 +2170,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::InputInt("Border size", &temp);
 						open_project.windows[i].wrapped.border_size = int16_t(std::max(0, temp));
 					}
+					ImGui::Checkbox("Share table highlight", &(open_project.windows[i].wrapped.share_table_highlight));
 					ImGui::Checkbox("Receive updates while hidden", &(open_project.windows[i].wrapped.updates_while_hidden));
 					temp = 0;
 					switch(open_project.windows[i].wrapped.orientation) {
@@ -810,6 +2217,33 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					if(ImGui::Button("Add Member Variable")) {
 						open_project.windows[i].wrapped.members.emplace_back();
 					}
+
+					{
+						std::string tex = "Page left: " + (open_project.windows[i].wrapped.page_left_texture.size() > 0 ? open_project.windows[i].wrapped.page_left_texture : std::string("[none]"));
+						ImGui::Text(tex.c_str());
+						ImGui::SameLine();
+						if(ImGui::Button("Change (pl)")) {
+							auto new_file = fs::pick_existing_file(L"");
+							auto breakpt = new_file.find_last_of(L'\\');
+							open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						}
+					}
+					{
+						std::string tex = "Page right: " + (open_project.windows[i].wrapped.page_right_texture.size() > 0 ? open_project.windows[i].wrapped.page_right_texture : std::string("[none]"));
+						ImGui::Text(tex.c_str());
+						ImGui::SameLine();
+						if(ImGui::Button("Change (pr)")) {
+							auto new_file = fs::pick_existing_file(L"");
+							auto breakpt = new_file.find_last_of(L'\\');
+							open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						}
+					}
+					{
+						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+						temp = int32_t(open_project.windows[i].wrapped.page_text_color);
+						ImGui::Combo("Page number text color", &temp, items, 16);
+						open_project.windows[i].wrapped.page_text_color = text_color(temp);
+					}
 				}
 				ImGui::PopID();
 			}
@@ -855,18 +2289,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::PopID();
 							break;
 						}
-						if(j > 0) {
-							ImGui::SameLine();
-							if(ImGui::Button("Move down")) {
-								std::swap(win.children[j - 1], win.children[j]);
-							}
-						}
-						if(j + 1 < win.children.size()) {
-							ImGui::SameLine();
-							if(ImGui::Button("Move up")) {
-								std::swap(win.children[j + 1], win.children[j]);
-							}
-						}
 						ImGui::SameLine();
 						if(ImGui::Button("Copy")) {
 							win.children.push_back(win.children[j]);
@@ -891,18 +2313,22 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								if(found) {
 									MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
 								} else {
+									rename_control(win.layout, c.name, c.temp_name);
 									c.name = c.temp_name;
 								}
 							}
 						}
 
-						int32_t temp = c.x_pos;
+						int32_t temp = 0;
+						/*
+						temp = c.x_pos;
 						ImGui::InputInt("X position", &temp);
 						c.x_pos = int16_t(temp);
 
 						temp = c.y_pos;
 						ImGui::InputInt("Y position", &temp);
 						c.y_pos = int16_t(temp);
+						*/
 
 						temp = c.x_size;
 						ImGui::InputInt("Width", &temp);
@@ -921,9 +2347,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::Checkbox("Ignore grid", &(c.no_grid));
 
 						{
-							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart" };
+							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag" };
 							temp = int32_t(c.background);
-							ImGui::Combo("Background", &temp, items, 6);
+							ImGui::Combo("Background", &temp, items, 8);
 							c.background = background_type(temp);
 						}
 
@@ -968,6 +2394,16 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							c.datapoints = int16_t(temp);
 
 							ImGui::InputText("Data key", &c.list_content);
+							ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+						} else if(c.background == background_type::colorsquare) {
+							{
+								ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
+								ImGui::ColorEdit4("Default color", (float*)&ccolor);
+								c.other_color.r = ccolor.x;
+								c.other_color.g = ccolor.y;
+								c.other_color.b = ccolor.z;
+								c.other_color.a = ccolor.w;
+							}
 						}
 						if(c.background == background_type::bordered_texture) {
 							temp = c.border_size;
@@ -1122,6 +2558,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 									if(ImGui::Button("Delete")) {
 										c.table_columns.erase(c.table_columns.begin() + k);
+										ImGui::Unindent();
+										ImGui::PopID();
+										break;
 									}
 									if(k > 0) {
 										ImGui::SameLine();
@@ -1238,6 +2677,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 				ImGui::End();
 			}
+
+			if(0 <= selected_window && selected_window <= int32_t(open_project.windows.size())) {
+				ImGui::Begin("Layout");
+				imgui_layout_contents(open_project.windows[selected_window].layout);
+				ImGui::End();
+			}
 		}
 
 
@@ -1268,7 +2713,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 					for(auto i = win.children.size(); i-- > 0; ) {
 						auto& c = win.children[i];
-						auto ct = test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + c.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + c.y_pos * ui_scale + drag_offset_y, c.x_size * ui_scale, c.y_size * ui_scale, ui_scale);
+						auto ct = test_rect_target(io.MousePos.x, io.MousePos.y, c.x_pos, c.y_pos, c.x_size * ui_scale, c.y_size * ui_scale, ui_scale);
 						if(ct != drag_target::none) {
 							selected_control = int32_t(i);
 							chosen_control = selected_control;
@@ -1276,8 +2721,15 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 							drag_start_x = io.MousePos.x;
 							drag_start_y = io.MousePos.y;
-							base_values.x_pos = c.x_pos;
-							base_values.y_pos = c.y_pos;
+							auto lc = find_control(win.layout, selected_control);
+							if(lc) {
+								base_values.x_pos = lc->abs_x;
+								base_values.y_pos = lc->abs_y;
+							} else {
+								base_values.x_pos = c.x_pos;
+								base_values.y_pos = c.y_pos;
+							}
+							
 							base_values.x_size = c.x_size;
 							base_values.y_size = c.y_size;
 							break;
@@ -1394,69 +2846,55 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						auto& c = win.children[selected_control];
 						switch(control_drag_target) {
 							case drag_target::center:
-								c.x_pos = int16_t(c.no_grid ? (base_values.x_pos + offset_x) : (base_values.x_pos + offset_x - std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
-								c.y_pos = int16_t(c.no_grid ? (base_values.y_pos + offset_y) : (base_values.y_pos + offset_y - std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
-								break;
+							{
+								auto lc = find_control(win.layout, selected_control);
+								if(lc && lc->absolute_position) {
+									lc->abs_x = int16_t(base_values.x_pos + offset_x - (c.no_grid ? 0.0f : std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
+									lc->abs_y = int16_t(base_values.y_pos + offset_y - (c.no_grid ? 0.0f : std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
+								}
+							} break;
 							case drag_target::left:
 							{
-								auto right = c.x_pos + c.x_size;
-								c.x_pos = int16_t(c.no_grid ? (base_values.x_pos + offset_x) : (base_values.x_pos + offset_x - std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
-								c.x_size = int16_t(std::max(0, right - c.x_pos));
+								c.x_size = int16_t(std::max(0.0f, base_values.x_size - offset_x - (c.no_grid ? 0.0f : std::fmod(base_values.x_size - offset_x, float(open_project.grid_size)))));
 							}
 							break;
 							case drag_target::right:
 							{
-								auto right = int16_t(c.no_grid ? (base_values.x_pos + base_values.x_size + offset_x) : (base_values.x_pos + base_values.x_size + offset_x - std::fmod(base_values.x_pos + base_values.x_size + offset_x, float(open_project.grid_size))));
-								c.x_size = int16_t(std::max(0, right - c.x_pos));
+								c.x_size = int16_t(std::max(0.0f, base_values.x_size + offset_x - (c.no_grid ? 0.0f : std::fmod(base_values.x_size + offset_x, float(open_project.grid_size)))));
 							}
 							break;
 							case drag_target::top:
 							{
-								auto bottom = c.y_pos + c.y_size;
-								c.y_pos = int16_t(c.no_grid ? (base_values.y_pos + offset_y) : (base_values.y_pos + offset_y - std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
-								c.y_size = int16_t(std::max(0, bottom - c.y_pos));
+								c.y_size = int16_t(std::max(0.0f, base_values.y_size - offset_y - (c.no_grid ? 0.0f : std::fmod(base_values.y_size - offset_y, float(open_project.grid_size)))));
 							}
 							break;
 							case drag_target::bottom:
 							{
-								auto bottom = int16_t(c.no_grid ? (base_values.y_pos + base_values.y_size + offset_y) : (base_values.y_pos + base_values.y_size + offset_y - std::fmod(base_values.y_pos + base_values.y_size + offset_y, float(open_project.grid_size))));
-								c.y_size = int16_t(std::max(0, bottom - c.y_pos));
+								c.y_size = int16_t(std::max(0.0f, base_values.y_size + offset_y - (c.no_grid ? 0.0f : std::fmod(base_values.y_size + offset_y, float(open_project.grid_size)))));
 							}
 							break;
 							case drag_target::top_left:
 							{
-								auto right = c.x_pos + c.x_size;
-								c.x_pos = int16_t(c.no_grid ? (base_values.x_pos + offset_x) : (base_values.x_pos + offset_x - std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
-								c.x_size = int16_t(std::max(0, right - c.x_pos));
-								auto bottom = c.y_pos + c.y_size;
-								c.y_pos = int16_t(c.no_grid ? (base_values.y_pos + offset_y) : (base_values.y_pos + offset_y - std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
-								c.y_size = int16_t(std::max(0, bottom - c.y_pos));
+								c.x_size = int16_t(std::max(0.0f, base_values.x_size - offset_x - (c.no_grid ? 0.0f : std::fmod(base_values.x_size - offset_x, float(open_project.grid_size)))));
+								c.y_size = int16_t(std::max(0.0f, base_values.y_size - offset_y - (c.no_grid ? 0.0f : std::fmod(base_values.y_size - offset_y, float(open_project.grid_size)))));
 							}
 							break;
 							case drag_target::top_right:
 							{
-								auto right = int16_t(c.no_grid ? (base_values.x_pos + base_values.x_size + offset_x) : (base_values.x_pos + base_values.x_size + offset_x - std::fmod(base_values.x_pos + base_values.x_size + offset_x, float(open_project.grid_size))));
-								c.x_size = int16_t(std::max(0, right - c.x_pos));
-								auto bottom = c.y_pos + c.y_size;
-								c.y_pos = int16_t(c.no_grid ? (base_values.y_pos + offset_y) : (base_values.y_pos + offset_y - std::fmod(base_values.y_pos + offset_y, float(open_project.grid_size))));
-								c.y_size = int16_t(std::max(0, bottom - c.y_pos));
+								c.x_size = int16_t(std::max(0.0f, base_values.x_size + offset_x - (c.no_grid ? 0.0f : std::fmod(base_values.x_size + offset_x, float(open_project.grid_size)))));
+								c.y_size = int16_t(std::max(0.0f, base_values.y_size - offset_y - (c.no_grid ? 0.0f : std::fmod(base_values.y_size - offset_y, float(open_project.grid_size)))));
 							}
 							break;
 							case drag_target::bottom_left:
 							{
-								auto right = c.x_pos + c.x_size;
-								c.x_pos = int16_t(c.no_grid ? (base_values.x_pos + offset_x) : (base_values.x_pos + offset_x - std::fmod(base_values.x_pos + offset_x, float(open_project.grid_size))));
-								c.x_size = int16_t(std::max(0, right - c.x_pos));
-								auto bottom = int16_t(c.no_grid ? (base_values.y_pos + base_values.y_size + offset_y) : (base_values.y_pos + base_values.y_size + offset_y - std::fmod(base_values.y_pos + base_values.y_size + offset_y, float(open_project.grid_size))));
-								c.y_size = int16_t(std::max(0, bottom - c.y_pos));
+								c.x_size = int16_t(std::max(0.0f, base_values.x_size - offset_x - (c.no_grid ? 0.0f : std::fmod(base_values.x_size - offset_x, float(open_project.grid_size)))));
+								c.y_size = int16_t(std::max(0.0f, base_values.y_size + offset_y - (c.no_grid ? 0.0f : std::fmod(base_values.y_size + offset_y, float(open_project.grid_size)))));
 							}
 							break;
 							case drag_target::bottom_right:
 							{
-								auto right = int16_t(c.no_grid ? (base_values.x_pos + base_values.x_size + offset_x) : (base_values.x_pos + base_values.x_size + offset_x - std::fmod(base_values.x_pos + base_values.x_size + offset_x, float(open_project.grid_size))));
-								c.x_size = int16_t(std::max(0, right - c.x_pos));
-								auto bottom = int16_t(c.no_grid ? (base_values.y_pos + base_values.y_size + offset_y) : (base_values.y_pos + base_values.y_size + offset_y - std::fmod(base_values.y_pos + base_values.y_size + offset_y, float(open_project.grid_size))));
-								c.y_size = int16_t(std::max(0, bottom - c.y_pos));
+								c.x_size = int16_t(std::max(0.0f, base_values.x_size + offset_x - (c.no_grid ? 0.0f : std::fmod(base_values.x_size + offset_x, float(open_project.grid_size)))));
+								c.y_size = int16_t(std::max(0.0f, base_values.y_size + offset_y - (c.no_grid ? 0.0f : std::fmod(base_values.y_size + offset_y, float(open_project.grid_size)))));
 							}
 							break;
 							default: break;
@@ -1476,7 +2914,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 					for(auto i = win.children.size(); i-- > 0; ) {
 						auto& c = win.children[i];
-						auto ct = test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + c.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + c.y_pos * ui_scale + drag_offset_y, c.x_size * ui_scale, c.y_size * ui_scale, ui_scale);
+						auto ct = test_rect_target(io.MousePos.x, io.MousePos.y, c.x_pos, c.y_pos, c.x_size * ui_scale, c.y_size * ui_scale, ui_scale);
 						if(ct != drag_target::none) {
 							selected_control = int32_t(i);
 							mouse_to_drag_type(ct);
@@ -1515,79 +2953,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 		if(0 <= selected_window && selected_window < int32_t(open_project.windows.size())) {
 			auto& win = open_project.windows[selected_window];
 			bool highlightwin = selected_control == -1 && (test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + drag_offset_y, win.wrapped.x_size * ui_scale, win.wrapped.y_size * ui_scale, ui_scale) != drag_target::none || control_drag_target != drag_target::none);
-			
-			if(win.wrapped.background == background_type::none || win.wrapped.background == background_type::existing_gfx || win.wrapped.texture.empty() || win.wrapped.background == background_type::linechart || win.wrapped.background == background_type::stackedbarchart) {
-				render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
-			} else if(win.wrapped.background == background_type::texture) {
-				if(win.wrapped.ogl_texture.loaded == false) {
-					win.wrapped.ogl_texture.load(open_project.project_directory +  fs::utf8_to_native(win.wrapped.texture));
-				}
-				if(win.wrapped.ogl_texture.texture_handle == 0) {
-					render_empty_rect(win.wrapped.rectangle_color* (highlightwin ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos* ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos* ui_scale + drag_offset_y), std::max(1, int32_t(win.wrapped.x_size* ui_scale)), std::max(1, int32_t(win.wrapped.y_size* ui_scale)));
-				} else {
-					render_textured_rect(win.wrapped.rectangle_color* (highlightwin ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos* ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos* ui_scale + drag_offset_y), std::max(1, int32_t(win.wrapped.x_size* ui_scale)), std::max(1, int32_t(win.wrapped.y_size* ui_scale)), win.wrapped.ogl_texture.texture_handle);
-				}
-			} else if(win.wrapped.background == background_type::bordered_texture) {
-				if(win.wrapped.ogl_texture.loaded == false) {
-					win.wrapped.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(win.wrapped.texture));
-				}
-				if(win.wrapped.ogl_texture.texture_handle == 0) {
-					render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
-				} else {
-					render_stretch_textured_rect(win.wrapped.rectangle_color* (highlightwin ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos* ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos* ui_scale + drag_offset_y), std::max(1, int32_t(win.wrapped.x_size* ui_scale)), std::max(1, int32_t(win.wrapped.y_size* ui_scale)), win.wrapped.border_size * ui_scale, win.wrapped.ogl_texture.texture_handle);
-				}
-			}
-
-			for(auto i = size_t(0); i < win.children.size(); ++i) {
-				auto& c = win.children[i];
-
-				auto ct = test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + c.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + c.y_pos * ui_scale + drag_offset_y, c.x_size * ui_scale, c.y_size * ui_scale, ui_scale);
-				bool highlight_control = selected_control == int32_t(i);
-
-				if(c.container_type == container_type::table) {
-					if(c.table_columns.empty()) {
-						c.x_size = int16_t(open_project.grid_size);
-					} else {
-						int16_t sum = 0;
-						for(auto& col : c.table_columns) {
-							sum += col.display_data.width;
-						}
-						c.x_size = sum;
-					}
-				}
-
-				if(c.background == background_type::none || c.background == background_type::existing_gfx ||  c.texture.empty()) {
-					if(c.container_type != container_type::table || c.table_columns.empty()) {
-						render_empty_rect(c.rectangle_color * (highlight_control ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos * ui_scale + c.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos * ui_scale + c.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
-					}
-				} else if(c.background == background_type::texture) {
-					if(c.ogl_texture.loaded == false) {
-						c.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(c.texture));
-					}
-					if(c.ogl_texture.texture_handle == 0) {
-						render_empty_rect(c.rectangle_color* (highlight_control ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos* ui_scale + c.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos* ui_scale + c.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
-					} else {
-						render_textured_rect(c.rectangle_color* (highlight_control ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos* ui_scale + c.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos* ui_scale + c.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)), c.ogl_texture.texture_handle);
-					}
-				} else if(c.background == background_type::bordered_texture) {
-					if(c.ogl_texture.loaded == false) {
-						c.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(c.texture));
-					}
-					if(c.ogl_texture.texture_handle == 0) {
-						render_empty_rect(c.rectangle_color * (highlight_control ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos * ui_scale + c.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos * ui_scale + c.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
-					} else {
-						render_stretch_textured_rect(c.rectangle_color* (highlight_control ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos* ui_scale + c.x_pos * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos* ui_scale + c.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)), c.border_size * ui_scale, c.ogl_texture.texture_handle);
-					}
-				}
-
-				if(c.container_type == container_type::table) {
-					int16_t sum = 0;
-					for(auto& col : c.table_columns) {
-						render_empty_rect(c.rectangle_color* (highlight_control ? 1.0f : 0.8f), int32_t(win.wrapped.x_pos* ui_scale + (c.x_pos + sum) * ui_scale + drag_offset_x), int32_t(win.wrapped.y_pos* ui_scale + c.y_pos * ui_scale + drag_offset_y), std::max(1, int32_t(col.display_data.width * ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
-						sum += col.display_data.width;
-					}
-				}
-			}
+			render_window(win, (win.wrapped.x_pos + drag_offset_x / ui_scale), (win.wrapped.y_pos + drag_offset_y / ui_scale), highlightwin, ui_scale);
 		}
 
 		//

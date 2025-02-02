@@ -3,10 +3,11 @@
 #include <string>
 #include <vector>
 #include <variant>
+#include <memory>
 #include "texture.hpp"
 
 enum class background_type : uint8_t {
-	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart
+	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart, colorsquare, flag
 }; 
 enum class aui_text_alignment : uint8_t {
 	left, right, center
@@ -105,6 +106,8 @@ struct window_element_t {
 	std::string parent;
 	std::string texture;
 	std::string alternate_bg;
+	std::string page_left_texture;
+	std::string page_right_texture;
 	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };
 	ogl::texture ogl_texture;
 	int16_t x_size = 0;
@@ -113,12 +116,15 @@ struct window_element_t {
 	int16_t y_pos = 0;
 	int16_t border_size = 0;
 	background_type background = background_type::none;
+	text_color page_text_color = text_color::black;
 	bool no_grid = false;
 	bool has_alternate_bg = false;
 	bool updates_while_hidden = false;
 	bool draggable = false;
 	orientation orientation = orientation::upper_left;
 	bool ignore_rtl = false;
+	bool share_table_highlight = false;
+	bool parent_is_layout = false;
 };
 
 enum class property : uint8_t {
@@ -165,6 +171,9 @@ enum class property : uint8_t {
 	other_color = 40,
 	hover_activation = 41,
 	hotkey = 42,
+	share_table_highlight = 43,
+	page_button_textures = 44,
+	layout_information = 45
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -245,9 +254,104 @@ struct ui_element_t {
 	bool hover_activation = false;
 };
 
+enum class layout_type : uint8_t {
+	single_horizontal,
+	single_vertical,
+	overlapped_horizontal,
+	overlapped_vertical,
+	mulitline_horizontal,
+	multiline_vertical
+};
+enum class layout_line_alignment : uint8_t {
+	leading, trailing, centered
+};
+enum class glue_type : uint8_t {
+	standard,
+	at_least,
+	line_break,
+	page_break,
+	glue_don_t_break
+};
+
+struct layout_control_t {
+	std::string name;
+	int16_t cached_index = -1;
+	int16_t abs_x = 0;
+	int16_t abs_y = 0;
+	bool absolute_position = false;
+};
+struct layout_window_t {
+	std::string name;
+	int16_t cached_index = -1;
+	int16_t abs_x = 0;
+	int16_t abs_y = 0;
+	bool absolute_position = false;
+};
+struct layout_glue_t {
+	glue_type type = glue_type::standard;
+	int16_t amount = 0;
+};
+/*
+design: layout process vs. providing specific items
+
+step 0: container update function
+step 1: generator update -- generator internally makes a list, resets any internal data
+step 3: layout repeatedly asks generator for next (note: may need to back up), also signaling whether it is at the start of a page/column
+	layout calls place function, passing NULL as container pointer, generator pseudo-inserts one or more elements, returns size and glue
+step 4: particular page is generated:
+	generator told to reset pools
+	layout calls place function, passing container pointer and item parity, generator inserts one or more elements, returns size (and glue ?)
+*/
+
+struct generator_item {
+	std::string name;
+	std::string header;
+	int16_t cached_index = -1;
+	int16_t inter_item_space = 0;
+	glue_type glue = glue_type::standard;
+	bool sortable;
+};
+struct generator_t {
+	std::string name;
+	std::vector<generator_item> inserts;
+};
+struct layout_level_t;
+struct sub_layout_t {
+	std::unique_ptr<layout_level_t> layout;
+
+	sub_layout_t() noexcept = default;
+	sub_layout_t(sub_layout_t const& o) noexcept {
+		std::abort();
+	}
+	sub_layout_t(sub_layout_t&& o) noexcept = default;
+	sub_layout_t& operator=(sub_layout_t&& o) noexcept = default;
+	~sub_layout_t() = default;
+};
+
+using layout_item = std::variant<std::monostate, layout_control_t, layout_window_t, layout_glue_t, generator_t, sub_layout_t>;
+
+struct layout_level_t {
+	std::vector<layout_item> contents;
+	std::vector<int32_t> page_starts;
+	int16_t size_x = -1;
+	int16_t size_y = -1;
+	int16_t margin_top = 0;
+	int16_t margin_bottom = -1;
+	int16_t margin_left = -1;
+	int16_t margin_right = -1;
+	layout_line_alignment line_alignment = layout_line_alignment::leading;
+	layout_line_alignment line_internal_alignment = layout_line_alignment::leading;
+	// text_color page_display_color = text_color::black;
+	layout_type type = layout_type::single_horizontal;
+	animation_type page_animation = animation_type::none;
+	uint8_t interline_spacing = 0;
+	bool paged = false;
+};
+
 struct window_element_wrapper_t {
 	window_element_t wrapped;
 	std::vector<ui_element_t> children;
+	layout_level_t layout;
 };
 
 struct open_project_t {
