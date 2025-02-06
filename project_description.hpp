@@ -7,7 +7,7 @@
 #include "texture.hpp"
 
 enum class background_type : uint8_t {
-	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart, colorsquare, flag
+	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart, colorsquare, flag, table_columns, table_headers
 }; 
 enum class aui_text_alignment : uint8_t {
 	left, right, center
@@ -108,6 +108,7 @@ struct window_element_t {
 	std::string alternate_bg;
 	std::string page_left_texture;
 	std::string page_right_texture;
+	std::string table_connection;
 	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };
 	ogl::texture ogl_texture;
 	int16_t x_size = 0;
@@ -173,7 +174,8 @@ enum class property : uint8_t {
 	hotkey = 42,
 	share_table_highlight = 43,
 	page_button_textures = 44,
-	layout_information = 45
+	layout_information = 45,
+	table_connection = 46,
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -202,6 +204,16 @@ struct full_col_data {
 	table_internal_column internal_data;
 	table_display_column display_data;
 };
+struct table_definition {
+	std::string name;
+	std::string temp_name;
+	std::vector< full_col_data> table_columns;
+	std::string ascending_sort_icon;
+	std::string descending_sort_icon;
+	color4f highlight_color{ 0.0f, 0.0f, 0.0f, 0.0f };
+	color3f divider_color{ 0.0f, 0.0f, 0.0f };
+	bool has_highlight_color = false;
+};
 struct ui_element_t {
 	std::vector< data_member> members;
 	std::vector< std::string> table_inserts;
@@ -219,6 +231,7 @@ struct ui_element_t {
 	std::string row_background_a;
 	std::string row_background_b;
 	std::string hotkey;
+	std::string table_connection;
 	color4f table_highlight_color{ 0.0f, 0.0f, 0.0f, 0.0f };
 	color4f other_color{ 0.0f, 0.0f, 0.0f, 0.0f };
 	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };
@@ -360,5 +373,96 @@ struct open_project_t {
 	std::wstring source_path;
 	int32_t grid_size = 9;
 	std::vector<window_element_wrapper_t> windows;
+	std::vector<table_definition> tables;
 };
+
+inline table_definition const* table_from_name(open_project_t const& proj, std::string const& name) {
+	for(auto& t : proj.tables) {
+		if(t.name == name) {
+			return &t;
+		}
+	}
+	return nullptr;
+}
+inline table_definition* table_from_name(open_project_t& proj, std::string const& name) {
+	for(auto& t : proj.tables) {
+		if(t.name == name) {
+			return &t;
+		}
+	}
+	return nullptr;
+}
+inline window_element_wrapper_t const* window_from_name(open_project_t const& proj, std::string const& name) {
+	for(auto& t : proj.windows) {
+		if(t.wrapped.name == name) {
+			return &t;
+		}
+	}
+	return nullptr;
+}
+inline window_element_wrapper_t* window_from_name(open_project_t& proj, std::string const& name) {
+	for(auto& t : proj.windows) {
+		if(t.wrapped.name == name) {
+			return &t;
+		}
+	}
+	return nullptr;
+}
+inline std::vector<table_definition const*> tables_in_layout(open_project_t const& proj, layout_level_t const& lvl) {
+	std::vector<table_definition const*> result;
+	for(auto& c : lvl.contents) {
+		if(holds_alternative<generator_t>(c)) {
+			auto& i = get<generator_t>(c);
+			for(auto& m : i.inserts) {
+				if(auto w = window_from_name(proj, m.name); w) {
+					if(auto t = table_from_name(proj, w->wrapped.table_connection); t && w->wrapped.table_connection.empty() == false) {
+						if(std::find(result.begin(), result.end(), t) == result.end())
+							result.push_back(t);
+					}
+				}
+			}
+		}
+		if(holds_alternative<sub_layout_t>(c)) {
+			auto& i = get<sub_layout_t>(c);
+			auto sr = tables_in_layout(proj, *i.layout);
+			for(auto t : sr) {
+				if(std::find(result.begin(), result.end(), t) == result.end())
+					result.push_back(t);
+			}
+		}
+	}
+	return result;
+}
+inline std::vector<table_definition*> tables_in_layout(open_project_t& proj, layout_level_t& lvl) {
+	std::vector<table_definition*> result;
+	for(auto& c : lvl.contents) {
+		if(holds_alternative<generator_t>(c)) {
+			auto& i = get<generator_t>(c);
+			for(auto& m : i.inserts) {
+				if(auto w = window_from_name(proj, m.name); w) {
+					if(auto t = table_from_name(proj, w->wrapped.table_connection); t && w->wrapped.table_connection.empty() == false) {
+						if(std::find(result.begin(), result.end(), t) == result.end())
+							result.push_back(t);
+					}
+				}
+			}
+		}
+		if(holds_alternative<sub_layout_t>(c)) {
+			auto& i = get<sub_layout_t>(c);
+			auto sr = tables_in_layout(proj, *i.layout);
+			for(auto t : sr) {
+				if(std::find(result.begin(), result.end(), t) == result.end())
+					result.push_back(t);
+			}
+		}
+	}
+	return result;
+}
+inline std::vector<table_definition const*> tables_in_window(open_project_t const& proj, window_element_wrapper_t const& win) {
+	return tables_in_layout(proj, win.layout);
+}
+inline std::vector<table_definition*> tables_in_window(open_project_t& proj, window_element_wrapper_t& win) {
+	return tables_in_layout(proj, win.layout);
+}
+
 

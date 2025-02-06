@@ -313,6 +313,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 			buffer.write(property::share_table_highlight);
 			buffer.write(win.wrapped.share_table_highlight);
 		}
+		if(win.wrapped.table_connection.size() > 0) {
+			buffer.write(property::table_connection);
+			buffer.write(win.wrapped.table_connection);
+		}
 		for(auto& dm : win.wrapped.members) {
 			buffer.write(property::data_member);
 			buffer.write(dm.type);
@@ -494,6 +498,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 				buffer.write(property::animation_type);
 				buffer.write(c.animation_type);
 			}
+			if(c.table_connection.size() > 0) {
+				buffer.write(property::table_connection);
+				buffer.write(c.table_connection);
+			}
 			for(auto& dm : c.members) {
 				buffer.write(property::data_member);
 				buffer.write(dm.type);
@@ -516,7 +524,93 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 			}
 			buffer.finish_section();
 		}
+		auto table_list = tables_in_window(p, win);
+		for(auto t : table_list) {
+			auto tdef_name = ".tab" + t->name;
+			buffer.start_section(); // essential section
+			buffer.write(tdef_name);
+			buffer.write(t->ascending_sort_icon);
+			buffer.write(t->descending_sort_icon);
+			buffer.write(t->divider_color);
+			buffer.finish_section();
+			buffer.start_section(); // col section
+			for(auto& tc : t->table_columns) {
+				buffer.write(tc.display_data.header_key);
+				buffer.write(tc.display_data.header_tooltip_key);
+				buffer.write(tc.display_data.cell_tooltip_key);
+				buffer.write(tc.display_data.width);
+				buffer.write(tc.display_data.cell_text_color);
+				buffer.write(tc.display_data.header_text_color);
+				buffer.write(tc.display_data.text_alignment);
+			}
+			buffer.finish_section();
+		}
 		buffer.finish_section();
+	}
+	for(auto& tab : p.tables) {
+		buffer.start_section();
+
+		buffer.start_section();
+		std::string table_type = ".TABLE";
+		buffer.write(table_type);
+		buffer.write(tab.name);
+		buffer.write(tab.ascending_sort_icon);
+		buffer.write(tab.descending_sort_icon);
+		buffer.write(tab.highlight_color);
+		buffer.write(tab.divider_color);
+		buffer.write(tab.has_highlight_color);
+		buffer.finish_section();
+
+		buffer.start_section();
+		for(auto& tc : tab.table_columns) {
+			buffer.write(tc.display_data.header_key);
+			buffer.write(tc.display_data.header_tooltip_key);
+			buffer.write(tc.display_data.header_texture);
+			buffer.write(tc.display_data.cell_tooltip_key);
+			buffer.write(tc.display_data.width);
+			buffer.write(tc.display_data.cell_text_color);
+			buffer.write(tc.display_data.header_text_color);
+			buffer.write(tc.display_data.text_alignment);
+			buffer.write(tc.internal_data.column_name);
+			buffer.write(tc.internal_data.container);
+			buffer.write(tc.internal_data.cell_type);
+			buffer.write(tc.internal_data.has_dy_header_tooltip);
+			buffer.write(tc.internal_data.has_dy_cell_tooltip);
+			buffer.write(tc.internal_data.sortable);
+			buffer.write(tc.internal_data.header_background);
+			buffer.write(tc.internal_data.decimal_alignment);
+		}
+		buffer.finish_section();
+
+		buffer.finish_section();
+	}
+}
+
+void make_tables_from_legacy(open_project_t& result) {
+	if(result.tables.empty()) {
+		for(auto& win : result.windows) {
+			for(auto& c : win.children) {
+				if(c.table_columns.empty() == false) {
+					table_definition tab;
+					tab.name = c.name;
+					tab.table_columns = c.table_columns;
+					result.tables.emplace_back(std::move(tab));
+					tab.has_highlight_color = c.has_table_highlight_color;
+					tab.highlight_color = c.table_highlight_color;
+					tab.divider_color = c.table_divider_color;
+				}
+			}
+		}
+	}
+}
+
+void make_layout_from_legacy(open_project_t& result) {
+	for(auto& win : result.windows) {
+		if(win.layout.contents.empty()) {
+			for(auto& c : win.children) {
+				win.layout.contents.push_back(layout_control_t{ c.name, int16_t(-1), c.x_pos, c.y_pos, true });
+			}
+		}
 	}
 }
 
@@ -530,209 +624,253 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 		auto window_section = buffer.read_section(); // essential section
 
 		auto essential_window_section = window_section.read_section(); // essential section
-		window_element_wrapper_t win;
+		
+		auto name = essential_window_section.read<std::string_view>();
+		if(name == ".TABLE") { // table info
+			table_definition tab;
+			essential_window_section.read(tab.name);
+			essential_window_section.read(tab.ascending_sort_icon);
+			essential_window_section.read(tab.descending_sort_icon);
+			essential_window_section.read(tab.highlight_color);
+			essential_window_section.read(tab.divider_color);
+			essential_window_section.read(tab.has_highlight_color);
 
-		essential_window_section.read(win.wrapped.name);
-		essential_window_section.read(win.wrapped.x_pos);
-		essential_window_section.read(win.wrapped.y_pos);
-		essential_window_section.read(win.wrapped.x_size);
-		essential_window_section.read(win.wrapped.y_size);
-		essential_window_section.read(win.wrapped.orientation);
-		while(essential_window_section) {
-			auto ptype = essential_window_section.read< property>();
-			if(ptype == property::border_size) {
-				essential_window_section.read(win.wrapped.border_size);
-			} else if(ptype == property::texture) {
-				essential_window_section.read(win.wrapped.texture);
-			} else if(ptype == property::alternate_bg) {
-				essential_window_section.read(win.wrapped.alternate_bg);
-			} else if(ptype == property::page_button_textures) {
-				essential_window_section.read(win.wrapped.page_left_texture);
-				essential_window_section.read(win.wrapped.page_right_texture);
-				essential_window_section.read(win.wrapped.page_text_color);
-			} else if(ptype == property::layout_information) {
-				bytes_to_layout(win.layout, essential_window_section);
-			} else {
-				abort();
+			auto optional_section = window_section.read_section();
+			while(optional_section) {
+				full_col_data tc;
+				optional_section.read(tc.display_data.header_key);
+				optional_section.read(tc.display_data.header_tooltip_key);
+				optional_section.read(tc.display_data.header_texture);
+				optional_section.read(tc.display_data.cell_tooltip_key);
+				optional_section.read(tc.display_data.width);
+				optional_section.read(tc.display_data.cell_text_color);
+				optional_section.read(tc.display_data.header_text_color);
+				optional_section.read(tc.display_data.text_alignment);
+				optional_section.read(tc.internal_data.column_name);
+				optional_section.read(tc.internal_data.container);
+				optional_section.read(tc.internal_data.cell_type);
+				optional_section.read(tc.internal_data.has_dy_header_tooltip);
+				optional_section.read(tc.internal_data.has_dy_cell_tooltip);
+				optional_section.read(tc.internal_data.sortable);
+				optional_section.read(tc.internal_data.header_background);
+				optional_section.read(tc.internal_data.decimal_alignment);
+				tab.table_columns.emplace_back(std::move(tc));
 			}
-		}
-
-		auto optional_section = window_section.read_section(); // essential section
-
-		optional_section.read(win.wrapped.parent);
-		while(optional_section) {
-			auto ptype = optional_section.read< property>();
-			if(ptype == property::background) {
-				optional_section.read(win.wrapped.background);
-			} else if(ptype == property::rectangle_color) {
-				optional_section.read(win.wrapped.rectangle_color);
-			} else if(ptype == property::no_grid) {
-				optional_section.read(win.wrapped.no_grid);
-			} else if(ptype == property::ignore_rtl) {
-				optional_section.read(win.wrapped.ignore_rtl);
-			} else if(ptype == property::draggable) {
-				optional_section.read(win.wrapped.draggable);
-			} else if(ptype == property::updates_while_hidden) {
-				optional_section.read(win.wrapped.updates_while_hidden);
-			} else if(ptype == property::texture) {
-				optional_section.read(win.wrapped.texture);
-			} else if(ptype == property::has_alternate_bg) {
-				optional_section.read(win.wrapped.has_alternate_bg);
-			} else if(ptype == property::share_table_highlight) {
-				optional_section.read(win.wrapped.share_table_highlight);
-			} else if(ptype == property::data_member) {
-				data_member m;
-				optional_section.read(m.type);
-				optional_section.read(m.name);
-				win.wrapped.members.push_back(m);
-			} else {
-				abort();
-			}
-		}
-
-		while(window_section) {
-			ui_element_t c;
-			auto essential_child_section = window_section.read_section();
-
-			essential_child_section.read(c.name);
-			essential_child_section.read(c.x_pos);
-			essential_child_section.read(c.y_pos);
-			essential_child_section.read(c.x_size);
-			essential_child_section.read(c.y_size);
-
-			while(essential_child_section) {
-				auto ptype = essential_child_section.read< property>();
-				if(ptype == property::text_color) {
-					essential_child_section.read(c.text_color);
+			result.tables.emplace_back(std::move(tab));
+		} else {
+			window_element_wrapper_t win;
+			win.wrapped.name = name;
+			essential_window_section.read(win.wrapped.x_pos);
+			essential_window_section.read(win.wrapped.y_pos);
+			essential_window_section.read(win.wrapped.x_size);
+			essential_window_section.read(win.wrapped.y_size);
+			essential_window_section.read(win.wrapped.orientation);
+			while(essential_window_section) {
+				auto ptype = essential_window_section.read< property>();
+				if(ptype == property::border_size) {
+					essential_window_section.read(win.wrapped.border_size);
 				} else if(ptype == property::texture) {
-					essential_child_section.read(c.texture);
+					essential_window_section.read(win.wrapped.texture);
 				} else if(ptype == property::alternate_bg) {
-					essential_child_section.read(c.alternate_bg);
-				} else if(ptype == property::text_align) {
-					essential_child_section.read(c.text_align);
-				} else if(ptype == property::tooltip_text_key) {
-					essential_child_section.read(c.tooltip_text_key);
-				} else if(ptype == property::text_key) {
-					essential_child_section.read(c.text_key);
-				} else if(ptype == property::text_type) {
-					essential_child_section.read(c.text_type);
-				} else if(ptype == property::text_scale) {
-					essential_child_section.read(c.text_scale);
-				} else if(ptype == property::border_size) {
-					essential_child_section.read(c.border_size);
-				} else if(ptype == property::table_highlight_color) {
-					c.has_table_highlight_color = true;
-					essential_child_section.read(c.table_highlight_color);
-				} else if(ptype == property::ascending_sort_icon) {
-					essential_child_section.read(c.ascending_sort_icon);
-				} else if(ptype == property::descending_sort_icon) {
-					essential_child_section.read(c.descending_sort_icon);
-				} else if(ptype == property::row_background_a) {
-					essential_child_section.read(c.row_background_a);
-				} else if(ptype == property::row_background_b) {
-					essential_child_section.read(c.row_background_b);
-				} else if(ptype == property::row_height) {
-					essential_child_section.read(c.row_height);
-				} else if(ptype == property::table_divider_color) {
-					essential_child_section.read(c.table_divider_color);
-				} else if(ptype == property::other_color) {
-					essential_child_section.read(c.other_color);
-				} else if(ptype == property::table_display_column_data) {
-					table_display_column tc;
-					essential_child_section.read(tc.header_key);
-					essential_child_section.read(tc.header_tooltip_key);
-					essential_child_section.read(tc.header_texture);
-					essential_child_section.read(tc.cell_tooltip_key);
-					essential_child_section.read(tc.width);
-					essential_child_section.read(tc.cell_text_color);
-					essential_child_section.read(tc.header_text_color);
-					essential_child_section.read(tc.text_alignment);
-					c.table_columns.emplace_back();
-					c.table_columns.back().display_data = tc;
+					essential_window_section.read(win.wrapped.alternate_bg);
+				} else if(ptype == property::page_button_textures) {
+					essential_window_section.read(win.wrapped.page_left_texture);
+					essential_window_section.read(win.wrapped.page_right_texture);
+					essential_window_section.read(win.wrapped.page_text_color);
+				} else if(ptype == property::layout_information) {
+					bytes_to_layout(win.layout, essential_window_section);
 				} else {
 					abort();
 				}
 			}
-			int32_t col_count = 0;
-			auto optional_child_section = window_section.read_section();
-			while(optional_child_section) {
-				auto ptype = optional_child_section.read< property>();
+
+			auto optional_section = window_section.read_section();
+
+			optional_section.read(win.wrapped.parent);
+			while(optional_section) {
+				auto ptype = optional_section.read< property>();
 				if(ptype == property::background) {
-					optional_child_section.read(c.background);
+					optional_section.read(win.wrapped.background);
 				} else if(ptype == property::rectangle_color) {
-					optional_child_section.read(c.rectangle_color);
+					optional_section.read(win.wrapped.rectangle_color);
 				} else if(ptype == property::no_grid) {
-					optional_child_section.read(c.no_grid);
-				} else if(ptype == property::table_has_per_section_headers) {
-					optional_child_section.read(c.table_has_per_section_headers);
+					optional_section.read(win.wrapped.no_grid);
 				} else if(ptype == property::ignore_rtl) {
-					optional_child_section.read(c.ignore_rtl);
-				} else if(ptype == property::dynamic_element) {
-					optional_child_section.read(c.dynamic_element);
-				} else if(ptype == property::dynamic_tooltip) {
-					optional_child_section.read(c.dynamic_tooltip);
-				} else if(ptype == property::can_disable) {
-					optional_child_section.read(c.can_disable);
+					optional_section.read(win.wrapped.ignore_rtl);
+				} else if(ptype == property::draggable) {
+					optional_section.read(win.wrapped.draggable);
 				} else if(ptype == property::updates_while_hidden) {
-					optional_child_section.read(c.updates_while_hidden);
-				} else if(ptype == property::left_click_action) {
-					optional_child_section.read(c.left_click_action);
-				} else if(ptype == property::right_click_action) {
-					optional_child_section.read(c.right_click_action);
-				} else if(ptype == property::shift_click_action) {
-					optional_child_section.read(c.shift_click_action);
-				} else if(ptype == property::hover_activation) {
-					optional_child_section.read(c.hover_activation);
-				} else if(ptype == property::dynamic_text) {
-					optional_child_section.read(c.dynamic_text);
-				} else if(ptype == property::container_type) {
-					optional_child_section.read(c.container_type);
-				} else if(ptype == property::child_window) {
-					optional_child_section.read(c.child_window);
-				} else if(ptype == property::list_content) {
-					optional_child_section.read(c.list_content);
+					optional_section.read(win.wrapped.updates_while_hidden);
+				} else if(ptype == property::texture) {
+					optional_section.read(win.wrapped.texture);
 				} else if(ptype == property::has_alternate_bg) {
-					optional_child_section.read(c.has_alternate_bg);
-				} else if(ptype == property::animation_type) {
-					optional_child_section.read(c.animation_type);
-				} else if(ptype == property::datapoints) {
-					optional_child_section.read(c.datapoints);
-				} else if(ptype == property::hotkey) {
-					optional_child_section.read(c.hotkey);
+					optional_section.read(win.wrapped.has_alternate_bg);
+				} else if(ptype == property::share_table_highlight) {
+					optional_section.read(win.wrapped.share_table_highlight);
+				} else if(ptype == property::table_connection) {
+					optional_section.read(win.wrapped.table_connection);
 				} else if(ptype == property::data_member) {
 					data_member m;
-					optional_child_section.read(m.type);
-					optional_child_section.read(m.name);
-					c.members.push_back(m);
-				} else if(ptype == property::table_insert) {
-					std::string n;
-					optional_child_section.read(n);
-					c.table_inserts.push_back(n);
-				} else if(ptype == property::texture) {
-					optional_child_section.read(c.texture);
-				} else if(ptype == property::table_internal_column_data) {
-					if(col_count >= int32_t(c.table_columns.size()))
-						std::abort();
-					table_internal_column tc;
-					optional_child_section.read(tc.column_name);
-					optional_child_section.read(tc.container);
-					optional_child_section.read(tc.cell_type);
-					optional_child_section.read(tc.has_dy_header_tooltip);
-					optional_child_section.read(tc.has_dy_cell_tooltip);
-					optional_child_section.read(tc.sortable);
-					optional_child_section.read(tc.header_background);
-					optional_child_section.read(tc.decimal_alignment);
-					c.table_columns[col_count].internal_data = tc;
-					++col_count;
+					optional_section.read(m.type);
+					optional_section.read(m.name);
+					win.wrapped.members.push_back(m);
 				} else {
 					abort();
 				}
 			}
 
-			win.children.push_back(std::move(c));
+			while(window_section) {
+				auto essential_child_section = window_section.read_section();
+				std::string_view name = essential_child_section.read<std::string_view>();
+				if(name.starts_with(".tab")) { 
+					auto optional_child_section = window_section.read_section(); // discard
+				} else {
+					ui_element_t c;
+					c.name = name;
+					essential_child_section.read(c.x_pos);
+					essential_child_section.read(c.y_pos);
+					essential_child_section.read(c.x_size);
+					essential_child_section.read(c.y_size);
+
+					while(essential_child_section) {
+						auto ptype = essential_child_section.read< property>();
+						if(ptype == property::text_color) {
+							essential_child_section.read(c.text_color);
+						} else if(ptype == property::texture) {
+							essential_child_section.read(c.texture);
+						} else if(ptype == property::alternate_bg) {
+							essential_child_section.read(c.alternate_bg);
+						} else if(ptype == property::text_align) {
+							essential_child_section.read(c.text_align);
+						} else if(ptype == property::tooltip_text_key) {
+							essential_child_section.read(c.tooltip_text_key);
+						} else if(ptype == property::text_key) {
+							essential_child_section.read(c.text_key);
+						} else if(ptype == property::text_type) {
+							essential_child_section.read(c.text_type);
+						} else if(ptype == property::text_scale) {
+							essential_child_section.read(c.text_scale);
+						} else if(ptype == property::border_size) {
+							essential_child_section.read(c.border_size);
+						} else if(ptype == property::table_highlight_color) {
+							c.has_table_highlight_color = true;
+							essential_child_section.read(c.table_highlight_color);
+						} else if(ptype == property::ascending_sort_icon) {
+							essential_child_section.read(c.ascending_sort_icon);
+						} else if(ptype == property::descending_sort_icon) {
+							essential_child_section.read(c.descending_sort_icon);
+						} else if(ptype == property::row_background_a) {
+							essential_child_section.read(c.row_background_a);
+						} else if(ptype == property::row_background_b) {
+							essential_child_section.read(c.row_background_b);
+						} else if(ptype == property::row_height) {
+							essential_child_section.read(c.row_height);
+						} else if(ptype == property::table_divider_color) {
+							essential_child_section.read(c.table_divider_color);
+						} else if(ptype == property::other_color) {
+							essential_child_section.read(c.other_color);
+						} else if(ptype == property::table_display_column_data) {
+							table_display_column tc;
+							essential_child_section.read(tc.header_key);
+							essential_child_section.read(tc.header_tooltip_key);
+							essential_child_section.read(tc.header_texture);
+							essential_child_section.read(tc.cell_tooltip_key);
+							essential_child_section.read(tc.width);
+							essential_child_section.read(tc.cell_text_color);
+							essential_child_section.read(tc.header_text_color);
+							essential_child_section.read(tc.text_alignment);
+							c.table_columns.emplace_back();
+							c.table_columns.back().display_data = tc;
+						} else {
+							abort();
+						}
+					}
+					int32_t col_count = 0;
+					auto optional_child_section = window_section.read_section();
+					while(optional_child_section) {
+						auto ptype = optional_child_section.read< property>();
+						if(ptype == property::background) {
+							optional_child_section.read(c.background);
+						} else if(ptype == property::rectangle_color) {
+							optional_child_section.read(c.rectangle_color);
+						} else if(ptype == property::no_grid) {
+							optional_child_section.read(c.no_grid);
+						} else if(ptype == property::table_has_per_section_headers) {
+							optional_child_section.read(c.table_has_per_section_headers);
+						} else if(ptype == property::ignore_rtl) {
+							optional_child_section.read(c.ignore_rtl);
+						} else if(ptype == property::dynamic_element) {
+							optional_child_section.read(c.dynamic_element);
+						} else if(ptype == property::dynamic_tooltip) {
+							optional_child_section.read(c.dynamic_tooltip);
+						} else if(ptype == property::can_disable) {
+							optional_child_section.read(c.can_disable);
+						} else if(ptype == property::updates_while_hidden) {
+							optional_child_section.read(c.updates_while_hidden);
+						} else if(ptype == property::left_click_action) {
+							optional_child_section.read(c.left_click_action);
+						} else if(ptype == property::right_click_action) {
+							optional_child_section.read(c.right_click_action);
+						} else if(ptype == property::shift_click_action) {
+							optional_child_section.read(c.shift_click_action);
+						} else if(ptype == property::hover_activation) {
+							optional_child_section.read(c.hover_activation);
+						} else if(ptype == property::dynamic_text) {
+							optional_child_section.read(c.dynamic_text);
+						} else if(ptype == property::container_type) {
+							optional_child_section.read(c.container_type);
+						} else if(ptype == property::child_window) {
+							optional_child_section.read(c.child_window);
+						} else if(ptype == property::list_content) {
+							optional_child_section.read(c.list_content);
+						} else if(ptype == property::has_alternate_bg) {
+							optional_child_section.read(c.has_alternate_bg);
+						} else if(ptype == property::animation_type) {
+							optional_child_section.read(c.animation_type);
+						} else if(ptype == property::datapoints) {
+							optional_child_section.read(c.datapoints);
+						} else if(ptype == property::hotkey) {
+							optional_child_section.read(c.hotkey);
+						} else if(ptype == property::data_member) {
+							data_member m;
+							optional_child_section.read(m.type);
+							optional_child_section.read(m.name);
+							c.members.push_back(m);
+						} else if(ptype == property::table_insert) {
+							std::string n;
+							optional_child_section.read(n);
+							c.table_inserts.push_back(n);
+						} else if(ptype == property::texture) {
+							optional_child_section.read(c.texture);
+						} else if(ptype == property::table_connection) {
+							optional_child_section.read(c.table_connection);
+						} else if(ptype == property::table_internal_column_data) {
+							if(col_count >= int32_t(c.table_columns.size()))
+								std::abort();
+							table_internal_column tc;
+							optional_child_section.read(tc.column_name);
+							optional_child_section.read(tc.container);
+							optional_child_section.read(tc.cell_type);
+							optional_child_section.read(tc.has_dy_header_tooltip);
+							optional_child_section.read(tc.has_dy_cell_tooltip);
+							optional_child_section.read(tc.sortable);
+							optional_child_section.read(tc.header_background);
+							optional_child_section.read(tc.decimal_alignment);
+							c.table_columns[col_count].internal_data = tc;
+							++col_count;
+						} else {
+							abort();
+						}
+					}
+
+					win.children.push_back(std::move(c));
+				}
+			}
+			result.windows.push_back(std::move(win));
 		}
-		result.windows.push_back(std::move(win));
 	}
 
+	make_tables_from_legacy(result);
+	make_layout_from_legacy(result);
 	return result;
 }
