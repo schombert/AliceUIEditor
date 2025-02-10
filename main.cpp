@@ -1486,9 +1486,9 @@ void imgui_layout_contents(layout_level_t& layout) {
 	ImGui::Checkbox("Paged", &(layout.paged));
 	if(layout.paged) {
 		{
-			const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
+			const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)", "page turn (middle)" };
 			temp = int32_t(layout.page_animation);
-			ImGui::Combo("Animation", &temp, items, 4);
+			ImGui::Combo("Animation", &temp, items, 5);
 			layout.page_animation = animation_type(temp);
 		}
 		/* {

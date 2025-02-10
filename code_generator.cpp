@@ -1444,6 +1444,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						case animation_type::page_left: aninam = "page_flip_left"; break;
 						case animation_type::page_right: aninam = "page_flip_right"; break;
 						case animation_type::page_up: aninam = "page_flip_up"; break;
+						case animation_type::page_middle: aninam = "page_flip_mid"; break;
 						default: break;
 					}
 
@@ -1994,7 +1995,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							result += "\t" "" + col.internal_data.column_name + "_cached_text = text::produce_simple_string(state, table_source->" + t->name + "_" + col.internal_data.column_name + "_header_text_key);\n";
 							result += "\t" " " + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
 							result += "\t" " " + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
-							result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 0) : std::string("0")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" +t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
+							result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 0) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" +t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
 							result += "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
 							result += "\t" "}\n";
 						}
@@ -2210,7 +2211,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 									result += "\t"  "if(!" + col.internal_data.column_name + "_internal_layout.contents.empty() && linesz > 0.0f) {\n";
 									result += "\t"  "\t" "auto cmod = ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + " , false, " + std::string(col.internal_data.sortable ? "true" : "false") + "); \n";
 									result += "\t" "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) {\n";
-									result += "\t" "\t" "\t" "ui::render_text_chunk(state, t, float(x) + t.x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start" + (col.internal_data.sortable ? " + " + std::to_string(proj.grid_size * 0) : std::string("0")) + " + " + std::to_string(proj.grid_size) + ", float(y + int32_t(ycentered)),  fh, ui::get_text_color(state, table_source->" + t->name + "_" + col.internal_data.column_name + "_header_text_color), cmod);\n";
+									result += "\t" "\t" "\t" "ui::render_text_chunk(state, t, float(x) + t.x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start" + (col.internal_data.sortable ? " + " + std::to_string(proj.grid_size * 0) : std::string("")) + " + " + std::to_string(proj.grid_size) + ", float(y + int32_t(ycentered)),  fh, ui::get_text_color(state, table_source->" + t->name + "_" + col.internal_data.column_name + "_header_text_color), cmod);\n";
 									result += "\t" "\t" "}\n";
 									result += "\t"  "}\n";
 								}
@@ -2250,6 +2251,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							case animation_type::page_left: aninam = "page_flip_left"; break;
 							case animation_type::page_right: aninam = "page_flip_right"; break;
 							case animation_type::page_up: aninam = "page_flip_up"; break;
+							case animation_type::page_middle: aninam = "page_flip_mid"; break;
 							default: break;
 						}
 

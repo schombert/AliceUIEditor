@@ -58,7 +58,8 @@ enum class animation_type : uint8_t {
 	none,
 	page_left,
 	page_right,
-	page_up
+	page_up,
+	page_middle
 };
 
 struct color3f {
