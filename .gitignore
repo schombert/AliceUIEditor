@@ -366,3 +366,4 @@ FodyWeavers.xsd
 compile_commands.json
 .ninja_log
 .vscode
+imgui.ini
