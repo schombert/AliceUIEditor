@@ -7,7 +7,7 @@
 #include "texture.hpp"
 
 enum class background_type : uint8_t {
-	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart, colorsquare, flag, table_columns, table_headers
+	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart, colorsquare, flag, table_columns, table_headers, progress_bar, icon_strip
 }; 
 enum class aui_text_alignment : uint8_t {
 	left, right, center

@@ -394,6 +394,21 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t"  "std::string_view gfx_key;\n";
 				result += "\t"  "dcon::gfx_object_id background_gid;\n";
 				result += "\t"  "int32_t frame = 0;\n";
+			} else if(c.background == background_type::icon_strip) {
+				result += "\t"  "std::string_view texture_key;\n";
+				if(c.has_alternate_bg) {
+					result += "\t"  "std::string_view alt_texture_key;\n";
+					result += "\t"  "dcon::texture_id alt_background_texture;\n";
+					result += "\t"  "bool is_active = false;\n";
+				}
+				result += "\t"  "dcon::texture_id background_texture;\n";
+				result += "\t"  "int32_t frame = 0;\n";
+			} else if(c.background == background_type::progress_bar) {
+				result += "\t"  "std::string_view texture_key;\n";
+				result += "\t"  "dcon::texture_id background_texture;\n";
+				result += "\t"  "std::string_view alt_texture_key;\n";
+				result += "\t"  "dcon::texture_id alt_background_texture;\n";
+				result += "\t"  "float progress = 0.0f;\n";
 			} else if(c.background == background_type::texture || c.background == background_type::bordered_texture) {
 				result += "\t"  "std::string_view texture_key;\n";
 				if(c.has_alternate_bg) {
@@ -489,7 +504,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
 			result += "\t" "\t" "if(type == ui::mouse_probe_type::click) {\n";
-			if(c.background != background_type::none && (c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation || c.background == background_type::table_headers)) {
+			if(c.background != background_type::none || c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) {
 				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
 			} else {
 				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
@@ -521,7 +536,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t"  "void on_reset_text(sys::state & state) noexcept override;\n";
 			}
 
-			if(c.background != background_type::none) {
+			if(c.background != background_type::none || c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) {
 				result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 				if(c.hotkey.size() > 0) {
@@ -741,7 +756,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t"  "\t"  "\t" "if(ui::ui_height(state) > base_data.size.y)\n";
 			result += "\t"  "\t"  "\t" "\t" "new_abs_pos.y = int16_t(std::clamp(int32_t(new_abs_pos.y), 0, ui::ui_height(state) - base_data.size.y));\n";
 
-			result += "\t"  "\t"  "\t" "if(state.world.locale_get_native_rtl(state.font_collection.get_current_locale())) {\n";
+			result += "\t"  "\t"  "\t" "if(state_is_rtl(state)) {\n";
 			result += "\t"  "\t"  "\t" "\t" "base_data.position.x -= int16_t(new_abs_pos.x - location_abs.x);\n";
 			result += "\t"  "\t"  "\t" "} else {\n";
 			result += "\t"  "\t"  "\t" "\t" "base_data.position.x += int16_t(new_abs_pos.x - location_abs.x);\n";
@@ -1072,7 +1087,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						result += "\t" "" + col.internal_data.column_name + "_cached_text = text::produce_simple_string(state, " + col.internal_data.column_name + "_text_key);\n";
 						result += "\t" " " + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
 						result += "\t" " " + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
-						result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 3) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
+						result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 3) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
 						result += "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
 						result += "\t" "}\n";
 					}
@@ -1086,7 +1101,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "auto ycentered = (base_data.size.y - linesz) / 2;\n";
 				result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - ui::get_absolute_location(state, *this).x;\n";
 
-				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_background_texture, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_background_texture, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 
 				for(auto& col : c.table_columns) {
 					result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= " + col.internal_data.column_name + "_column_start && rel_mouse_x < (" + col.internal_data.column_name + "_column_start + " + col.internal_data.column_name + "_column_width);\n";
@@ -1098,19 +1113,19 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						}
 
 						if(col.internal_data.header_background && col.display_data.header_texture.length() > 0) {
-							result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start), float(y), float(" + col.internal_data.column_name + "_column_width), float(base_data.size.y), ogl::get_late_load_texture_handle(state, " + col.internal_data.column_name + "_texture, " + col.internal_data.column_name + "_texture_key), ui::rotation::upright, false, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()));\n";
+							result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start), float(y), float(" + col.internal_data.column_name + "_column_width), float(base_data.size.y), ogl::get_late_load_texture_handle(state, " + col.internal_data.column_name + "_texture, " + col.internal_data.column_name + "_texture_key), ui::rotation::upright, false, state_is_rtl(state));\n";
 
 						}
 
 						if(col.internal_data.sortable) {
 							if(c.ascending_sort_icon.length() > 0) {
 								result += "if(" + col.internal_data.column_name + "_sort_direction > 0) {\n";
-								result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 2) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, ascending_icon, ascending_icon_key), ui::rotation::upright, false, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()));\n";
+								result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 2) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, ascending_icon, ascending_icon_key), ui::rotation::upright, false, state_is_rtl(state));\n";
 								result += "}\n";
 							}
 							if(c.descending_sort_icon.length() > 0) {
 								result += "if(" + col.internal_data.column_name + "_sort_direction < 0) {\n";
-								result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 2) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, descending_icon, descending_icon_key), ui::rotation::upright, false, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()));\n";
+								result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 2) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, descending_icon, descending_icon_key), ui::rotation::upright, false, state_is_rtl(state));\n";
 								result += "}\n";
 							}
 						}
@@ -1209,9 +1224,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - ui::get_absolute_location(state, *this).x;\n";
 
 				result += "\t" "if(alternate_row) {\n";
-				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_row_background_texture, alt_row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_row_background_texture, alt_row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 				result += "\t" "} else {\n";
-				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, row_background_texture, row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, row_background_texture, row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 				result += "\t" "}\n";
 
 				if(c.has_table_highlight_color) {
@@ -1313,7 +1328,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
 						result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
 						result += "\t" "\t" "{\n";
-						result += "\t" "\t" "text::single_line_layout sl{ " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(" + hprefix + col.internal_data.column_name + "_column_width - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr }; \n";
+						result += "\t" "\t" "text::single_line_layout sl{ " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(" + hprefix + col.internal_data.column_name + "_column_width - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr }; \n";
 						result += "\t" "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
 						result += "\t" "\t" "}\n";
 
@@ -1323,7 +1338,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							result += "\t" "float running_total = 0.0f;\n";
 							result += "\t" "auto best_cluster = std::string::npos;\n";
 							result += "\t" "auto found_decimal_pos =  " + col.internal_data.column_name + "_cached_text.find_last_of('.');";
-							result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state.world.locale_get_native_rtl(state.font_collection.get_current_locale())); \n";
+							result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
 							result += "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) { \n";
 							result += "\t" "\t" "running_total = float(t.x);\n";
 							result += "\t" "\t" "for(auto& ch : t.unicodechars.glyph_info) {\n";
@@ -1355,7 +1370,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						}
 						result += "\t" "} else {\n";
 						if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
-							result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state.world.locale_get_native_rtl(state.font_collection.get_current_locale())); \n";
+							result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
 							result += "\t" "if(left_align)\n";
 							result += "\t" "\t" "((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos = std::min(" + col.internal_data.column_name + "_decimal_pos, ((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos);\n";
 							result += "\t" "else\n";
@@ -1722,7 +1737,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
 				result += "\t" "return ui::message_result::consumed;\n";
 				result += "}\n";
-			} else if(c.background != background_type::none) {
+			} else if(c.background != background_type::none || c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) {
 				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
 				if(c.left_click_action || c.shift_click_action) {
 					if(c.can_disable) {
@@ -1969,7 +1984,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "cached_text = new_text;\n";
 				result += "\t" "\t" "internal_layout.contents.clear();\n";
 				result += "\t" "\t" "internal_layout.number_of_lines = 0;\n";
-				result += "\t" "\t" "text::single_line_layout sl{ internal_layout, text::layout_parameters{ 0, 0, static_cast<int16_t>(base_data.size.x), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, text_is_header, text_scale * " + std::to_string(2 * proj.grid_size) + "), 0, text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
+				result += "\t" "\t" "text::single_line_layout sl{ internal_layout, text::layout_parameters{ 0, 0, static_cast<int16_t>(base_data.size.x), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, text_is_header, text_scale * " + std::to_string(2 * proj.grid_size) + "), 0, text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
 				result += "\t" "\t" "sl.add_text(state, cached_text);\n";
 				result += "\t" "}\n";
 				result += "}\n";
@@ -1979,7 +1994,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "cached_text = text::produce_simple_string(state, text_key);\n";
 					result += "\t" "internal_layout.contents.clear();\n";
 					result += "\t" "internal_layout.number_of_lines = 0;\n";
-					result += "\t" "text::single_line_layout sl{ internal_layout, text::layout_parameters{ 0, 0, static_cast<int16_t>(base_data.size.x), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, text_is_header, text_scale * " + std::to_string(2 * proj.grid_size) + "), 0, text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
+					result += "\t" "text::single_line_layout sl{ internal_layout, text::layout_parameters{ 0, 0, static_cast<int16_t>(base_data.size.x), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, text_is_header, text_scale * " + std::to_string(2 * proj.grid_size) + "), 0, text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
 					result += "\t" "sl.add_text(state, cached_text);\n";
 				}
 				result += "}\n";
@@ -1995,7 +2010,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							result += "\t" "" + col.internal_data.column_name + "_cached_text = text::produce_simple_string(state, table_source->" + t->name + "_" + col.internal_data.column_name + "_header_text_key);\n";
 							result += "\t" " " + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
 							result += "\t" " " + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
-							result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 0) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" +t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
+							result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 0) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" +t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
 							result += "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
 							result += "\t" "}\n";
 						}
@@ -2016,7 +2031,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
 							result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
 							result += "\t" "\t" "{\n";
-							result += "\t" "\t" "text::single_line_layout sl{ " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" + t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr }; \n";
+							result += "\t" "\t" "text::single_line_layout sl{ " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" + t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr }; \n";
 							result += "\t" "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
 							result += "\t" "\t" "}\n";
 
@@ -2026,7 +2041,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 								result += "\t" "float running_total = 0.0f;\n";
 								result += "\t" "auto best_cluster = std::string::npos;\n";
 								result += "\t" "auto found_decimal_pos =  " + col.internal_data.column_name + "_cached_text.find_last_of('.');";
-								result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state.world.locale_get_native_rtl(state.font_collection.get_current_locale())); \n";
+								result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
 								result += "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) { \n";
 								result += "\t" "\t" "running_total = float(t.x);\n";
 								result += "\t" "\t" "for(auto& ch : t.unicodechars.glyph_info) {\n";
@@ -2058,7 +2073,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							}
 							result += "\t" "} else {\n";
 							if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
-								result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state.world.locale_get_native_rtl(state.font_collection.get_current_locale())); \n";
+								result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
 								result += "\t" "if(left_align)\n";
 								result += "\t" "\t" "table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos = std::min(" + col.internal_data.column_name + "_decimal_pos, table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos);\n";
 								result += "\t" "else\n";
@@ -2073,7 +2088,6 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 
 			// RENDER
-			//state.world.locale_get_native_rtl(state.font_collection.get_current_locale())
 			if(c.text_key.length() > 0 || c.dynamic_text || c.background != background_type::none) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
 				if(c.background == background_type::existing_gfx) {
@@ -2081,31 +2095,46 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t""\t" "auto& gfx_def = state.ui_defs.gfx[background_gid];\n";
 					result += "\t" "\t" "if(gfx_def.primary_texture_handle) {\n";
 					result += "\t"  "\t" "\t" "if(gfx_def.get_object_type() == ui::object_type::bordered_rect) {\n";
-					result += "\t" "\t" "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), gfx_def.type_dependent, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "\t" "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), gfx_def.type_dependent, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					result += "\t""\t" "\t" "} else if(gfx_def.number_of_frames > 1) {\n";
-					result += "\t" "\t" "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), frame, gfx_def.number_of_frames, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "\t" "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), frame, gfx_def.number_of_frames, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					result += "\t" "\t" "\t" "} else {\n";
-					result += "\t" "\t" "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "\t" "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					result += "\t" "\t" "\t" "}\n";
 					result += "\t" "\t" "}\n";
 					result += "\t" "}\n";
+				} else if(c.background == background_type::icon_strip) {
+					if(c.has_alternate_bg) {
+						result += "\t"  "if(is_active) { \n";
+						result += "\t" "\t" "auto tid = ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key);\n";
+						result += "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), frame, state.open_gl.asset_textures[alt_background_texture].size_x / std::max(1, state.open_gl.asset_textures[alt_background_texture].size_y), float(x), float(y), float(base_data.size.x), float(base_data.size.y),  tid, base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
+						result += "\t"  "} else { \n";
+						result += "\t" "\t" "auto tid = ogl::get_late_load_texture_handle(state, background_texture, texture_key);\n";
+						result += "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), frame, state.open_gl.asset_textures[background_texture].size_x / std::max(1, state.open_gl.asset_textures[background_texture].size_y), float(x), float(y), float(base_data.size.x), float(base_data.size.y),  tid, base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
+						result += "\t"  "} \n";
+					} else {
+						result += "\t" "auto tid = ogl::get_late_load_texture_handle(state, background_texture, texture_key);\n";
+						result += "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), frame, state.open_gl.asset_textures[background_texture].size_x / std::max(1, state.open_gl.asset_textures[background_texture].size_y), float(x), float(y), float(base_data.size.x), float(base_data.size.y),  tid, base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
+					}
 				} else if(c.background == background_type::texture) {
 					if(c.has_alternate_bg) {
 						result += "\t"  "if(is_active)\n";
-						result += "\t"   "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t"   "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 						result += "\t"  "else\n";
-						result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+						result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 					} else {
-						result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") +");\n";
+						result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") +");\n";
 					}
+				} else if(c.background == background_type::progress_bar) {
+					result += "\t"   "\t" "ogl::render_progress_bar(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), progress, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 				} else if(c.background == background_type::bordered_texture) {
 					if(c.has_alternate_bg) {
 						result += "\t" "if(is_active)\n";
-						result += "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 						result += "\t" "else\n";
-						result += "\t"  "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t"  "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					} else {
-						result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+						result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					}
 				} else if(c.background == background_type::linechart) {
 					result += "\t" "ogl::render_linegraph(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, line_color.r, line_color.g, line_color.b, line_color.a, lines);\n";
@@ -2197,12 +2226,12 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 								if(col.internal_data.sortable) {
 									if(t->ascending_sort_icon.length() > 0) {
 										result += "\t" "if(table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction > 0) {\n";
-										result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(0) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 1) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, table_source->" + t->name + "_ascending_icon, table_source->" + t->name + "_ascending_icon_key), ui::rotation::upright, false, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()));\n";
+										result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(0) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 1) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, table_source->" + t->name + "_ascending_icon, table_source->" + t->name + "_ascending_icon_key), ui::rotation::upright, false, state_is_rtl(state));\n";
 										result += "\t" "}\n";
 									}
 									if(t->descending_sort_icon.length() > 0) {
 										result += "\t" "if(table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction < 0) {\n";
-										result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(0) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 1) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, table_source->" + t->name + "_descending_icon, table_source->" + t->name + "_descending_icon_key), ui::rotation::upright, false, state.world.locale_get_native_rtl(state.font_collection.get_current_locale()));\n";
+										result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(0) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 1) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, table_source->" + t->name + "_descending_icon, table_source->" + t->name + "_descending_icon_key), ui::rotation::upright, false, state_is_rtl(state));\n";
 										result += "\t" "}\n";
 									}
 								}
@@ -2296,7 +2325,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				for(auto& col : c.table_columns) {
 					if(col.internal_data.cell_type == table_cell_type::text && col.internal_data.decimal_alignment != aui_text_alignment::center) {
 						result += "\t" "{\n";
-						result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state.world.locale_get_native_rtl(state.font_collection.get_current_locale())); \n";
+						result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
 						result += "\t" "if(left_align)\n";
 						result += "\t" "\t" + col.internal_data.column_name + "_decimal_pos = 1000000.0f;\n";
 						result += "\t" "else\n";
@@ -2390,31 +2419,31 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "auto& gfx_def = state.ui_defs.gfx[background_gid];\n";
 				result += "\t" "\t" "if(gfx_def.primary_texture_handle) {\n";
 				result += "\t" "\t" "\t" "if(gfx_def.get_object_type() == ui::object_type::bordered_rect) {\n";
-				result += "\t" "\t" "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), gfx_def.type_dependent, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+				result += "\t" "\t" "\t" "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), gfx_def.type_dependent, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 				result += "\t" "\t" "\t" "} else if(gfx_def.number_of_frames > 1) {\n";
-				result += "\t" "\t" "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), frame, gfx_def.number_of_frames, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+				result += "\t" "\t" "\t" "\t" "ogl::render_subsprite(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), frame, gfx_def.number_of_frames, float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped(), " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 				result += "\t" "\t" "\t" "} else {\n";
-				result += "\t" "\t" "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped()," + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + ");\n";
+				result += "\t" "\t" "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_texture_handle(state, gfx_def.primary_texture_handle, gfx_def.is_partially_transparent()), base_data.get_rotation(), gfx_def.is_vertically_flipped()," + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 				result += "\t" "\t" "\t" "}\n";
 				result += "\t" "\t" "}\n";
 				result += "\t" "}\n";
 			} else if(win.wrapped.background == background_type::texture) {
 				if(win.wrapped.has_alternate_bg) {
 					result += "\t" "if(is_active)\n";
-					result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					result += "\t" "else\n";
-					result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 				} else {
-					result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 				}
 			} else if(win.wrapped.background == background_type::bordered_texture) {
 				if(win.wrapped.has_alternate_bg) {
 					result += "\t" "if(is_active)\n";
-					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_background_texture, alt_texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					result += "\t" "else\n";
-					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 				} else {
-					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
+					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 				}
 			}
 
@@ -2462,7 +2491,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				if(col.internal_data.cell_type == table_cell_type::text) {
 					if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
 						result += "\t" "{\n";
-						result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state.world.locale_get_native_rtl(state.font_collection.get_current_locale())); \n";
+						result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
 						result += "\t" "if(left_align)\n";
 						result += "\t" "\t" + t->name + "_" + col.internal_data.column_name + "_decimal_pos = 1000000.0f;\n";
 						result += "\t" "else\n";
@@ -2608,6 +2637,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t"  "ui::element_base::flags |= ui::element_base::wants_update_when_hidden_mask;\n";
 		}
 
+		/*
 		result += "\t" "auto name_key = state.lookup_key(\"" + project_name + "::" + win.wrapped.name + "\");\n";
 		result += "\t" "for(auto ex : state.ui_defs.extensions) {\n";
 		result += "\t" "\t" "if(name_key && ex.window == name_key) {\n";
@@ -2619,6 +2649,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		result += "\t" "\t" "\t" "}\n";
 		result += "\t" "\t" "}\n";
 		result += "\t" "}\n";
+		*/
+
 
 		result += "\t" "while(!pending_children.empty()) {\n";
 		result += "\t" "\t" "auto child_data = read_child_bytes(pending_children.back().data, pending_children.back().size);\n";
