@@ -110,17 +110,17 @@ std::string color_to_name(text_color t) {
 		case text_color::red: return "red";
 		case text_color::green: return "green";
 		case text_color::yellow: return "yellow";
-		case text_color::unspecified: return "unspecified"; 
-		case text_color::light_blue: return "light_blue"; 
-		case text_color::dark_blue: return "dark_blue"; 
-		case text_color::orange: return "orange"; 
-		case text_color::lilac: return "lilac"; 
-		case text_color::light_grey: return "light_grey"; 
-		case text_color::dark_red: return "dark_red"; 
-		case text_color::dark_green: return "dark_green"; 
-		case text_color::gold: return "gold"; 
-		case text_color::reset: return "reset"; 
-		case text_color::brown: return "brown"; 
+		case text_color::unspecified: return "unspecified";
+		case text_color::light_blue: return "light_blue";
+		case text_color::dark_blue: return "dark_blue";
+		case text_color::orange: return "orange";
+		case text_color::lilac: return "lilac";
+		case text_color::light_grey: return "light_grey";
+		case text_color::dark_red: return "dark_red";
+		case text_color::dark_green: return "dark_green";
+		case text_color::gold: return "gold";
+		case text_color::reset: return "reset";
+		case text_color::brown: return "brown";
 		default: return "black";
 	}
 }
@@ -203,7 +203,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 	result += "namespace alice_ui {\n";
 
 	auto project_name = fs::native_to_utf8(proj.project_name);
-	
+
 	// predeclare
 	for(auto& win : proj.windows) {
 		for(auto& c : win.children) {
@@ -223,11 +223,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					base_type = "ui::container_base";
 				}
 			}
-			
+
 			if(c.container_type == container_type::table) {
 				// generic header type
 				result += "struct " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t : public ui::element_base {\n";
-				
+
 
 				for(auto& col : c.table_columns) {
 					if(col.internal_data.cell_type == table_cell_type::text) {
@@ -243,7 +243,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						if(col.display_data.header_tooltip_key.length() > 0 && ! col.internal_data.has_dy_header_tooltip) {
 							result += "\t"  "inline static std::string_view " + col.internal_data.column_name + "_tooltip_key;\n";
 						}
-						
+
 						if(col.internal_data.sortable) {
 							result += "\t"  "inline static int8_t " + col.internal_data.column_name + "_sort_direction = 0;\n";
 						}
@@ -313,7 +313,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t"  "inline static std::string_view alt_row_texture_key;\n";
 					result += "\t"  "inline static dcon::texture_id alt_row_background_texture;\n";
 				}
-				
+
 				result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
 				result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
@@ -661,7 +661,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						result += "\t"  "std::string_view " + t->name + "_" + col.internal_data.column_name + "_header_text_key;\n";
 					if(col.display_data.header_tooltip_key.size() > 0 && !col.internal_data.has_dy_header_tooltip)
 						result += "\t"  "std::string_view " + t->name + "_" + col.internal_data.column_name + "_header_tooltip_key;\n";
-					
+
 					result += "\t"  "text::text_color " + t->name + "_" + col.internal_data.column_name + "_header_text_color = text::text_color::" + color_to_name(col.display_data.header_text_color) + ";\n";
 					result += "\t"  "text::text_color " + t->name + "_" + col.internal_data.column_name + "_column_text_color = text::text_color::" + color_to_name(col.display_data.cell_text_color) + ";\n";
 					result += "\t" "text::alignment " + t->name + "_" + col.internal_data.column_name + "_text_alignment = text::alignment::" + alignment_to_name(col.display_data.text_alignment) + ";\n";
@@ -798,7 +798,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					} else {
 						parent_string += "->parent->parent";
 					}
-					
+
 				} else {
 					w = nullptr;
 				}
@@ -811,7 +811,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" + project_name + "_" + w->name + "_" + e.name + "_t& " + e.name + " = *((" + project_name + "_" + w->name + "_" + e.name + "_t*)(" + parent_string + ")); \n";
 				parent_string += "->parent";
 				result += "\t" + project_name + "_" + w->name + "_t& " + w->name + " = *((" + project_name + "_" + w->name + "_t*)(" + parent_string + ")); \n";
-				
+
 				if(w->parent.size() > 0) {
 					bool found = false;
 					bool from_layout = w->parent_is_layout;
@@ -824,7 +824,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					}
 					if(!found)
 						w = nullptr;
-					
+
 					if( from_layout) {
 						parent_string += "->parent";
 					} else {
@@ -902,7 +902,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							result += "\t" "\t" "\t" "if(std::holds_alternative<" + i.name + "_option>(values[i])) {\n"; // if holds type
 							result += "\t" "\t" "\t" "\t" "auto start_i = i;\n";
 							result += "\t" "\t" "\t" "\t" "while(i < values.size() && std::holds_alternative<" + i.name + "_option>(values[i])) ++i;\n";
-							
+
 							for(auto& col : t->table_columns) {
 								if(col.internal_data.sortable) {
 									result += "\t" "\t" "\t" "\t" "if(table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction != 0) {\n";
@@ -965,7 +965,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				if(inserts.header.size() > 0) {
 					result += "\t" "\t" "if(index == 0 || first_in_section || (true" + shared_header_test + ")) {\n";
 					result += "\t" "\t" "\t" "if(destination) {\n";
-					
+
 					result += "\t" "\t" "\t" "\t" "if(" + inserts.header + "_pool.size() <= size_t(" + inserts.header + "_pool_used)) " + inserts.header + "_pool.emplace_back(make_" + project_name + "_" + inserts.header + "(state));\n";
 					result += "\t" "\t" "\t" "\t" "if(" + inserts.name + "_pool.size() <= size_t(" + inserts.name + "_pool_used)) " + inserts.name + "_pool.emplace_back(make_" + project_name + "_" + inserts.name + "(state));\n";
 
@@ -1002,7 +1002,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 						}
 					}
 					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->impl_on_update(state);\n";
-					
+
 
 					result += "\t" "\t" "\t" "\t" + inserts.header + "_pool_used++;\n";
 					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool_used++;\n";
@@ -1011,7 +1011,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "\t" "return measure_result{std::max(" + inserts.header + "_pool[0]->base_data.size.x, " + inserts.name + "_pool[0]->base_data.size.x), " + inserts.header + "_pool[0]->base_data.size.y + " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space * 2) + ", measure_result::special::" + std::string(special_type_to_str(inserts.glue)) + "};\n";
 					result += "\t" "\t" "}\n";
 				}
-				
+
 				result += "\t" "\t" "if(destination) {\n";
 
 				result += "\t" "\t" "\t" "if(" + inserts.name + "_pool.size() <= size_t(" + inserts.name + "_pool_used)) " + inserts.name + "_pool.emplace_back(make_" + project_name + "_" + inserts.name + "(state));\n";
@@ -1809,7 +1809,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			// SPECIAL
 			if(c.background == background_type::linechart) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::set_data_points(sys::state& state, std::vector<float> const& datapoints, float min, float max) {\n";
-				
+
 				result += "\t" "assert(datapoints.size() ==  " + std::to_string(c.datapoints) + ");\n";
 				result += "\t" "float y_height = max - min;\n";
 				result += "\t" "std::vector<float> scaled_datapoints = std::vector<float>(" + std::to_string(c.datapoints) + ");\n";
@@ -1823,11 +1823,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "}\n";
 				result += "\t" "}\n";
 				result += "\t" "lines.set_y(scaled_datapoints.data());\n";
-				
+
 				result += "}\n";
 			} else if(c.background == background_type::stackedbarchart) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_chart(sys::state& state) {\n";
-				
+
 				if(c.has_alternate_bg == false)
 					result += "\t" "std::sort(graph_content.begin(), graph_content.end(), [](auto const& a, auto const& b) { return a.amount > b.amount; });\n";
 				result += "\t" "float total = 0.0f;\n";
@@ -1853,7 +1853,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t""data_texture.data[k * 3 + 2] = uint8_t(graph_content[index].color.b * 255.0f);\n";
 				result += "\t" "}\n";
 				result += "\t" "data_texture.data_updated = true;\n";
-				
+
 				result += "}\n";
 			}
 
@@ -1961,7 +1961,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "} \n";
 				result += "}\n";
 			}
-			
+
 			// TEXT
 			if(c.text_key.length() > 0 || c.dynamic_text) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::set_text(sys::state& state, std::string const& new_text) {\n";
@@ -2115,7 +2115,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x ), float(y), float(base_data.size.x), float(base_data.size.y), color.r, color.g, color.b, color.a);\n";
 				} else if(c.background == background_type::flag) {
 					result += "\t" "if(std::holds_alternative<dcon::nation_id>(flag)) {\n";
-					result += "\t" "\t" "culture::flag_type flag_type = culture::flag_type{};\n";
+					result += "\t" "\t" "dcon::government_flag_id flag_type = dcon::government_flag_id{};\n";
 					result += "\t" "\t" "auto h_temp = state.world.nation_get_identity_from_identity_holder(std::get<dcon::nation_id>(flag));\n";
 					result += "\t" "\t" "if(bool(std::get<dcon::nation_id>(flag)) && state.world.nation_get_owned_province_count(std::get<dcon::nation_id>(flag)) != 0) {\n";
 					result += "\t"  "\t" "\t" "flag_type = culture::get_current_flag_type(state, std::get<dcon::nation_id>(flag));\n";
@@ -2126,7 +2126,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", true), float(x), float(y), float(base_data.size.x), float(base_data.size.y), flag_texture_handle, base_data.get_rotation(), false,  false);\n";
 
 					result += "\t" "} else if(std::holds_alternative<dcon::national_identity_id>(flag)) {\n";
-					result += "\t" "\t" "culture::flag_type flag_type = culture::flag_type{};\n";
+					result += "\t" "\t" "dcon::government_flag_id flag_type = dcon::government_flag_id{};\n";
 					result += "\t" "\t" "auto n_temp = state.world.national_identity_get_nation_from_identity_holder(std::get<dcon::national_identity_id>(flag));\n";
 					result += "\t" "\t" "if(bool(n_temp) && state.world.nation_get_owned_province_count(n_temp) != 0) {\n";
 					result += "\t"  "\t" "\t" "flag_type = culture::get_current_flag_type(state, n_temp);\n";
@@ -2139,7 +2139,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "} else if(std::holds_alternative<dcon::rebel_faction_id>(flag)) {\n";
 					result += "\t" "\t" "dcon::rebel_faction_id rf_temp = std::get<dcon::rebel_faction_id>(flag);\n";
 					result += "\t" "\t" "if(state.world.rebel_faction_get_type(rf_temp).get_independence() != uint8_t(culture::rebel_independence::none) && state.world.rebel_faction_get_defection_target(rf_temp)) {\n";
-					result += "\t" "\t" "\t" "culture::flag_type flag_type = culture::flag_type{};\n";
+					result += "\t" "\t" "\t" "dcon::government_flag_id flag_type = dcon::government_flag_id{};\n";
 					result += "\t" "\t" "\t" "auto h_temp = state.world.rebel_faction_get_defection_target(rf_temp);\n";
 					result += "\t" "\t" "\t" "auto n_temp = state.world.national_identity_get_nation_from_identity_holder(h_temp);\n";
 					result += "\t" "\t"  "\t" "if(bool(n_temp) && state.world.nation_get_owned_province_count(n_temp) != 0) {\n";
@@ -2417,7 +2417,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state.world.locale_get_native_rtl(state.font_collection.get_current_locale())") + "); \n";
 				}
 			}
-			
+
 			if(win.wrapped.share_table_highlight) {
 				auto t = table_from_name(proj, win.wrapped.table_connection);
 				if(t) {
@@ -2693,11 +2693,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 					++cindex;
 				}
-				if(c.ascending_sort_icon.length() > 0) 
+				if(c.ascending_sort_icon.length() > 0)
 					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::ascending_icon_key = child_data.ascending_sort_icon;\n";
-				if(c.descending_sort_icon.length() > 0) 
+				if(c.descending_sort_icon.length() > 0)
 					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::descending_icon_key = child_data.descending_sort_icon;\n";
-				if(c.row_background_a.length() > 0) 
+				if(c.row_background_a.length() > 0)
 					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_texture_key = child_data.row_background_a;\n";
 				if(c.row_background_b.length() > 0)
 					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::alt_row_texture_key = child_data.row_background_b;\n";

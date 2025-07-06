@@ -1851,7 +1851,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 	// Setup Dear ImGui style
-	ImGui::StyleColorsDark();
+	ImGui::StyleColorsLight();
 
 	// Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -1893,6 +1893,17 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 	style.ScrollbarRounding = 0.0f;
 	style.GrabRounding = 0.0f;
 	style.TabRounding = 0.0f;
+
+	style.WindowRounding = 6.f;
+	style.ChildRounding = 6.f;
+	style.FrameRounding = 6.f;
+	style.PopupRounding = 6.f;
+	style.ScrollbarRounding = 6.f;
+	style.GrabRounding = 2.f;
+	style.TabRounding = 6.f;
+	style.SeparatorTextBorderSize = 5.f;
+	style.FrameBorderSize = 1.f;
+	style.TabBorderSize = 1.f;
 
 
 	//style.ScaleAllSizes(scale_value);
