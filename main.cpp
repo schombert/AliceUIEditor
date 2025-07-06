@@ -151,18 +151,18 @@ void load_shaders() {
 			"vec2 tsize = textureSize(texture_sampler, 0);\n"
 			"float xout = 0.0;\n"
 			"float yout = 0.0;\n"
-			"if(realx <= border_size)\n"
-				"xout = realx / tsize.x;\n"
-			"else if(realx >= (d_rect.z - border_size))\n"
-				"xout = (1.0 - border_size / tsize.x) + (border_size - (d_rect.z - realx)) / tsize.x;\n"
+			"if(realx <= border_size * grid_size)\n"
+				"xout = realx / (tsize.x * grid_size);\n"
+			"else if(realx >= (d_rect.z - border_size * grid_size))\n"
+				"xout = (1.0 - border_size / tsize.x) + (border_size * grid_size - (d_rect.z - realx)) / (tsize.x * grid_size);\n"
 			"else\n"
-				"xout = border_size / tsize.x + (1.0 - 2.0 * border_size / tsize.x) * (realx - border_size) / (d_rect.z * 2.0 * border_size);\n"
-			"if(realy <= border_size)\n"
-				"yout = realy / tsize.y;\n"
-			"else if(realy >= (d_rect.w - border_size))\n"
-				"yout = (1.0 - border_size / tsize.y) + (border_size - (d_rect.w - realy)) / tsize.y;\n"
+				"xout = border_size / tsize.x + (1.0 - 2.0 * border_size / tsize.x) * (realx - border_size * grid_size) / (d_rect.z * 2.0 * border_size * grid_size);\n"
+			"if(realy <= border_size * grid_size)\n"
+				"yout = realy / (tsize.y * grid_size);\n"
+			"else if(realy >= (d_rect.w - border_size * grid_size))\n"
+				"yout = (1.0 - border_size / tsize.y) + (border_size * grid_size - (d_rect.w - realy)) / (tsize.y * grid_size);\n"
 			"else\n"
-				"yout = border_size / tsize.y + (1.0 - 2.0 * border_size / tsize.y) * (realy - border_size) / (d_rect.w * 2.0 * border_size);\n"
+				"yout = border_size / tsize.y + (1.0 - 2.0 * border_size / tsize.y) * (realy - border_size * grid_size) / (d_rect.w * 2.0 * border_size * grid_size);\n"
 			"return texture(texture_sampler, vec2(xout, yout));\n"
 		"}\n"
 		"vec4 coloring_function(vec2 tc) {\n"
@@ -283,7 +283,7 @@ void render_textured_rect(color3f color, float ix, float iy, int32_t iwidth, int
 
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
-void render_stretch_textured_rect(color3f color, float ix, float iy, int32_t iwidth, int32_t iheight, float border_size, GLuint texture_handle) {
+void render_stretch_textured_rect(color3f color, float ix, float iy, float ui_scale, int32_t iwidth, int32_t iheight, float border_size, GLuint texture_handle) {
 	float x = float(ix);
 	float y = float(iy);
 	float width = float(iwidth);
@@ -294,6 +294,7 @@ void render_stretch_textured_rect(color3f color, float ix, float iy, int32_t iwi
 	glBindVertexBuffer(0, global_square_buffer, 0, sizeof(GLfloat) * 4);
 
 	glUniform1f(glGetUniformLocation(ui_shader_program, "border_size"), border_size);
+	glUniform1f(glGetUniformLocation(ui_shader_program, "grid_size"), ui_scale);
 	glUniform4f(glGetUniformLocation(ui_shader_program, "d_rect"), x, y, width, height);
 	glUniform3f(glGetUniformLocation(ui_shader_program, "inner_color"), color.r, color.g, color.b);
 
@@ -353,6 +354,48 @@ enum class drag_target {
 	none, center, left, right, top, bottom, top_left, top_right, bottom_left, bottom_right
 };
 
+
+std::wstring relative_file_name(std::wstring_view base_name, std::wstring_view project_directory) {
+	if(base_name.length() > 1) {
+		size_t common_length = 0;
+		while(common_length < base_name.size()) {
+			auto next_common_length = base_name.find_first_of(L'\\', common_length);
+			if(base_name.substr(0, next_common_length + 1) != project_directory.substr(0, next_common_length + 1)) {
+				break;
+			}
+			common_length = next_common_length + size_t(1);
+		}
+		uint32_t missing_separators_count = 0;
+		for(size_t i = common_length; i < project_directory.size(); ++i) {
+			if(project_directory[i] == L'\\') {
+				++missing_separators_count;
+			}
+		}
+		if(missing_separators_count == 0) {
+			if(common_length >= base_name.size()) {
+				auto last_sep = base_name.find_last_of(L'\\');
+				if(last_sep == std::wstring::npos)
+					return std::wstring(base_name);
+
+				return std::wstring(base_name.substr(last_sep + 1));
+			} else {
+				return std::wstring(base_name.substr(common_length));
+			}
+		} else {
+			std::wstring temp;
+			for(uint32_t i = 0; i < missing_separators_count; ++i) {
+				temp += L"..\\";
+			}
+			if(common_length >= base_name.size()) {
+				std::abort(); // impossible
+				//return temp;
+			} else {
+				return temp + std::wstring(base_name.substr(common_length));
+			}
+		}
+	}
+	return std::wstring(base_name);
+}
 drag_target test_rect_target(float pos_x, float pos_y, float rx, float ry, float rw, float rh, float scale) {
 	bool top = false;
 	bool bottom = false;
@@ -477,7 +520,7 @@ void render_window(window_element_wrapper_t& win, float x, float y, bool highlig
 		if(win.wrapped.ogl_texture.texture_handle == 0) {
 			render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
 		} else {
-			render_stretch_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.border_size * ui_scale, win.wrapped.ogl_texture.texture_handle);
+			render_stretch_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), ui_scale, std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.border_size, win.wrapped.ogl_texture.texture_handle);
 		}
 	}
 
@@ -523,11 +566,11 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				}
 			}
 		}
-	} else if(c.background != background_type::texture && c.background != background_type::bordered_texture) {
+	} else if(c.background != background_type::texture && c.background != background_type::bordered_texture && c.background != background_type::progress_bar) {
 		if(c.container_type != container_type::table || c.table_columns.empty()) {
 			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
-	} else if(c.background == background_type::texture) {
+	} else if(c.background == background_type::texture || c.background == background_type::progress_bar) {
 		if(c.ogl_texture.loaded == false) {
 			c.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(c.texture));
 		}
@@ -543,7 +586,7 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		if(c.ogl_texture.texture_handle == 0) {
 			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		} else {
-			render_stretch_textured_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)), c.border_size * ui_scale, c.ogl_texture.texture_handle);
+			render_stretch_textured_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), ui_scale, std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)), c.border_size, c.ogl_texture.texture_handle);
 		}
 	}
 
@@ -2174,8 +2217,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::SameLine();
 						if(ImGui::Button("Change")) {
 							auto new_file = fs::pick_existing_file(L"");
-							auto breakpt = new_file.find_last_of(L'\\');
-							open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							//auto breakpt = new_file.find_last_of(L'\\');
+							//open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							open_project.windows[i].wrapped.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 							open_project.windows[i].wrapped.ogl_texture.unload();
 						}
 						ImGui::Checkbox("Has alternate background", &(open_project.windows[i].wrapped.has_alternate_bg));
@@ -2185,8 +2229,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::SameLine();
 							if(ImGui::Button("Change Alternate")) {
 								auto new_file = fs::pick_existing_file(L"");
-								auto breakpt = new_file.find_last_of(L'\\');
-								open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 							}
 						}
 					}
@@ -2269,8 +2314,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::SameLine();
 						if(ImGui::Button("Change (pl)")) {
 							auto new_file = fs::pick_existing_file(L"");
-							auto breakpt = new_file.find_last_of(L'\\');
-							open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							//auto breakpt = new_file.find_last_of(L'\\');
+							//open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 						}
 					}
 					{
@@ -2279,8 +2325,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::SameLine();
 						if(ImGui::Button("Change (pr)")) {
 							auto new_file = fs::pick_existing_file(L"");
-							auto breakpt = new_file.find_last_of(L'\\');
-							open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							//auto breakpt = new_file.find_last_of(L'\\');
+							//open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 						}
 					}
 					{
@@ -2372,8 +2419,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					ImGui::SameLine();
 					if(ImGui::Button("Change asc icon")) {
 						auto new_file = fs::pick_existing_file(L"");
-						auto breakpt = new_file.find_last_of(L'\\');
-						c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 					}
 
 					tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
@@ -2381,8 +2429,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					ImGui::SameLine();
 					if(ImGui::Button("Change des icon")) {
 						auto new_file = fs::pick_existing_file(L"");
-						auto breakpt = new_file.find_last_of(L'\\');
-						c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 					}
 
 					{
@@ -2469,8 +2518,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								ImGui::SameLine();
 								if(ImGui::Button("Change row alt")) {
 									auto new_file = fs::pick_existing_file(L"");
-									auto breakpt = new_file.find_last_of(L'\\');
-									c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								}
 							}
 
@@ -2597,9 +2647,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::Checkbox("Ignore grid", &(c.no_grid));
 
 						{
-							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers" };
+							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip" };
 							temp = int32_t(c.background);
-							ImGui::Combo("Background", &temp, items, 10);
+							ImGui::Combo("Background", &temp, items, 12);
 							c.background = background_type(temp);
 						}
 
@@ -2624,14 +2674,15 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							}
 						} else if(c.background == background_type::existing_gfx) {
 							ImGui::InputText("Texture", &(c.texture));
-						} else if(c.background == background_type::texture || c.background == background_type::bordered_texture) {
+						} else if(c.background == background_type::texture || c.background == background_type::bordered_texture || c.background == background_type::icon_strip) {
 							std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
 							ImGui::Text(tex.c_str());
 							ImGui::SameLine();
 							if(ImGui::Button("Change")) {
 								auto new_file = fs::pick_existing_file(L"");
-								auto breakpt = new_file.find_last_of(L'\\');
-								c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								c.ogl_texture.unload();
 							}
 							ImGui::Checkbox("Has alternate background", &(c.has_alternate_bg));
@@ -2641,9 +2692,31 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								ImGui::SameLine();
 								if(ImGui::Button("Change Alternate")) {
 									auto new_file = fs::pick_existing_file(L"");
-									auto breakpt = new_file.find_last_of(L'\\');
-									c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								}
+							}
+						} else if(c.background == background_type::progress_bar) {
+							std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+								c.ogl_texture.unload();
+							}
+
+							tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change Alternate")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 							}
 						} else if(c.background == background_type::linechart) {
 							temp = c.datapoints;
@@ -2756,8 +2829,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								ImGui::SameLine();
 								if(ImGui::Button("Change asc icon")) {
 									auto new_file = fs::pick_existing_file(L"");
-									auto breakpt = new_file.find_last_of(L'\\');
-									c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								}
 
 								tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
@@ -2765,8 +2839,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								ImGui::SameLine();
 								if(ImGui::Button("Change des icon")) {
 									auto new_file = fs::pick_existing_file(L"");
-									auto breakpt = new_file.find_last_of(L'\\');
-									c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								}
 
 								{
@@ -2785,8 +2860,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								ImGui::SameLine();
 								if(ImGui::Button("Change row bg")) {
 									auto new_file = fs::pick_existing_file(L"");
-									auto breakpt = new_file.find_last_of(L'\\');
-									c.row_background_a = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//c.row_background_a = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									c.row_background_a = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								}
 
 								tex = "Row alternate background: " + (c.row_background_b.size() > 0 ? c.row_background_b : std::string("[none]"));
@@ -2794,8 +2870,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								ImGui::SameLine();
 								if(ImGui::Button("Change row alt")) {
 									auto new_file = fs::pick_existing_file(L"");
-									auto breakpt = new_file.find_last_of(L'\\');
-									c.row_background_b = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//c.row_background_b = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									c.row_background_b = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								}
 
 								ImGui::Checkbox("Per-section table headers", &(c.table_has_per_section_headers));
@@ -2891,8 +2968,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 											ImGui::SameLine();
 											if(ImGui::Button("Change row alt")) {
 												auto new_file = fs::pick_existing_file(L"");
-												auto breakpt = new_file.find_last_of(L'\\');
-												c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+												//auto breakpt = new_file.find_last_of(L'\\');
+												//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+												c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 											}
 										}
 
