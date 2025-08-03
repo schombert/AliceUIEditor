@@ -1,0 +1,33 @@
+cflags = -std=c++20 -O3 -DWIN32 -D_AMD64_ -I./GLFW -I./imgui -I./imgui/misc/cpp -I./imgui/backends -I.
+
+rule clone_imgui
+  command = cmd /c "git clone --depth=1 https://github.com/ocornut/imgui.git && touch $out"
+  description = cloning imgui
+
+rule compile_cpp
+  command = clang++ -MD -MF $out.d $cflags $debug_flags -c $in -o $out
+  description = compile $out
+  depfile = $out.d
+
+rule link_cpp
+  command = clang++ $cflags $debug_flags_link -o $out $in -L./lib -lAdvapi32 -lOle32 -lGdi32 -lShcore -lglfw3dll -lopengl32 -Xlinker /subsystem:windows -Xlinker /NODEFAULTLIB:MSVCRT
+  description = link $out
+
+build out/imgui_cloned : clone_imgui
+
+build out/cache/main.o : compile_cpp main.cpp | out/imgui_cloned
+build out/cache/filesystem.o : compile_cpp filesystem.cpp
+build out/cache/glew.o : compile_cpp glew.c
+build out/cache/code_generator.o : compile_cpp code_generator.cpp
+build out/cache/texture.o : compile_cpp texture.cpp
+build out/cache/project_file_writing.o : compile_cpp project_file_writing.cpp
+build out/cache/imgui.o : compile_cpp imgui/imgui.cpp | out/imgui_cloned
+build out/cache/imgui_widgets.o : compile_cpp imgui/imgui_widgets.cpp | out/imgui_cloned
+build out/cache/imgui_tables.o : compile_cpp imgui/imgui_tables.cpp | out/imgui_cloned
+build out/cache/imgui_stdlib.o : compile_cpp imgui/misc/cpp/imgui_stdlib.cpp | out/imgui_cloned
+build out/cache/imgui_impl_opengl3.o : compile_cpp imgui/backends/imgui_impl_opengl3.cpp | out/imgui_cloned
+build out/cache/imgui_impl_glfw.o : compile_cpp imgui/backends/imgui_impl_glfw.cpp | out/imgui_cloned
+build out/cache/imgui_draw.o : compile_cpp imgui/imgui_draw.cpp | out/imgui_cloned
+build out/cache/imgui_demo.o : compile_cpp imgui/imgui_demo.cpp | out/imgui_cloned
+
+build out/editor.exe : link_cpp out/cache/main.o out/cache/filesystem.o out/cache/glew.o out/cache/code_generator.o out/cache/imgui_demo.o out/cache/imgui_draw.o out/cache/imgui_impl_glfw.o out/cache/imgui_impl_opengl3.o out/cache/imgui_stdlib.o out/cache/imgui_tables.o out/cache/imgui.o out/cache/project_file_writing.o out/cache/texture.o out/cache/imgui_widgets.o

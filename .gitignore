@@ -361,3 +361,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+
+compile_commands.json
+.ninja_log
+.vscode
+imgui.ini
+imgui
