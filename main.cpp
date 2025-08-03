@@ -1477,69 +1477,74 @@ void imgui_layout_contents(layout_level_t& layout) {
 	ImGui::PushID(&layout);
 
 	int32_t temp = 0;
-	{
-		const char* items[] = { "horizontal", "vertical", "overlapped horizontal", "overlapped vertical", "multiline", "multicolumn" };
-		temp = int32_t(layout.type);
-		ImGui::Combo("Layout type", &temp, items, 6);
-		layout.type = layout_type(temp);
-	}
 
-	temp = layout.size_x;
-	ImGui::InputInt("Width (-1 for maximal)", &temp);
-	layout.size_x = int16_t(temp);
-
-	temp = layout.size_y;
-	ImGui::InputInt("Height (-1 for maximal)", &temp);
-	layout.size_y = int16_t(temp);
-
-	temp = layout.margin_top;
-	ImGui::InputInt("Top margin", &temp);
-	layout.margin_top = int16_t(temp);
-
-	temp = layout.margin_bottom;
-	ImGui::InputInt("Bottom margin", &temp);
-	layout.margin_bottom = int16_t(temp);
-
-	temp = layout.margin_left;
-	ImGui::InputInt("Left margin", &temp);
-	layout.margin_left = int16_t(temp);
-
-	temp = layout.margin_right;
-	ImGui::InputInt("Right margin", &temp);
-	layout.margin_right = int16_t(temp);
-
-	{
-		const char* items[] = { "leading", "trailing", "centered" };
-		temp = int32_t(layout.line_alignment);
-		ImGui::Combo("Line alignment", &temp, items, 3);
-		layout.line_alignment = layout_line_alignment(temp);
-	}
-	{
-		const char* items[] = { "leading", "trailing", "centered" };
-		temp = int32_t(layout.line_internal_alignment);
-		ImGui::Combo("Internal line alignment", &temp, items, 3);
-		layout.line_internal_alignment = layout_line_alignment(temp);
-	}
-	if(layout.type == layout_type::mulitline_horizontal || layout.type == layout_type::multiline_vertical) {
-		temp = layout.interline_spacing;
-		ImGui::InputInt("Interline spacing", &temp);
-		layout.interline_spacing = uint8_t(temp);
-	}
-
-	ImGui::Checkbox("Paged", &(layout.paged));
-	if(layout.paged) {
+	if(ImGui::TreeNodeEx("Layout options", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
 		{
-			const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)", "page turn (middle)" };
-			temp = int32_t(layout.page_animation);
-			ImGui::Combo("Animation", &temp, items, 5);
-			layout.page_animation = animation_type(temp);
+			temp = int32_t(layout.type);
+			const char* items[] = { "horizontal", "vertical", "overlapped horizontal", "overlapped vertical", "multiline", "multicolumn" };
+			ImGui::Combo("Layout type", &temp, items, 6);
+			layout.type = layout_type(temp);
 		}
-		/* {
-			const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-			temp = int32_t(layout.page_display_color);
-			ImGui::Combo("Page numbering color", &temp, items, 16);
-			layout.page_display_color = text_color(temp);
-		} */
+
+		temp = layout.size_x;
+		ImGui::InputInt("Width (-1 for maximal)", &temp);
+		layout.size_x = int16_t(temp);
+
+		temp = layout.size_y;
+		ImGui::InputInt("Height (-1 for maximal)", &temp);
+		layout.size_y = int16_t(temp);
+
+		temp = layout.margin_top;
+		ImGui::InputInt("Top margin", &temp);
+		layout.margin_top = int16_t(temp);
+
+		temp = layout.margin_bottom;
+		ImGui::InputInt("Bottom margin", &temp);
+		layout.margin_bottom = int16_t(temp);
+
+		temp = layout.margin_left;
+		ImGui::InputInt("Left margin", &temp);
+		layout.margin_left = int16_t(temp);
+
+		temp = layout.margin_right;
+		ImGui::InputInt("Right margin", &temp);
+		layout.margin_right = int16_t(temp);
+
+		{
+			const char* items[] = { "leading", "trailing", "centered" };
+			temp = int32_t(layout.line_alignment);
+			ImGui::Combo("Line alignment", &temp, items, 3);
+			layout.line_alignment = layout_line_alignment(temp);
+		}
+		{
+			const char* items[] = { "leading", "trailing", "centered" };
+			temp = int32_t(layout.line_internal_alignment);
+			ImGui::Combo("Internal line alignment", &temp, items, 3);
+			layout.line_internal_alignment = layout_line_alignment(temp);
+		}
+		if(layout.type == layout_type::mulitline_horizontal || layout.type == layout_type::multiline_vertical) {
+			temp = layout.interline_spacing;
+			ImGui::InputInt("Interline spacing", &temp);
+			layout.interline_spacing = uint8_t(temp);
+		}
+
+		ImGui::Checkbox("Paged", &(layout.paged));
+		if(layout.paged) {
+			{
+				const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)", "page turn (middle)" };
+				temp = int32_t(layout.page_animation);
+				ImGui::Combo("Animation", &temp, items, 5);
+				layout.page_animation = animation_type(temp);
+			}
+			/* {
+				const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+				temp = int32_t(layout.page_display_color);
+				ImGui::Combo("Page numbering color", &temp, items, 16);
+				layout.page_display_color = text_color(temp);
+			} */
+		}
+
+		ImGui::TreePop();
 	}
 
 	int32_t id = 0;
@@ -1552,7 +1557,7 @@ void imgui_layout_contents(layout_level_t& layout) {
 
 		if(std::holds_alternative< layout_control_t>(m)) {
 			auto& i = std::get<layout_control_t>(m);
-			if(ImGui::TreeNodeEx("Control", ImGuiTreeNodeFlags_SpanFullWidth)) {
+			if(ImGui::TreeNodeEx("Control", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
 				if(ImGui::Button("Delete")) {
 					layout.contents.erase(layout.contents.begin() + id);
 					ImGui::TreePop();
@@ -1605,7 +1610,7 @@ void imgui_layout_contents(layout_level_t& layout) {
 			}
 		} else if(std::holds_alternative<layout_window_t>(m)) {
 			auto& i = std::get<layout_window_t>(m);
-			if(ImGui::TreeNodeEx("Sub window", ImGuiTreeNodeFlags_SpanFullWidth)) {
+			if(ImGui::TreeNodeEx("Sub window", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
 				if(ImGui::Button("Delete")) {
 					layout.contents.erase(layout.contents.begin() + id);
 					ImGui::TreePop();
@@ -1658,7 +1663,7 @@ void imgui_layout_contents(layout_level_t& layout) {
 			}
 		} else if(std::holds_alternative<layout_glue_t>(m)) {
 			auto& i = std::get<layout_glue_t>(m);
-			if(ImGui::TreeNodeEx("Glue", ImGuiTreeNodeFlags_SpanFullWidth)) {
+			if(ImGui::TreeNodeEx("Glue", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
 				if(ImGui::Button("Delete")) {
 					layout.contents.erase(layout.contents.begin() + id);
 					ImGui::TreePop();
@@ -1693,7 +1698,7 @@ void imgui_layout_contents(layout_level_t& layout) {
 			}
 		} else if(std::holds_alternative<generator_t>(m)) {
 			auto& i = std::get<generator_t>(m);
-			if(ImGui::TreeNodeEx("Generator", ImGuiTreeNodeFlags_SpanFullWidth)) {
+			if(ImGui::TreeNodeEx("Generator", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
 				if(ImGui::Button("Delete")) {
 					layout.contents.erase(layout.contents.begin() + id);
 					ImGui::TreePop();
@@ -1779,7 +1784,7 @@ void imgui_layout_contents(layout_level_t& layout) {
 			}
 		} else if(std::holds_alternative< sub_layout_t>(m)) {
 			auto& i = std::get<sub_layout_t>(m);
-			if(ImGui::TreeNodeEx("Sub layout", ImGuiTreeNodeFlags_SpanFullWidth)) {
+			if(ImGui::TreeNodeEx("Sub layout", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
 				if(ImGui::Button("Delete")) {
 					layout.contents.erase(layout.contents.begin() + id);
 					ImGui::TreePop();
@@ -1816,7 +1821,7 @@ void imgui_layout_contents(layout_level_t& layout) {
 		const char* items[] = { "Control", "Window", "Glue", "Generator", "Layout" };
 		ImGui::Combo("Type", &new_content_choice, items, 5);
 	}
-	ImGui::SameLine();
+	// ImGui::SameLine();
 	if(ImGui::Button("Add")) {
 		switch(new_content_choice) {
 			case 0:
@@ -3037,7 +3042,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			}
 
 			if(0 <= selected_window && selected_window <= int32_t(open_project.windows.size())) {
-				ImGui::Begin("Layout");
+				ImGui::Begin("Layout", NULL, ImGuiWindowFlags_HorizontalScrollbar);
 				imgui_layout_contents(open_project.windows[selected_window].layout);
 				ImGui::End();
 			}
@@ -3276,7 +3281,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						if(ct != drag_target::none) {
 							selected_control = int32_t(i);
 							mouse_to_drag_type(ct);
-							ImGui::SetTooltip(c.name.c_str());
+							ImGui::SetTooltip("%s", c.name.c_str());
 							break;
 						}
 					}
@@ -3285,7 +3290,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						auto t = test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + drag_offset_y, win.wrapped.x_size * ui_scale, win.wrapped.y_size * ui_scale, ui_scale);
 						if(t != drag_target::none) {
 							mouse_to_drag_type(t);
-							ImGui::SetTooltip(win.wrapped.name.c_str());
+							ImGui::SetTooltip("%s", win.wrapped.name.c_str());
 						}
 					}
 				}
