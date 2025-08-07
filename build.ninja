@@ -1,4 +1,6 @@
-cflags = -std=c++20 -O3 -DWIN32 -D_AMD64_ -I./GLFW -I./imgui -I./imgui/misc/cpp -I./imgui/backends -I.
+cflags = -std=c++20 -O0 -DWIN32 -D_AMD64_ -I./GLFW -I./imgui -I./imgui/misc/cpp -I./imgui/backends -I.
+debug_flags = -g -gdwarf-3 -gcodeview
+debug_flags_link = -g -gdwarf-3
 
 rule clone_imgui
   command = cmd /c "git clone --depth=1 https://github.com/ocornut/imgui.git && touch $out"

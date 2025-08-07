@@ -7,8 +7,20 @@
 #include "texture.hpp"
 
 enum class background_type : uint8_t {
-	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart, colorsquare, flag, table_columns, table_headers, progress_bar, icon_strip
-}; 
+	none,
+	texture,
+	bordered_texture,
+	existing_gfx,
+	linechart,
+	stackedbarchart,
+	colorsquare,
+	flag,
+	table_columns,
+	table_headers,
+	progress_bar,
+	icon_strip,
+	doughnut
+};
 enum class aui_text_alignment : uint8_t {
 	left, right, center
 };
@@ -110,7 +122,7 @@ struct window_element_t {
 	std::string page_left_texture;
 	std::string page_right_texture;
 	std::string table_connection;
-	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };
+	color3f rectangle_color{ 0.2f, 0.2f, 0.2f };
 	ogl::texture ogl_texture;
 	int16_t x_size = 0;
 	int16_t y_size = 0;
@@ -347,6 +359,7 @@ using layout_item = std::variant<std::monostate, layout_control_t, layout_window
 struct layout_level_t {
 	std::vector<layout_item> contents;
 	std::vector<int32_t> page_starts;
+	bool open_in_ui = false;
 	int16_t size_x = -1;
 	int16_t size_y = -1;
 	int16_t margin_top = 0;

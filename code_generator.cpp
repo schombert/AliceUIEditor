@@ -1,6 +1,7 @@
 #include "code_generator.hpp"
 #include <string_view>
 #include "filesystem.hpp"
+#include "project_description.hpp"
 
 namespace generator {
 
@@ -424,6 +425,12 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "ogl::lines lines{ " + std::to_string(c.datapoints) + " };\n";
 				result += "\t" "ogl::color4f line_color{ " + std::to_string(c.other_color.r) + "f, " + std::to_string(c.other_color.g) + "f, " + std::to_string(c.other_color.b) + "f, " + std::to_string(c.other_color.a) + "f };\n";
 				result += "\t" "void set_data_points(sys::state& state, std::vector<float> const& datapoints, float min, float max);\n";
+			} else if(c.background == background_type::doughnut) {
+				result += "\t" "ogl::generic_ui_mesh_triangle_strip mesh{ " + std::to_string(c.datapoints * 2) + " };\n";
+				result += "\t" "ogl::data_texture data_texture{ " + std::to_string(c.datapoints) + ", 3 };\n";
+				result += "\t" "struct graph_entry {" + c.list_content + " key; ogl::color3f color; float amount; };\n";
+				result += "\t" "std::vector<graph_entry> graph_content;\n";
+				result += "\t" "void update_chart(sys::state& state);\n";
 			} else if(c.background == background_type::colorsquare) {
 				result += "\t" "ogl::color4f color{ " + std::to_string(c.other_color.r) + "f, " + std::to_string(c.other_color.g) + "f, " + std::to_string(c.other_color.b) + "f, " + std::to_string(c.other_color.a) + "f };\n";
 			} else if(c.background == background_type::stackedbarchart) {
@@ -489,7 +496,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
 			if(c.dynamic_tooltip) {
-				if(c.background != background_type::stackedbarchart)
+				if(c.background != background_type::stackedbarchart && c.background != background_type::doughnut)
 					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
 				else
 					result += "\t" "\t" "return ui::tooltip_behavior::position_sensitive_tooltip;\n";
@@ -1840,7 +1847,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "lines.set_y(scaled_datapoints.data());\n";
 
 				result += "}\n";
-			} else if(c.background == background_type::stackedbarchart) {
+			} else if(c.background == background_type::stackedbarchart || c.background == background_type::doughnut) {
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_chart(sys::state& state) {\n";
 
 				if(c.has_alternate_bg == false)
@@ -1949,13 +1956,24 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "if(temp_index < int32_t(graph_content.size())) {\n";
 					result += "\t" "\t" "auto& selected_key = graph_content[temp_index].key;\n";
 				}
+				if(c.background == background_type::doughnut) {
+					result += "\t" "float temp_total = 0.0f;\n";
+					result += "\t" "for(auto& p : graph_content) { temp_total += p.amount; }\n";
+					result += "\t" "float x_normal = float(x) / float(base_data.size.x) * 2.f - 1.f;\n";
+					result += "\t" "float y_normal = float(y) / float(base_data.size.y) * 2.f - 1.f;\n";
+					result += "\t" "float temp_offset = temp_total * (std::atan2f(-y_normal, -x_normal) / std::numbers::pi_v<float> / 2.f + 0.5f);\n";
+					result += "\t" "int32_t temp_index = 0;\n";
+					result += "\t" "for(auto& p : graph_content) { if(temp_offset <= p.amount) break; temp_offset -= p.amount; ++temp_index; }\n";
+					result += "\t" "if(temp_index < int32_t(graph_content.size())) {\n";
+					result += "\t" "\t" "auto& selected_key = graph_content[temp_index].key;\n";
+				}
 				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
 				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
 					it->second.used = true;
 					result += it->second.text;
 				}
 				result += "// END\n";
-				if(c.background == background_type::stackedbarchart) {
+				if(c.background == background_type::stackedbarchart || c.background == background_type::doughnut) {
 					result += "\t" "}\n";
 				}
 				result += "}\n";
@@ -2138,6 +2156,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					}
 				} else if(c.background == background_type::linechart) {
 					result += "\t" "ogl::render_linegraph(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, line_color.r, line_color.g, line_color.b, line_color.a, lines);\n";
+				} else if(c.background == background_type::doughnut) {
+					result += "\t" "ogl::render_ui_mesh(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, mesh, data_texture);\n";
 				} else if(c.background == background_type::stackedbarchart) {
 					result += "\t" "ogl::render_stripchart(state, ogl::color_modification::none, float(x), float(y), float(base_data.size.x), float(base_data.size.y), data_texture);\n";
 				} else if(c.background == background_type::colorsquare) {

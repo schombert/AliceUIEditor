@@ -1,6 +1,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include <cstddef>
 #include <stdio.h>
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -118,14 +119,14 @@ void load_shaders() {
 		"vec4 empty_rect(vec2 tc) {\n"
 			"float realx = tc.x * d_rect.z;\n"
 			"float realy = tc.y * d_rect.w;\n"
-			"if(realx <= 2 || realy <= 2 || realx >= (d_rect.z -2) || realy >= (d_rect.w -2))\n"
+			"if(realx <= 2.5 || realy <= 2.5 || realx >= (d_rect.z -2.5) || realy >= (d_rect.w -2.5))\n"
 				"return vec4(inner_color.r, inner_color.g, inner_color.b, 1.0f);\n"
 			"return vec4(inner_color.r, inner_color.g, inner_color.b, 0.25f);\n"
 		"}\n"
 		"vec4 hollow_rect(vec2 tc) {\n"
 			"float realx = tc.x * d_rect.z;\n"
 			"float realy = tc.y * d_rect.w;\n"
-			"if(realx <= 4 || realy <= 4 || realx >= (d_rect.z -4) || realy >= (d_rect.w -4))\n"
+			"if(realx <= 4.5 || realy <= 4.5 || realx >= (d_rect.z -4.5) || realy >= (d_rect.w -4.5))\n"
 			"return vec4(inner_color.r, inner_color.g, inner_color.b, 1.0f);\n"
 			"return vec4(inner_color.r, inner_color.g, inner_color.b, 0.0f);\n"
 		"}\n"
@@ -133,20 +134,20 @@ void load_shaders() {
 			"float realx = grid_off.x + tc.x * d_rect.z;\n"
 			"float realy = grid_off.y + tc.y * d_rect.w;\n"
 			"if(mod(realx, grid_size) < 1.0f || mod(realy, grid_size) < 1.0f)\n"
-				"return vec4(1.0f, 1.0f, 1.0f, 0.5f);\n"
+				"return vec4(1.0f, 1.0f, 1.0f, 0.1f);\n"
 			"return vec4(0.0f, 0.0f, 0.0f, 0.0f);\n"
 		"}\n"
 		"vec4 direct_texture(vec2 tc) {\n"
 			"float realx = tc.x * d_rect.z;\n"
 			"float realy = tc.y * d_rect.w;\n"
-			"if(realx <= 2 || realy <= 2 || realx >= (d_rect.z -2) || realy >= (d_rect.w -2))\n"
+			"if(realx <= 2.5 || realy <= 2.5 || realx >= (d_rect.z -2.5) || realy >= (d_rect.w -2.5))\n"
 				"return vec4(inner_color.r, inner_color.g, inner_color.b, 1.0f);\n"
 			"\treturn texture(texture_sampler, tc);\n"
 		"}\n"
 		"vec4 frame_stretch(vec2 tc) {\n"
 			"float realx = tc.x * d_rect.z;\n"
 			"float realy = tc.y * d_rect.w;\n"
-			"if(realx <= 2 || realy <= 2 || realx >= (d_rect.z -2) || realy >= (d_rect.w -2))\n"
+			"if(realx <= 2.5 || realy <= 2.5 || realx >= (d_rect.z -2.5) || realy >= (d_rect.w -2.5))\n"
 				"return vec4(inner_color.r, inner_color.g, inner_color.b, 1.0f);\n"
 			"vec2 tsize = textureSize(texture_sampler, 0);\n"
 			"float xout = 0.0;\n"
@@ -346,6 +347,11 @@ void render_hollow_rect(color3f color, float ix, float iy, int32_t iwidth, int32
 	glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 }
 
+void render_layout_rect(color3f outline_color, float ix, float iy, int32_t iwidth, int32_t iheight) {
+	render_empty_rect(outline_color * 0.5f, ix, iy, iwidth, iheight);
+	render_hollow_rect(outline_color, ix, iy, iwidth, iheight);
+}
+
 static void glfw_error_callback(int error, const char* description) {
 	MessageBoxW(nullptr, L"GLFW Error", L"OpenGL error", MB_OK);
 }
@@ -360,10 +366,13 @@ std::wstring relative_file_name(std::wstring_view base_name, std::wstring_view p
 		size_t common_length = 0;
 		while(common_length < base_name.size()) {
 			auto next_common_length = base_name.find_first_of(L'\\', common_length);
-			if(base_name.substr(0, next_common_length + 1) != project_directory.substr(0, next_common_length + 1)) {
+			if (next_common_length != std::string::npos) {
+				next_common_length++;
+			}
+			if(base_name.substr(0, next_common_length) != project_directory.substr(0, next_common_length)) {
 				break;
 			}
-			common_length = next_common_length + size_t(1);
+			common_length = next_common_length;
 		}
 		uint32_t missing_separators_count = 0;
 		for(size_t i = common_length; i < project_directory.size(); ++i) {
@@ -498,11 +507,19 @@ void update_cached_window(std::string_view name, int16_t& index) {
 	}
 }
 
-void render_layout(window_element_wrapper_t& window, layout_level_t& layout, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale);
+void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int layer, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale);
 
 void render_window(window_element_wrapper_t& win, float x, float y, bool highlightwin, float ui_scale) {
 	// bg
-	if(win.wrapped.background == background_type::none || win.wrapped.background == background_type::existing_gfx || win.wrapped.texture.empty() || win.wrapped.background == background_type::linechart || win.wrapped.background == background_type::stackedbarchart || win.wrapped.background == background_type::colorsquare) {
+	if(
+		win.wrapped.background == background_type::none
+		|| win.wrapped.background == background_type::existing_gfx
+		|| win.wrapped.texture.empty()
+		|| win.wrapped.background == background_type::linechart
+		|| win.wrapped.background == background_type::stackedbarchart
+		|| win.wrapped.background == background_type::doughnut
+		|| win.wrapped.background == background_type::colorsquare
+	) {
 		render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
 	} else if(win.wrapped.background == background_type::texture) {
 		if(win.wrapped.ogl_texture.loaded == false) {
@@ -538,7 +555,7 @@ void render_window(window_element_wrapper_t& win, float x, float y, bool highlig
 	}
 
 	// layout
-	render_layout(win, win.layout, x, y, win.wrapped.x_size, win.wrapped.y_size, win.wrapped.rectangle_color, ui_scale);
+	render_layout(win, win.layout, 1, x, y, win.wrapped.x_size, win.wrapped.y_size, win.wrapped.rectangle_color, ui_scale);
 }
 
 void render_control(ui_element_t& c, float x, float y, bool highlighted, float ui_scale) {
@@ -701,7 +718,7 @@ struct layout_iterator {
 		}
 		return measure_result{ 0, 0, measure_result::special::none };
 	}
-	void render_current(window_element_wrapper_t& window, float x, float y, int32_t lsz_x, int32_t lsz_y, color3f outline_color, float scale) {
+	void render_current(window_element_wrapper_t& window, int layer, float x, float y, int32_t lsz_x, int32_t lsz_y, color3f outline_color, float scale) {
 		if(!has_more())
 			return;
 		auto& m = backing[index];
@@ -729,7 +746,7 @@ struct layout_iterator {
 			}
 		} else if(std::holds_alternative< sub_layout_t>(m)) {
 			auto& i = std::get<sub_layout_t>(m);
-			render_layout(window, *(i.layout), x, y, lsz_x, lsz_y, outline_color, scale);
+			render_layout(window, *(i.layout), layer + 1, x, y, lsz_x, lsz_y, outline_color, scale);
 		}
 	}
 	void move_position(int32_t n) {
@@ -802,7 +819,7 @@ index_result nth_layout_child(layout_level_t& m, int32_t index) {
 	return index_result{ nullptr, 0 };
 }
 
-void render_layout(window_element_wrapper_t& window, layout_level_t& layout, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale) {
+void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int layer, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale) {
 	auto base_x_size = layout.size_x != -1 ? int32_t(layout.size_x) : width;
 	auto base_y_size = layout.size_y != -1 ? int32_t(layout.size_y) : height;
 	auto top_margin = int32_t(layout.margin_top);
@@ -815,7 +832,11 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, flo
 		effective_y_size -= int32_t(2 * open_project.grid_size);
 	}
 
-	render_hollow_rect(outline_color * 0.8f, ((x + left_margin) * scale), ((y + top_margin) * scale), std::max(1, int32_t(effective_x_size * scale)), std::max(1, int32_t(effective_y_size * scale)));
+	if (layout.open_in_ui) {
+		render_layout_rect(outline_color * 2.f * layer, ((x + left_margin) * scale), ((y + top_margin) * scale), std::max(1, int32_t(effective_x_size * scale)), std::max(1, int32_t(effective_y_size * scale)));
+	} else {
+		render_layout_rect(outline_color * 0.5f * layer, ((x + left_margin) * scale), ((y + top_margin) * scale), std::max(1, int32_t(effective_x_size * scale)), std::max(1, int32_t(effective_y_size * scale)));
+	}
 
 	switch(layout.type) {
 		case layout_type::single_horizontal:
@@ -897,7 +918,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, flo
 						yoff = y + i.abs_y;
 					}
 				}
-				it.render_current(window, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+				it.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
 
 				space_used += mr.x_space;
 				if(mr.other == measure_result::special::space_consumer) {
@@ -986,7 +1007,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, flo
 						yoff = y + i.abs_y;
 					}
 				}
-				it.render_current(window, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+				it.render_current(window, layer, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
 
 				space_used += mr.y_space;
 				if(mr.other == measure_result::special::space_consumer) {
@@ -1088,7 +1109,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, flo
 						was_abs = true;
 					}
 				}
-				it.render_current(window, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+				it.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
 
 				space_used += mr.x_space;
 				if(mr.other == measure_result::special::space_consumer) {
@@ -1193,7 +1214,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, flo
 						was_abs = true;
 					}
 				}
-				it.render_current(window, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+				it.render_current(window, layer, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
 
 				space_used += mr.y_space;
 				if(mr.other == measure_result::special::space_consumer) {
@@ -1292,7 +1313,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, flo
 							yoff = y + i.abs_y;
 						}
 					}
-					line_start.render_current(window, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+					line_start.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
 
 					space_used += mr.x_space;
 					if(mr.other == measure_result::special::space_consumer) {
@@ -1402,7 +1423,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, flo
 							yoff = y + i.abs_y;
 						}
 					}
-					line_start.render_current(window, xoff, yoff, mr.x_space , mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+					line_start.render_current(window, layer, xoff, yoff, mr.x_space , mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
 
 					space_used += mr.y_space;
 					if(mr.other == measure_result::special::space_consumer) {
@@ -1473,12 +1494,34 @@ void rename_control(layout_level_t& layout, std::string const& old_name, std::st
 	}
 }
 
+void apply_layout_style(layout_level_t& layout, int16_t margins, int16_t header_height, bool first) {
+	int internal_layouts = 0;
+	bool is_first = true;
+	for(auto& m : layout.contents) {
+		if(std::holds_alternative< sub_layout_t>(m)) {
+			internal_layouts++;
+			auto& i = std::get<sub_layout_t>(m);
+			apply_layout_style(*i.layout, margins, header_height, is_first);
+			is_first = false;
+		}
+	}
+
+	if (internal_layouts == 0) {
+		layout.margin_top = margins;
+	}
+	if (internal_layouts == 0 && first && layout.size_y != -1) {
+		layout.size_y = header_height;
+	}
+}
+
 void imgui_layout_contents(layout_level_t& layout) {
 	ImGui::PushID(&layout);
 
 	int32_t temp = 0;
+	layout.open_in_ui = false;
 
 	if(ImGui::TreeNodeEx("Layout options", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
+		layout.open_in_ui = true;
 		{
 			temp = int32_t(layout.type);
 			const char* items[] = { "horizontal", "vertical", "overlapped horizontal", "overlapped vertical", "multiline", "multicolumn" };
@@ -2663,9 +2706,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::Checkbox("Ignore grid", &(c.no_grid));
 
 						{
-							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip" };
+							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut" };
 							temp = int32_t(c.background);
-							ImGui::Combo("Background", &temp, items, 12);
+							ImGui::Combo("Background", &temp, items, 13);
 							c.background = background_type(temp);
 						}
 
@@ -2747,6 +2790,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								c.other_color.a = ccolor.w;
 							}
 						} else if(c.background == background_type::stackedbarchart) {
+							temp = c.datapoints;
+							ImGui::InputInt("Data points", &temp);
+							c.datapoints = int16_t(temp);
+
+							ImGui::InputText("Data key", &c.list_content);
+							ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+						} else if(c.background == background_type::doughnut) {
 							temp = c.datapoints;
 							ImGui::InputInt("Data points", &temp);
 							c.datapoints = int16_t(temp);
@@ -3044,6 +3094,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			if(0 <= selected_window && selected_window <= int32_t(open_project.windows.size())) {
 				ImGui::Begin("Layout", NULL, ImGuiWindowFlags_HorizontalScrollbar);
 				imgui_layout_contents(open_project.windows[selected_window].layout);
+				ImGui::End();
+
+				ImGui::Begin("Style Editor");
+				static auto bottom_margin = 0;
+				ImGui::InputInt("Base margins", &bottom_margin);
+
+				static auto header_height = 20;
+				ImGui::InputInt("Header height", &header_height);
+
+				if (ImGui::Button("Apply")) {
+					apply_layout_style(open_project.windows[selected_window].layout, bottom_margin, header_height, false);
+				}
 				ImGui::End();
 			}
 		}
