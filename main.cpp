@@ -2501,79 +2501,300 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						c.divider_color.b = ccolor.y;
 					}
 
+					size_t amount_of_columns = c.table_columns.size();
 
-					ImGui::Text("Columns");
-					for(uint32_t k = 0; k < c.table_columns.size(); ++k) {
-						ImGui::PushID(int32_t(k));
-						ImGui::Indent();
-						if(k > 0) {
-							ImGui::Text("-------");
-						}
-						ImGui::InputText("Column name", &(c.table_columns[k].internal_data.column_name));
+					int move_from = -1;
+					int move_to = -1;
 
-						if(ImGui::Button("Delete")) {
-							c.table_columns.erase(c.table_columns.begin() + k);
-							ImGui::Unindent();
+					static ImGuiTableFlags flags =
+						ImGuiTableFlags_Borders
+						| ImGuiTableFlags_RowBg
+						| ImGuiTableFlags_ScrollX
+						| ImGuiTableFlags_ScrollY;
+
+					if (ImGui::BeginTable("table_description", amount_of_columns + 1, flags, ImVec2(0.0f, 500.f))) {
+						ImGui::TableSetupScrollFreeze(1, 1);
+
+						ImGui::TableNextRow();
+
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Reorder");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+
+							ImGui::PushID(k);
+							ImGui::Button("drag");
+							if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+							{
+								ImGui::SetDragDropPayload("DRAG_TABLE_COLUMN", &k, sizeof(int));
+								ImGui::Text("Moving column");
+								ImGui::EndDragDropSource();
+							}
+
+							if (ImGui::BeginDragDropTarget()) {
+								if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_TABLE_COLUMN"))
+								{
+									move_from = *(const int*)payload->Data;
+									move_to = k;
+									if (move_from != -1 && move_to != -1) {
+										// Reorder items
+										int copy_dst = (move_from > move_to) ? move_to : move_to - 1;
+										int copy_src = move_from;
+
+										auto item = c.table_columns[copy_src];
+										c.table_columns.erase(c.table_columns.begin() + copy_src);
+										c.table_columns.insert(c.table_columns.begin() + copy_dst, item);
+
+										// ImGui::SetDragDropPayload("DRAG_TABLE_COLUMN", &move_to, sizeof(int));
+									}
+								}
+								ImGui::EndDragDropTarget();
+							}
 							ImGui::PopID();
-							break;
-						}
-						if(k > 0) {
-							ImGui::SameLine();
-							if(ImGui::Button("Move left")) {
-								std::swap(c.table_columns[k - 1], c.table_columns[k]);
-							}
-						}
-						if(k + 1 < c.table_columns.size()) {
-							ImGui::SameLine();
-							if(ImGui::Button("Move right")) {
-								std::swap(c.table_columns[k + 1], c.table_columns[k]);
-							}
 						}
 
-						int32_t temp = c.table_columns[k].display_data.width;
-						ImGui::InputInt("Column width", &temp);
-						c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Column name");
 
-						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-						ImGui::Checkbox("Spacer column", &is_spacer);
-						c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
 
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::InputText("##Column name", &(c.table_columns[k].internal_data.column_name));
+							ImGui::PopID();
+						}
 
-						if(is_spacer == false) {
-							{
-								const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-								temp = int32_t(c.table_columns[k].display_data.cell_text_color);
-								ImGui::Combo("Cell text color", &temp, items, 16);
-								c.table_columns[k].display_data.cell_text_color = text_color(temp);
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Column width");
+
+						int32_t temp;
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+
+							ImGui::PushID(k);
+							temp = c.table_columns[k].display_data.width;
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::InputInt("##Column width", &temp);
+							c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
+							ImGui::PopID();
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Spacer column");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+
+							ImGui::PushID(k);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							ImGui::SetNextItemWidth(50.f);
+							ImGui::Checkbox("##Spacer column", &is_spacer);
+							c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
+							ImGui::PopID();
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Cell text color");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
 							}
 
-							{
-								const char* items[] = { "left (leading)", "right (trailing)", "center" };
-								temp = int32_t(c.table_columns[k].display_data.text_alignment);
-								ImGui::Combo("Cell text alignment", &temp, items, 3);
-								c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
+							ImGui::PushID(k);
+							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+							temp = int32_t(c.table_columns[k].display_data.cell_text_color);
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::Combo("##Cell text color", &temp, items, 16);
+							c.table_columns[k].display_data.cell_text_color = text_color(temp);
+							ImGui::PopID();
+
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Cell text alignment");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
 							}
 
-							{
-								const char* items[] = { "left (leading)", "right (trailing)", "none" };
-								temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
-								ImGui::Combo("Decimal alignment", &temp, items, 3);
-								c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							const char* items[] = { "left (leading)", "right (trailing)", "center" };
+							temp = int32_t(c.table_columns[k].display_data.text_alignment);
+							ImGui::Combo("##Cell text alignment", &temp, items, 3);
+							c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
+							ImGui::PopID();
+
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Decimal alignment");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
 							}
 
-							ImGui::Checkbox("Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							const char* items[] = { "left (leading)", "right (trailing)", "none" };
+							temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
+							ImGui::Combo("##Decimal alignment", &temp, items, 3);
+							c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
+							ImGui::PopID();
+
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Dynamic cell tooltip");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::Checkbox("##Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
+							ImGui::PopID();
+
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Cell tooltip key");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
 							if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
-								ImGui::InputText("Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
+								ImGui::InputText("##Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
+							} else {
+								ImGui::Text("Off");
+							}
+							ImGui::PopID();
+
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Column is sortable");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
 							}
 
-							ImGui::Checkbox("Column is sortable", &(c.table_columns[k].internal_data.sortable));
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::Checkbox("##Column is sortable", &(c.table_columns[k].internal_data.sortable));
+							ImGui::PopID();
 
-							ImGui::InputText("Header key", &(c.table_columns[k].display_data.header_key));
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
 
-							ImGui::Checkbox("Header has background", &(c.table_columns[k].internal_data.header_background));
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Header key");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::InputText("##Header key", &(c.table_columns[k].display_data.header_key));
+							ImGui::PopID();
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Header has background");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::Checkbox("##Header has background", &(c.table_columns[k].internal_data.header_background));
+							ImGui::PopID();
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Header background:");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
 							if(c.table_columns[k].internal_data.header_background) {
-								std::string tex = "Header background: " + (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
-								ImGui::Text(tex.c_str());
+								std::string tex = (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
+								ImGui::Text("%s", tex.c_str());
 								ImGui::SameLine();
 								if(ImGui::Button("Change row alt")) {
 									auto new_file = fs::pick_existing_file(L"");
@@ -2581,23 +2802,111 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 									//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
 									c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 								}
+							} else {
+								ImGui::Text("Off");
 							}
-
-							{
-								const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-								temp = int32_t(c.table_columns[k].display_data.header_text_color);
-								ImGui::Combo("Header text color", &temp, items, 16);
-								c.table_columns[k].display_data.header_text_color = text_color(temp);
-							}
-
-							ImGui::Checkbox("Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
-							if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
-								ImGui::InputText("Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
+							ImGui::PopID();
+							if (is_spacer) {
+								ImGui::EndDisabled();
 							}
 						}
 
-						ImGui::Unindent();
-						ImGui::PopID();
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Header text color");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+
+							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+							temp = int32_t(c.table_columns[k].display_data.header_text_color);
+							ImGui::Combo("##Header text color", &temp, items, 16);
+							c.table_columns[k].display_data.header_text_color = text_color(temp);
+
+							ImGui::PopID();
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Dynamic header tooltip");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+
+							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+							temp = int32_t(c.table_columns[k].display_data.header_text_color);
+							ImGui::Checkbox("##Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
+							c.table_columns[k].display_data.header_text_color = text_color(temp);
+
+							ImGui::PopID();
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+
+
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Header tooltip key");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+							if (is_spacer) {
+								ImGui::BeginDisabled();
+							}
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+
+							if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
+								ImGui::InputText("##Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
+							} else {
+								ImGui::Text("Off");
+							}
+
+							ImGui::PopID();
+							if (is_spacer) {
+								ImGui::EndDisabled();
+							}
+						}
+
+						// keep it last to avoid complications
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::Text("Delete");
+
+						for (int k = 0; k < amount_of_columns; k++) {
+							ImGui::TableSetColumnIndex(k + 1);
+
+							ImGui::PushID(k);
+							ImGui::SetNextItemWidth(100.f);
+							if(ImGui::Button("DEL")) {
+								c.table_columns.erase(c.table_columns.begin() + k);
+								break;
+							}
+							ImGui::PopID();
+						}
+
+						ImGui::EndTable();
 					}
 
 					if(ImGui::Button("Add column")) {
