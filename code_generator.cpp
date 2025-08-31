@@ -930,7 +930,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 									result += "\t" "\t" "\t" "\t" "if(table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction != 0) {\n";
 									result +=  "\t" "\t" "\t" "\t" "\t" "sys::merge_sort(values.begin() + start_i, values.begin() + i, [&](auto const& raw_a, auto const& raw_b){\n";
 									result +=  "\t" "\t" "\t" "\t" "\t" "\t" "auto const& a = std::get<" + i.name + "_option>(raw_a);\n";
-									result +="\t" "\t" "\t" "\t" "\t" "\t" "\t" "auto const& b = std::get<" + i.name + "_option>(raw_b);\n";
+									result +=  "\t" "\t" "\t" "\t" "\t" "\t" "auto const& b = std::get<" + i.name + "_option>(raw_b);\n";
 									result +=  "\t" "\t" "\t" "\t" "\t" "\t" "int8_t result = 0;\n";
 									result += "// BEGIN " + win.wrapped.name + "::" + g->name + "::" + t->name + "::sort::" + col.internal_data.column_name + "\n";
 									if(auto it = old_code.found_code.find(win.wrapped.name + "::" + g->name + "::" + t->name + "::sort::" + col.internal_data.column_name); it != old_code.found_code.end()) {

@@ -2901,6 +2901,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::SetNextItemWidth(100.f);
 							if(ImGui::Button("DEL")) {
 								c.table_columns.erase(c.table_columns.begin() + k);
+								ImGui::PopID();
 								break;
 							}
 							ImGui::PopID();
@@ -3403,18 +3404,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			if(0 <= selected_window && selected_window <= int32_t(open_project.windows.size())) {
 				ImGui::Begin("Layout", NULL, ImGuiWindowFlags_HorizontalScrollbar);
 				imgui_layout_contents(open_project.windows[selected_window].layout);
-				ImGui::End();
-
-				ImGui::Begin("Style Editor");
-				static auto bottom_margin = 0;
-				ImGui::InputInt("Base margins", &bottom_margin);
-
-				static auto header_height = 20;
-				ImGui::InputInt("Header height", &header_height);
-
-				if (ImGui::Button("Apply")) {
-					apply_layout_style(open_project.windows[selected_window].layout, bottom_margin, header_height, false);
-				}
 				ImGui::End();
 			}
 		}
