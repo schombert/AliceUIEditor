@@ -3,6 +3,7 @@
 #include "imgui_impl_opengl3.h"
 #include <cstddef>
 #include <stdio.h>
+#include <variant>
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
@@ -1741,6 +1742,69 @@ void imgui_layout_contents(layout_level_t& layout) {
 				}
 				ImGui::TreePop();
 			}
+		} else if (std::holds_alternative<texture_layer_t>(m)) {
+			auto& i = std::get<texture_layer_t>(m);
+			auto count = 4;
+			background_type available_types[] {
+				background_type::texture,
+				background_type::bordered_texture,
+				background_type::textured_corners,
+				background_type::border_texture_repeat
+			};
+			const char * names[] {
+				"Texture",
+				"Bordered texture",
+				"Corners",
+				"Repeat border"
+			};
+
+			if(ImGui::TreeNodeEx("Texture Layer", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
+				if(ImGui::Button("Delete")) {
+					layout.contents.erase(layout.contents.begin() + id);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+				if(id > 0) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move up")) {
+						std::swap(layout.contents[id - 1], layout.contents[id]);
+					}
+				}
+				if(id + 1 < layout.contents.size()) {
+					ImGui::SameLine();
+					if(ImGui::Button("Move down")) {
+						std::swap(layout.contents[id + 1], layout.contents[id]);
+					}
+				}
+
+				{
+					int index = 0;
+					for (int j = 0; j < count; j++) {
+						if (available_types[j] == i.texture_type) {
+							index = j;
+							break;
+						}
+					}
+
+					ImGui::Combo("Texture type", &index, names, count);
+					i.texture_type = available_types[index];
+				}
+
+				{
+					std::string tex = "Texture: " + (i.texture.size() > 0 ? i.texture : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						i.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+				}
+
+				ImGui::TreePop();
+			}
 		} else if(std::holds_alternative<generator_t>(m)) {
 			auto& i = std::get<generator_t>(m);
 			if(ImGui::TreeNodeEx("Generator", ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull)) {
@@ -1840,12 +1904,18 @@ void imgui_layout_contents(layout_level_t& layout) {
 					ImGui::SameLine();
 					if(ImGui::Button("Move up")) {
 						std::swap(layout.contents[id - 1], layout.contents[id]);
+						ImGui::TreePop();
+						ImGui::PopID();
+						break;
 					}
 				}
 				if(id + 1 < layout.contents.size()) {
 					ImGui::SameLine();
 					if(ImGui::Button("Move down")) {
 						std::swap(layout.contents[id + 1], layout.contents[id]);
+						ImGui::TreePop();
+						ImGui::PopID();
+						break;
 					}
 				}
 
@@ -1863,8 +1933,8 @@ void imgui_layout_contents(layout_level_t& layout) {
 	//
 	static int32_t new_content_choice = 0;
 	{
-		const char* items[] = { "Control", "Window", "Glue", "Generator", "Layout" };
-		ImGui::Combo("Type", &new_content_choice, items, 5);
+		const char* items[] = { "Control", "Window", "Glue", "Generator", "Layout", "Texture layer" };
+		ImGui::Combo("Type", &new_content_choice, items, 6);
 	}
 	// ImGui::SameLine();
 	if(ImGui::Button("Add")) {
@@ -1884,6 +1954,9 @@ void imgui_layout_contents(layout_level_t& layout) {
 			case 4:
 				layout.contents.emplace_back(sub_layout_t{ });
 				std::get<sub_layout_t>(layout.contents.back()).layout = std::make_unique<layout_level_t>();
+				break;
+			case 5:
+				layout.contents.emplace_back(texture_layer_t{});
 				break;
 		}
 	}

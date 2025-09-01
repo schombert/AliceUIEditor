@@ -164,8 +164,8 @@ struct window_element_t {
 };
 
 struct texture_layer_t {
-	background_type texture;
-	ogl::texture ogl_texture;
+	background_type texture_type = background_type::texture;
+	std::string texture;
 };
 
 enum class property : uint8_t {

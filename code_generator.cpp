@@ -728,9 +728,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		if(win.layout.contents.size() > 0)
 			result += "\t" "void create_layout_level(sys::state& state, layout_level& lvl, char const* ldata, size_t sz);\n";
 		result += "\t" "void on_create(sys::state& state) noexcept override;\n";
+		result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
 
 		if(win.wrapped.background != background_type::none) {
-			result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
 			result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 			result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 		}
@@ -1099,7 +1099,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "void  " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
 
 				result += "\t" "auto fh = text::make_font_id(state, false, 1.0f * " + std::to_string(proj.grid_size * 2) + ");\n";
-				result += "\t"  "auto linesz = state.font_collection.line_height(state, fh); \n";
+				result += "\t" "auto linesz = state.font_collection.line_height(state, fh); \n";
 				result += "\t" "auto ycentered = (base_data.size.y - linesz) / 2;\n";
 				result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - ui::get_absolute_location(state, *this).x;\n";
 
@@ -2470,6 +2470,56 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "ogl::render_rect_with_repeated_corner(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(" + std::to_string(proj.grid_size) + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 			}
 
+			// render all textures from layout:
+			result += "\t" "auto cmod = ui::get_color_modification(false, false,  false);" "\n";
+			result += "\t" "for (auto& __item : textures_to_render) {" "\n";
+			result += "\t" "\t" "if (__item.texture_type == background_type::texture)" "\n";
+			result += "\t" "\t" "\t" "ogl::render_textured_rect(state, cmod, float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+			result += "\t" "\t" "else if (__item.texture_type == background_type::border_texture_repeat)" "\n";
+			result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_border(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+			result += "\t" "\t" "else if (__item.texture_type == background_type::textured_corners)" "\n";
+			result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_corner(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+			result += "\t" "}" "\n";
+
+			if(win.wrapped.share_table_highlight) {
+				auto t = table_from_name(proj, win.wrapped.table_connection);
+				if(t) {
+					if(t->has_highlight_color) {
+						result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent);\n";
+
+						result += "\t" "auto under_mouse = [&](){auto p = state.ui_state.under_mouse; while(p){ if(p == this) return true; p = p->parent; } return false;}();\n";
+						result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - ui::get_absolute_location(state, *this).x;\n";
+
+						result += "\t" "if(under_mouse) {\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x), float(y), float(base_data.size.x), float(base_data.size.y), " + std::to_string(t->highlight_color.r) + "f, " + std::to_string(t->highlight_color.g) + "f, " + std::to_string(t->highlight_color.b) + "f, " + std::to_string(t->highlight_color.a) + "f);\n";
+						result += "\t" "}\n";
+
+						for(auto& col : t->table_columns) {
+							if(col.internal_data.cell_type == table_cell_type::text) {
+								result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && rel_mouse_x < (table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width);\n";
+								result += "\t" "if(col_um_" + col.internal_data.column_name + " && !under_mouse) {\n";
+								result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(base_data.size.y), " + std::to_string(t->highlight_color.r) + "f, " + std::to_string(t->highlight_color.g) + "f, " + std::to_string(t->highlight_color.b) + "f, " + std::to_string(t->highlight_color.a) + "f);\n";
+								result += "\t" "}\n";
+							}
+						}
+					}
+				}
+			}
+
+			result += "}\n";
+		} else {
+			result += "void " + project_name + "_" + win.wrapped.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
+			// render all textures from layout:
+			result += "\t" "auto cmod = ui::get_color_modification(false, false,  false);" "\n";
+			result += "\t" "for (auto& __item : textures_to_render) {" "\n";
+			result += "\t" "\t" "if (__item.texture_type == background_type::texture)" "\n";
+			result += "\t" "\t" "\t" "ogl::render_textured_rect(state, cmod, float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+			result += "\t" "\t" "else if (__item.texture_type == background_type::border_texture_repeat)" "\n";
+			result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_border(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+			result += "\t" "\t" "else if (__item.texture_type == background_type::textured_corners)" "\n";
+			result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_corner(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+			result += "\t" "}" "\n";
+
 			if(win.wrapped.share_table_highlight) {
 				auto t = table_from_name(proj, win.wrapped.table_connection);
 				if(t) {
@@ -2560,7 +2610,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "layout_item_types t;\n";
 			result += "\t" "\t" "buffer.read(t);\n";
 			result += "\t" "\t" "switch(t) {\n";
-
+			result += "\t" "\t" "\t" "case layout_item_types::texture_layer:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "texture_layer temp;\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.texture_type);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.texture);\n";
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
 			result += "\t" "\t" "\t" "case layout_item_types::control:\n";
 			result += "\t" "\t" "\t" "{\n";
 			result += "\t" "\t" "\t" "\t" "layout_control temp;\n";
