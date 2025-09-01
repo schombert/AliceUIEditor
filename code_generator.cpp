@@ -1,4 +1,5 @@
 #include "code_generator.hpp"
+#include <string>
 #include <string_view>
 #include "filesystem.hpp"
 #include "project_description.hpp"
@@ -395,22 +396,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t"  "std::string_view gfx_key;\n";
 				result += "\t"  "dcon::gfx_object_id background_gid;\n";
 				result += "\t"  "int32_t frame = 0;\n";
-			} else if(c.background == background_type::icon_strip) {
-				result += "\t"  "std::string_view texture_key;\n";
-				if(c.has_alternate_bg) {
-					result += "\t"  "std::string_view alt_texture_key;\n";
-					result += "\t"  "dcon::texture_id alt_background_texture;\n";
-					result += "\t"  "bool is_active = false;\n";
-				}
-				result += "\t"  "dcon::texture_id background_texture;\n";
-				result += "\t"  "int32_t frame = 0;\n";
 			} else if(c.background == background_type::progress_bar) {
 				result += "\t"  "std::string_view texture_key;\n";
 				result += "\t"  "dcon::texture_id background_texture;\n";
 				result += "\t"  "std::string_view alt_texture_key;\n";
 				result += "\t"  "dcon::texture_id alt_background_texture;\n";
 				result += "\t"  "float progress = 0.0f;\n";
-			} else if(c.background == background_type::texture || c.background == background_type::bordered_texture) {
+			} else if(background_type_is_textured(c.background)) {
 				result += "\t"  "std::string_view texture_key;\n";
 				if(c.has_alternate_bg) {
 					result += "\t"  "std::string_view alt_texture_key;\n";
@@ -418,8 +410,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t"  "bool is_active = false;\n";
 				}
 				result += "\t"  "dcon::texture_id background_texture;\n";
-				if(c.background == background_type::bordered_texture) {
+				if(background_type_requires_border_width(c.background)) {
 					result += "\t"  "int16_t border_size = 0;\n";
+				}
+				if(background_type_has_frames(c.background)) {
+					result += "\t"  "int32_t frame = 0;\n";
 				}
 			} else if(c.background == background_type::linechart) {
 				result += "\t" "ogl::lines lines{ " + std::to_string(c.datapoints) + " };\n";
@@ -511,7 +506,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
 			result += "\t" "\t" "if(type == ui::mouse_probe_type::click) {\n";
-			if(c.background != background_type::none || c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) {
+			if(c.background == background_type::flag || c.background == background_type::table_headers || c.background == background_type::table_columns || c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) {
 				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
 			} else {
 				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
@@ -2154,6 +2149,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					} else {
 						result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 					}
+				} else if(c.background == background_type::border_texture_repeat) {
+					result += "\t" "ogl::render_rect_with_repeated_border(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(" + std::to_string(proj.grid_size) +  "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
+				} else if(c.background == background_type::textured_corners) {
+					result += "\t" "ogl::render_rect_with_repeated_corner(state, ui::get_color_modification(this == state.ui_state.under_mouse, " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string((c.left_click_action || c.right_click_action || c.shift_click_action || c.hover_activation) ? "true" : "false") + "), float(" + std::to_string(proj.grid_size) +  "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 				} else if(c.background == background_type::linechart) {
 					result += "\t" "ogl::render_linegraph(state, ogl::color_modification::none, float(x), float(y), base_data.size.x, base_data.size.y, line_color.r, line_color.g, line_color.b, line_color.a, lines);\n";
 				} else if(c.background == background_type::doughnut) {
@@ -2465,6 +2464,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				} else {
 					result += "\t" "ogl::render_bordered_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(border_size), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 				}
+			} else if(win.wrapped.background == background_type::border_texture_repeat) {
+				result += "\t" "ogl::render_rect_with_repeated_border(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(" + std::to_string(proj.grid_size) + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
+			} else if(win.wrapped.background == background_type::textured_corners) {
+				result += "\t" "ogl::render_rect_with_repeated_corner(state, ui::get_color_modification(this == state.ui_state.under_mouse, false, false), float(" + std::to_string(proj.grid_size) + "), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, background_texture, texture_key), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + "); \n";
 			}
 
 			if(win.wrapped.share_table_highlight) {
@@ -2643,9 +2646,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "if(auto it = state.ui_state.gfx_by_name.find(state.lookup_key(gfx_key)); it != state.ui_state.gfx_by_name.end()) {\n";
 			result += "\t" "\t" "background_gid = it->second;\n";
 			result += "\t" "}\n";
-		} else if(win.wrapped.background == background_type::texture || win.wrapped.background == background_type::bordered_texture) {
+		} else if(background_type_is_textured(win.wrapped.background)) {
 			result += "\t"   "texture_key = win_data.texture;\n";
-			if(win.wrapped.background == background_type::bordered_texture) {
+			if(background_type_requires_border_width(win.wrapped.background)) {
 				result += "\t"  "\t"  "border_size = win_data.border_size;\n";
 			}
 			if(win.wrapped.has_alternate_bg) {
@@ -2691,9 +2694,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			if(c.background == background_type::existing_gfx) {
 				result += "\t" "\t" "\t"  "cptr->gfx_key = child_data.texture;\n";
-			} else if(c.background == background_type::texture || c.background == background_type::bordered_texture) {
+			} else if(background_type_is_textured(c.background)) {
 				result += "\t" "\t" "\t"  "cptr->texture_key = child_data.texture;\n";
-				if(c.background == background_type::bordered_texture) {
+				if(background_type_requires_border_width(c.background)) {
 					result += "\t" "\t" "\t"  "cptr->border_size = child_data.border_size;\n";
 				}
 				if(c.has_alternate_bg) {

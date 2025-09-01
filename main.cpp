@@ -519,6 +519,8 @@ void render_window(window_element_wrapper_t& win, float x, float y, bool highlig
 		|| win.wrapped.background == background_type::stackedbarchart
 		|| win.wrapped.background == background_type::doughnut
 		|| win.wrapped.background == background_type::colorsquare
+		|| win.wrapped.background == background_type::border_texture_repeat
+		|| win.wrapped.background == background_type::textured_corners
 	) {
 		render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
 	} else if(win.wrapped.background == background_type::texture) {
@@ -3016,9 +3018,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::Checkbox("Ignore grid", &(c.no_grid));
 
 						{
-							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut" };
+							const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut", "border repeat", "corners" };
 							temp = int32_t(c.background);
-							ImGui::Combo("Background", &temp, items, 13);
+							ImGui::Combo("Background", &temp, items, 15);
 							c.background = background_type(temp);
 						}
 
@@ -3043,7 +3045,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							}
 						} else if(c.background == background_type::existing_gfx) {
 							ImGui::InputText("Texture", &(c.texture));
-						} else if(c.background == background_type::texture || c.background == background_type::bordered_texture || c.background == background_type::icon_strip) {
+						} else if(background_type_is_textured(c.background)) {
 							std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
 							ImGui::Text(tex.c_str());
 							ImGui::SameLine();
