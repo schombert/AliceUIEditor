@@ -2473,13 +2473,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			// render all textures from layout:
 			if (!win.layout.contents.empty()) {
 				result += "\t" "auto cmod = ui::get_color_modification(false, false,  false);" "\n";
-				result += "\t" "for (auto& __item : textures_to_render) {" "\n";
-				result += "\t" "\t" "if (__item.texture_type == background_type::texture)" "\n";
-				result += "\t" "\t" "\t" "ogl::render_textured_rect(state, cmod, float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
-				result += "\t" "\t" "else if (__item.texture_type == background_type::border_texture_repeat)" "\n";
-				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_border(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
-				result += "\t" "\t" "else if (__item.texture_type == background_type::textured_corners)" "\n";
-				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_corner(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+				result += "\t" "for (auto& _item : textures_to_render) {" "\n";
+				result += "\t" "\t" "if (_item.texture_type == background_type::texture)" "\n";
+				result += "\t" "\t" "\t" "ogl::render_textured_rect(state, cmod, float(x + _item.x), float(y + _item.y), float(_item.w), float(_item.h), ogl::get_late_load_texture_handle(state, _item.texture_id, _item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+				result += "\t" "\t" "else if (_item.texture_type == background_type::border_texture_repeat)" "\n";
+				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_border(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + _item.x), float(y + _item.y), float(_item.w), float(_item.h), ogl::get_late_load_texture_handle(state, _item.texture_id, _item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+				result += "\t" "\t" "else if (_item.texture_type == background_type::textured_corners)" "\n";
+				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_corner(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + _item.x), float(y + _item.y), float(_item.w), float(_item.h), ogl::get_late_load_texture_handle(state, _item.texture_id, _item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 				result += "\t" "}" "\n";
 			}
 
@@ -2515,13 +2515,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			// render all textures from layout:
 			if (!win.layout.contents.empty()) {
 				result += "\t" "auto cmod = ui::get_color_modification(false, false,  false);" "\n";
-				result += "\t" "for (auto& __item : textures_to_render) {" "\n";
-				result += "\t" "\t" "if (__item.texture_type == background_type::texture)" "\n";
-				result += "\t" "\t" "\t" "ogl::render_textured_rect(state, cmod, float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
-				result += "\t" "\t" "else if (__item.texture_type == background_type::border_texture_repeat)" "\n";
-				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_border(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
-				result += "\t" "\t" "else if (__item.texture_type == background_type::textured_corners)" "\n";
-				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_corner(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + __item.x), float(y + __item.y), float(__item.w), float(__item.h), ogl::get_late_load_texture_handle(state, __item.texture_id, __item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+				result += "\t" "for (auto& _item : textures_to_render) {" "\n";
+				result += "\t" "\t" "if (_item.texture_type == background_type::texture)" "\n";
+				result += "\t" "\t" "\t" "ogl::render_textured_rect(state, cmod, float(x + _item.x), float(y + _item.y), float(_item.w), float(_item.h), ogl::get_late_load_texture_handle(state, _item.texture_id, _item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+				result += "\t" "\t" "else if (_item.texture_type == background_type::border_texture_repeat)" "\n";
+				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_border(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + _item.x), float(y + _item.y), float(_item.w), float(_item.h), ogl::get_late_load_texture_handle(state, _item.texture_id, _item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
+				result += "\t" "\t" "else if (_item.texture_type == background_type::textured_corners)" "\n";
+				result += "\t" "\t" "\t" "ogl::render_rect_with_repeated_corner(state, cmod, float(" + std::to_string(proj.grid_size) + "), float(x + _item.x), float(y + _item.y), float(_item.w), float(_item.h), ogl::get_late_load_texture_handle(state, _item.texture_id, _item.texture), base_data.get_rotation(), false, " + std::string(win.wrapped.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
 				result += "\t" "}" "\n";
 			}
 
