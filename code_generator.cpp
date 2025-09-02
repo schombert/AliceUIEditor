@@ -1956,7 +1956,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "for(auto& p : graph_content) { temp_total += p.amount; }\n";
 					result += "\t" "float x_normal = float(x) / float(base_data.size.x) * 2.f - 1.f;\n";
 					result += "\t" "float y_normal = float(y) / float(base_data.size.y) * 2.f - 1.f;\n";
-					result += "\t" "float temp_offset = temp_total * (std::atan2f(-y_normal, -x_normal) / std::numbers::pi_v<float> / 2.f + 0.5f);\n";
+					result += "\t" "float temp_offset = temp_total * (std::atan2(-y_normal, -x_normal) / std::numbers::pi_v<float> / 2.f + 0.5f);\n";
 					result += "\t" "int32_t temp_index = 0;\n";
 					result += "\t" "for(auto& p : graph_content) { if(temp_offset <= p.amount) break; temp_offset -= p.amount; ++temp_index; }\n";
 					result += "\t" "if(temp_index < int32_t(graph_content.size())) {\n";
