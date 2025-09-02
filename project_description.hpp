@@ -7,8 +7,42 @@
 #include "texture.hpp"
 
 enum class background_type : uint8_t {
-	none, texture, bordered_texture, existing_gfx, linechart, stackedbarchart, colorsquare, flag, table_columns, table_headers, progress_bar, icon_strip
-}; 
+	none,
+	texture,
+	bordered_texture,
+	existing_gfx,
+	linechart,
+	stackedbarchart,
+	colorsquare,
+	flag,
+	table_columns,
+	table_headers,
+	progress_bar,
+	icon_strip,
+	doughnut,
+	border_texture_repeat,
+	textured_corners
+};
+
+inline bool background_type_is_textured(background_type bg) {
+	if (bg == background_type::bordered_texture) return true;
+	if (bg == background_type::border_texture_repeat) return true;
+	if (bg == background_type::texture) return true;
+	if (bg == background_type::textured_corners) return true;
+	if (bg == background_type::icon_strip) return true;
+	return false;
+}
+
+inline bool background_type_requires_border_width(background_type bg) {
+	if (bg == background_type::bordered_texture) return true;
+	return false;
+}
+
+inline bool background_type_has_frames(background_type bg) {
+	if (bg == background_type::icon_strip) return true;
+	return false;
+}
+
 enum class aui_text_alignment : uint8_t {
 	left, right, center
 };
@@ -110,7 +144,7 @@ struct window_element_t {
 	std::string page_left_texture;
 	std::string page_right_texture;
 	std::string table_connection;
-	color3f rectangle_color{ 1.0f, 0.0f, 0.0f };
+	color3f rectangle_color{ 0.2f, 0.2f, 0.2f };
 	ogl::texture ogl_texture;
 	int16_t x_size = 0;
 	int16_t y_size = 0;
@@ -127,6 +161,11 @@ struct window_element_t {
 	bool ignore_rtl = false;
 	bool share_table_highlight = false;
 	bool parent_is_layout = false;
+};
+
+struct texture_layer_t {
+	background_type texture_type = background_type::texture;
+	std::string texture;
 };
 
 enum class property : uint8_t {
@@ -342,11 +381,12 @@ struct sub_layout_t {
 	~sub_layout_t() = default;
 };
 
-using layout_item = std::variant<std::monostate, layout_control_t, layout_window_t, layout_glue_t, generator_t, sub_layout_t>;
+using layout_item = std::variant<std::monostate, layout_control_t, layout_window_t, layout_glue_t, generator_t, texture_layer_t, sub_layout_t>;
 
 struct layout_level_t {
 	std::vector<layout_item> contents;
 	std::vector<int32_t> page_starts;
+	bool open_in_ui = false;
 	int16_t size_x = -1;
 	int16_t size_y = -1;
 	int16_t margin_top = 0;

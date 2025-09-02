@@ -91,7 +91,7 @@ struct layout_level_t {
 */
 
 enum class layout_item_types : uint8_t {
-	control, window, glue, generator, layout
+	control, window, glue, generator, layout, texture_layer
 };
 
 void layout_to_bytes(layout_level_t const& layout, serialization::out_buffer& buffer) {
@@ -157,6 +157,12 @@ void layout_to_bytes(layout_level_t const& layout, serialization::out_buffer& bu
 
 			buffer.write(layout_item_types::layout);
 			layout_to_bytes(*i.layout, buffer);
+		} else if(holds_alternative<texture_layer_t>(m)) {
+			auto& i = get<texture_layer_t>(m);
+
+			buffer.write(layout_item_types::texture_layer);
+			buffer.write(i.texture_type);
+			buffer.write(i.texture);
 		}
 	}
 	buffer.finish_section();
@@ -233,6 +239,15 @@ void bytes_to_layout(layout_level_t& layout, serialization::in_buffer& buffer) {
 				bytes_to_layout(*temp.layout, main_section);
 				layout.contents.emplace_back(std::move(temp));
 			} break;
+			case layout_item_types::texture_layer:
+			{
+				texture_layer_t temp;
+
+				main_section.read(temp.texture_type);
+				main_section.read(temp.texture);
+
+				layout.contents.emplace_back(std::move(temp));
+			}
 		}
 	}
 }
@@ -624,7 +639,7 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 		auto window_section = buffer.read_section(); // essential section
 
 		auto essential_window_section = window_section.read_section(); // essential section
-		
+
 		auto name = essential_window_section.read<std::string_view>();
 		if(name == ".TABLE") { // table info
 			table_definition tab;
@@ -722,7 +737,7 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 			while(window_section) {
 				auto essential_child_section = window_section.read_section();
 				std::string_view name = essential_child_section.read<std::string_view>();
-				if(name.starts_with(".tab")) { 
+				if(name.starts_with(".tab")) {
 					auto optional_child_section = window_section.read_section(); // discard
 				} else {
 					ui_element_t c;
