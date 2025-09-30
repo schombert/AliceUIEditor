@@ -1728,6 +1728,7 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 				)
 			);
 			layout.contents.erase(layout.contents.begin() + current_location.index);
+			path_to_selected_layout.clear();
 			result = true;
 		}
 		if(std::holds_alternative<sub_layout_t>(layout.contents[current_location.index])) {
@@ -1744,26 +1745,33 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 					)
 				);
 				buffer.clear();
+				path_to_selected_layout.clear();
 			}
 			if (ImGui::BeginMenu("Add")) {
 				if (ImGui::MenuItem("Control")) {
 					i.layout->contents.emplace_back(layout_control_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Window")) {
 					i.layout->contents.emplace_back(layout_window_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Glue")) {
 					i.layout->contents.emplace_back(layout_glue_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Generator")) {
 					i.layout->contents.emplace_back(generator_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Sublayout")) {
 					i.layout->contents.emplace_back(sub_layout_t{ });
 					std::get<sub_layout_t>(i.layout->contents.back()).layout = std::make_unique<layout_level_t>();
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Texture layer")) {
 					i.layout->contents.emplace_back(texture_layer_t{ });
+					path_to_selected_layout.clear();
 				}
 				ImGui::EndMenu();
 			}
@@ -1778,6 +1786,10 @@ void imgui_layout_contents(layout_level_t& root, layout_level_t& layout, std::ve
 	bool root_expanded = true;
 	if (path.size() == 0) {
 		root_expanded = ImGui::TreeNodeEx("\uEC4E", base_tree_flags);
+		if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+			path_to_selected_layout = {};
+			current_edit_target = edit_targets::layout_sublayout;
+		}
 		if (ImGui::BeginPopupContextItem()) {
 			auto& win = open_project.windows[selected_window];
 			auto& buffer = win.buffer;
@@ -1793,26 +1805,33 @@ void imgui_layout_contents(layout_level_t& root, layout_level_t& layout, std::ve
 					)
 				);
 				buffer.clear();
+				path_to_selected_layout.clear();
 			}
 			if (ImGui::BeginMenu("Add")) {
 				if (ImGui::MenuItem("Control")) {
 					layout.contents.emplace_back(layout_control_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Window")) {
 					layout.contents.emplace_back(layout_window_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Glue")) {
 					layout.contents.emplace_back(layout_glue_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Generator")) {
 					layout.contents.emplace_back(generator_t{ });
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Sublayout")) {
 					layout.contents.emplace_back(sub_layout_t{ });
 					std::get<sub_layout_t>(layout.contents.back()).layout = std::make_unique<layout_level_t>();
+					path_to_selected_layout.clear();
 				}
 				if (ImGui::MenuItem("Texture layer")) {
 					layout.contents.emplace_back(texture_layer_t{ });
+					path_to_selected_layout.clear();
 				}
 				ImGui::EndMenu();
 			}
@@ -2160,7 +2179,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 
 			if (ImGui::BeginMenu("Create")) {
-				if (ImGui::MenuItem("Container")) {
+				if (ImGui::MenuItem("Window")) {
 					open_project.windows.emplace_back();
 					open_project.windows.back().wrapped.x_size = 100;
 					open_project.windows.back().wrapped.y_size = 100;
@@ -2957,7 +2976,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					current_item = std::get<sub_layout_t>(current_item->contents[path_to_selected_layout[i]]).layout.get();
 				}
 
-				auto i = std::get<layout_window_t>(current_item->contents[path_to_selected_layout.back()]);
+				auto& i = std::get<layout_window_t>(current_item->contents[path_to_selected_layout.back()]);
 				int32_t temp;
 
 				std::vector<char const*> window_names;
@@ -3002,7 +3021,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					current_item = std::get<sub_layout_t>(current_item->contents[path_to_selected_layout[i]]).layout.get();
 				}
 
-				auto i = std::get<generator_t>(current_item->contents[path_to_selected_layout.back()]);
+				auto& i = std::get<generator_t>(current_item->contents[path_to_selected_layout.back()]);
 				int32_t temp;
 
 				ImGui::InputText("Name", &(i.name));
@@ -3078,7 +3097,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					current_item = std::get<sub_layout_t>(current_item->contents[path_to_selected_layout[i]]).layout.get();
 				}
 
-				auto i = std::get<texture_layer_t>(current_item->contents[path_to_selected_layout.back()]);
+				auto& i = std::get<texture_layer_t>(current_item->contents[path_to_selected_layout.back()]);
 
 				{
 					int index = retrieve_texture_layer_type(i.texture_type);
@@ -3115,7 +3134,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					current_item = std::get<sub_layout_t>(current_item->contents[path_to_selected_layout[i]]).layout.get();
 				}
 
-				auto i = std::get<layout_glue_t>(current_item->contents[path_to_selected_layout.back()]);
+				auto& i = std::get<layout_glue_t>(current_item->contents[path_to_selected_layout.back()]);
 				int32_t temp;
 
 				{
@@ -3141,7 +3160,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					current_item = std::get<sub_layout_t>(current_item->contents[path_to_selected_layout[i]]).layout.get();
 				}
 
-				auto selected_item = std::get<layout_control_t>(current_item->contents[path_to_selected_layout.back()]);
+				auto& selected_item = std::get<layout_control_t>(current_item->contents[path_to_selected_layout.back()]);
 
 				std::vector<char const*> control_names;
 				control_names.push_back("[none]");
@@ -3174,8 +3193,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					selected_item.abs_y = int16_t(temp);
 				}
 
-				if (ImGui::Button("Edit control") && selection > -1) {
-					selected_control = selection;
+				if (ImGui::Button("Edit control") && selection > 0) {
+					selected_control = selection - 1;
 					current_edit_target = edit_targets::control;
 				}
 			}
@@ -3196,22 +3215,28 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					if (ImGui::BeginMenu("Add")) {
 						if (ImGui::MenuItem("Control")) {
 							selected_layout->contents.emplace_back(layout_control_t{ });
+							path_to_selected_layout.clear();
 						}
 						if (ImGui::MenuItem("Window")) {
 							selected_layout->contents.emplace_back(layout_window_t{ });
+							path_to_selected_layout.clear();
 						}
 						if (ImGui::MenuItem("Glue")) {
 							selected_layout->contents.emplace_back(layout_glue_t{ });
+							path_to_selected_layout.clear();
 						}
 						if (ImGui::MenuItem("Generator")) {
 							selected_layout->contents.emplace_back(generator_t{ });
+							path_to_selected_layout.clear();
 						}
 						if (ImGui::MenuItem("Sublayout")) {
 							selected_layout->contents.emplace_back(sub_layout_t{ });
 							std::get<sub_layout_t>(selected_layout->contents.back()).layout = std::make_unique<layout_level_t>();
+							path_to_selected_layout.clear();
 						}
 						if (ImGui::MenuItem("Texture layer")) {
 							selected_layout->contents.emplace_back(texture_layer_t{ });
+							path_to_selected_layout.clear();
 						}
 						ImGui::EndMenu();
 					}
