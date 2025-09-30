@@ -406,6 +406,7 @@ struct window_element_wrapper_t {
 	window_element_t wrapped;
 	std::vector<ui_element_t> children;
 	layout_level_t layout;
+	std::vector<layout_item> buffer;
 };
 
 struct open_project_t {
