@@ -1713,6 +1713,8 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 	{
 		if (ImGui::Selectable("Delete")) {
 			layout.contents.erase(layout.contents.begin() + current_location.index);
+			path_to_selected_layout.clear();
+			current_edit_target = edit_targets::layout_sublayout;
 			result = true;
 		}
 		auto& win = open_project.windows[selected_window];
@@ -1729,6 +1731,7 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 			);
 			layout.contents.erase(layout.contents.begin() + current_location.index);
 			path_to_selected_layout.clear();
+			current_edit_target = edit_targets::layout_sublayout;
 			result = true;
 		}
 		if(std::holds_alternative<sub_layout_t>(layout.contents[current_location.index])) {
@@ -1746,32 +1749,46 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 				);
 				buffer.clear();
 				path_to_selected_layout.clear();
+				current_edit_target = edit_targets::layout_sublayout;
+				result = true;
 			}
 			if (ImGui::BeginMenu("Add")) {
 				if (ImGui::MenuItem("Control")) {
 					i.layout->contents.emplace_back(layout_control_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
+					result = true;
 				}
 				if (ImGui::MenuItem("Window")) {
 					i.layout->contents.emplace_back(layout_window_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
+					result = true;
 				}
 				if (ImGui::MenuItem("Glue")) {
 					i.layout->contents.emplace_back(layout_glue_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
+					result = true;
 				}
 				if (ImGui::MenuItem("Generator")) {
 					i.layout->contents.emplace_back(generator_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
+					result = true;
 				}
 				if (ImGui::MenuItem("Sublayout")) {
 					i.layout->contents.emplace_back(sub_layout_t{ });
 					std::get<sub_layout_t>(i.layout->contents.back()).layout = std::make_unique<layout_level_t>();
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
+					result = true;
 				}
 				if (ImGui::MenuItem("Texture layer")) {
 					i.layout->contents.emplace_back(texture_layer_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
+					result = true;
 				}
 				ImGui::EndMenu();
 			}
@@ -1806,32 +1823,39 @@ void imgui_layout_contents(layout_level_t& root, layout_level_t& layout, std::ve
 				);
 				buffer.clear();
 				path_to_selected_layout.clear();
+				current_edit_target = edit_targets::layout_sublayout;
 			}
 			if (ImGui::BeginMenu("Add")) {
 				if (ImGui::MenuItem("Control")) {
 					layout.contents.emplace_back(layout_control_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
 				}
 				if (ImGui::MenuItem("Window")) {
 					layout.contents.emplace_back(layout_window_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
 				}
 				if (ImGui::MenuItem("Glue")) {
 					layout.contents.emplace_back(layout_glue_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
 				}
 				if (ImGui::MenuItem("Generator")) {
 					layout.contents.emplace_back(generator_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
 				}
 				if (ImGui::MenuItem("Sublayout")) {
 					layout.contents.emplace_back(sub_layout_t{ });
 					std::get<sub_layout_t>(layout.contents.back()).layout = std::make_unique<layout_level_t>();
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
 				}
 				if (ImGui::MenuItem("Texture layer")) {
 					layout.contents.emplace_back(texture_layer_t{ });
 					path_to_selected_layout.clear();
+					current_edit_target = edit_targets::layout_sublayout;
 				}
 				ImGui::EndMenu();
 			}
@@ -2312,7 +2336,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 					}
 				}
-				ImGui::InputInt("Grid size", &open_project.grid_size);
+				ImGui::InputInt("Grid size (it's basically a font size!!! don't set to 1)", &open_project.grid_size);
 				if(open_project.grid_size < 1) {
 					open_project.grid_size = 1;
 				}
@@ -2330,198 +2354,198 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				if(ImGui::Button("Delete")) {
 					open_project.windows.erase(open_project.windows.begin() + selected_window);
 					switch_to_window(-1);
-				}
-				ImGui::SameLine();
-				if(ImGui::Button("Copy container")) {
-					open_project.windows.push_back(open_project.windows[selected_window]);
-					open_project.windows.back().wrapped.name += "_copy";
-				}
-				ImGui::InputText("Name", &(open_project.windows[selected_window].wrapped.temp_name));
-				ImGui::SameLine();
-				if(ImGui::Button("Change Name")) {
-					if(open_project.windows[selected_window].wrapped.temp_name.empty()) {
-						MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
-					} else {
-						bool found = false;
-						for(auto& w : open_project.windows) {
-							if(w.wrapped.name == open_project.windows[selected_window].wrapped.temp_name) {
-								found = true;
-								break;
+				} else {
+					ImGui::SameLine();
+					if(ImGui::Button("Copy container")) {
+						open_project.windows.push_back(open_project.windows[selected_window]);
+						open_project.windows.back().wrapped.name += "_copy";
+					}
+					ImGui::InputText("Name", &(open_project.windows[selected_window].wrapped.temp_name));
+					ImGui::SameLine();
+					if(ImGui::Button("Change Name")) {
+						if(open_project.windows[selected_window].wrapped.temp_name.empty()) {
+							MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
+						} else {
+							bool found = false;
+							for(auto& w : open_project.windows) {
+								if(w.wrapped.name == open_project.windows[selected_window].wrapped.temp_name) {
+									found = true;
+									break;
+								}
+							}
+							if(found) {
+								MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
+							} else {
+								for(auto& ow : open_project.windows)
+									rename_window(ow.layout, open_project.windows[selected_window].wrapped.name, open_project.windows[selected_window].wrapped.temp_name);
+
+								open_project.windows[selected_window].wrapped.name = open_project.windows[selected_window].wrapped.temp_name;
 							}
 						}
-						if(found) {
-							MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
-						} else {
-							for(auto& ow : open_project.windows)
-								rename_window(ow.layout, open_project.windows[selected_window].wrapped.name, open_project.windows[selected_window].wrapped.temp_name);
-
-							open_project.windows[selected_window].wrapped.name = open_project.windows[selected_window].wrapped.temp_name;
-						}
 					}
-				}
-				ImGui::InputText("Parent", &(open_project.windows[selected_window].wrapped.parent));
+					ImGui::InputText("Parent", &(open_project.windows[selected_window].wrapped.parent));
 
-				int32_t temp = open_project.windows[selected_window].wrapped.x_pos;
-				ImGui::InputInt("X position", &temp);
-				open_project.windows[selected_window].wrapped.x_pos = int16_t(temp);
+					int32_t temp = open_project.windows[selected_window].wrapped.x_pos;
+					ImGui::InputInt("X position", &temp);
+					open_project.windows[selected_window].wrapped.x_pos = int16_t(temp);
 
-				temp = open_project.windows[selected_window].wrapped.y_pos;
-				ImGui::InputInt("Y position", &temp);
-				open_project.windows[selected_window].wrapped.y_pos = int16_t(temp);
+					temp = open_project.windows[selected_window].wrapped.y_pos;
+					ImGui::InputInt("Y position", &temp);
+					open_project.windows[selected_window].wrapped.y_pos = int16_t(temp);
 
-				temp = open_project.windows[selected_window].wrapped.x_size;
-				ImGui::InputInt("Width", &temp);
-				open_project.windows[selected_window].wrapped.x_size = int16_t(std::max(0, temp));
+					temp = open_project.windows[selected_window].wrapped.x_size;
+					ImGui::InputInt("Width", &temp);
+					open_project.windows[selected_window].wrapped.x_size = int16_t(std::max(0, temp));
 
-				temp = open_project.windows[selected_window].wrapped.y_size;
-				ImGui::InputInt("Height", &temp);
-				open_project.windows[selected_window].wrapped.y_size = int16_t(std::max(0, temp));
+					temp = open_project.windows[selected_window].wrapped.y_size;
+					ImGui::InputInt("Height", &temp);
+					open_project.windows[selected_window].wrapped.y_size = int16_t(std::max(0, temp));
 
-				ImVec4 ccolor{ open_project.windows[selected_window].wrapped.rectangle_color.r, open_project.windows[selected_window].wrapped.rectangle_color.b, open_project.windows[selected_window].wrapped.rectangle_color.g, 1.0f };
-				ImGui::ColorEdit3("Outline color", (float*)&ccolor);
-				open_project.windows[selected_window].wrapped.rectangle_color.r = ccolor.x;
-				open_project.windows[selected_window].wrapped.rectangle_color.g = ccolor.z;
-				open_project.windows[selected_window].wrapped.rectangle_color.b = ccolor.y;
+					ImVec4 ccolor{ open_project.windows[selected_window].wrapped.rectangle_color.r, open_project.windows[selected_window].wrapped.rectangle_color.b, open_project.windows[selected_window].wrapped.rectangle_color.g, 1.0f };
+					ImGui::ColorEdit3("Outline color", (float*)&ccolor);
+					open_project.windows[selected_window].wrapped.rectangle_color.r = ccolor.x;
+					open_project.windows[selected_window].wrapped.rectangle_color.g = ccolor.z;
+					open_project.windows[selected_window].wrapped.rectangle_color.b = ccolor.y;
 
-				ImGui::Checkbox("Ignore grid", &(open_project.windows[selected_window].wrapped.no_grid));
+					ImGui::Checkbox("Ignore grid", &(open_project.windows[selected_window].wrapped.no_grid));
 
-				auto i = selected_window;
+					auto i = selected_window;
 
-				{
-					const char* items[] = { "none", "texture", "bordered texture", "legacy GFX" };
-					temp = int32_t(open_project.windows[i].wrapped.background);
-					ImGui::Combo("Background", &temp, items, 4);
-					open_project.windows[i].wrapped.background = background_type(temp);
-				}
-
-				if(open_project.windows[selected_window].wrapped.background == background_type::existing_gfx) {
-					ImGui::InputText("Texture", &(open_project.windows[i].wrapped.texture));
-				} else if(open_project.windows[i].wrapped.background != background_type::none) {
-					std::string tex = "Texture: " + (open_project.windows[i].wrapped.texture.size() > 0 ? open_project.windows[i].wrapped.texture : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						open_project.windows[i].wrapped.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						open_project.windows[i].wrapped.ogl_texture.unload();
+					{
+						const char* items[] = { "none", "texture", "bordered texture", "legacy GFX" };
+						temp = int32_t(open_project.windows[i].wrapped.background);
+						ImGui::Combo("Background", &temp, items, 4);
+						open_project.windows[i].wrapped.background = background_type(temp);
 					}
-					ImGui::Checkbox("Has alternate background", &(open_project.windows[i].wrapped.has_alternate_bg));
-					if(open_project.windows[selected_window].wrapped.has_alternate_bg) {
-						std::string tex = "Alternate texture: " + (open_project.windows[i].wrapped.alternate_bg.size() > 0 ? open_project.windows[i].wrapped.alternate_bg : std::string("[none]"));
+
+					if(open_project.windows[selected_window].wrapped.background == background_type::existing_gfx) {
+						ImGui::InputText("Texture", &(open_project.windows[i].wrapped.texture));
+					} else if(open_project.windows[i].wrapped.background != background_type::none) {
+						std::string tex = "Texture: " + (open_project.windows[i].wrapped.texture.size() > 0 ? open_project.windows[i].wrapped.texture : std::string("[none]"));
 						ImGui::Text(tex.c_str());
 						ImGui::SameLine();
-						if(ImGui::Button("Change Alternate")) {
+						if(ImGui::Button("Change")) {
 							auto new_file = fs::pick_existing_file(L"");
 							//auto breakpt = new_file.find_last_of(L'\\');
-							//open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							//open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							open_project.windows[i].wrapped.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							open_project.windows[i].wrapped.ogl_texture.unload();
+						}
+						ImGui::Checkbox("Has alternate background", &(open_project.windows[i].wrapped.has_alternate_bg));
+						if(open_project.windows[selected_window].wrapped.has_alternate_bg) {
+							std::string tex = "Alternate texture: " + (open_project.windows[i].wrapped.alternate_bg.size() > 0 ? open_project.windows[i].wrapped.alternate_bg : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change Alternate")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							}
 						}
 					}
-				}
-				if(open_project.windows[selected_window].wrapped.background == background_type::bordered_texture) {
-					temp = open_project.windows[selected_window].wrapped.border_size;
-					ImGui::InputInt("Border size", &temp);
-					open_project.windows[selected_window].wrapped.border_size = int16_t(std::max(0, temp));
-				}
-				ImGui::Checkbox("Share table highlight", &(open_project.windows[selected_window].wrapped.share_table_highlight));
-				if(open_project.windows[i].wrapped.share_table_highlight) {
-					std::vector<char const*> table_names;
-					table_names.push_back("[none]");
-					int32_t selection = (open_project.windows[selected_window].wrapped.table_connection== "" ? 0 : -1);
-					for(auto& c : open_project.tables) {
-						table_names.push_back(c.name.c_str());
-						if(c.name == open_project.windows[selected_window].wrapped.table_connection) {
-							selection = int32_t(table_names.size() - 1);
+					if(open_project.windows[selected_window].wrapped.background == background_type::bordered_texture) {
+						temp = open_project.windows[selected_window].wrapped.border_size;
+						ImGui::InputInt("Border size", &temp);
+						open_project.windows[selected_window].wrapped.border_size = int16_t(std::max(0, temp));
+					}
+					ImGui::Checkbox("Share table highlight", &(open_project.windows[selected_window].wrapped.share_table_highlight));
+					if(open_project.windows[i].wrapped.share_table_highlight) {
+						std::vector<char const*> table_names;
+						table_names.push_back("[none]");
+						int32_t selection = (open_project.windows[selected_window].wrapped.table_connection== "" ? 0 : -1);
+						for(auto& c : open_project.tables) {
+							table_names.push_back(c.name.c_str());
+							if(c.name == open_project.windows[selected_window].wrapped.table_connection) {
+								selection = int32_t(table_names.size() - 1);
+							}
+						}
+
+						temp = selection;
+						ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
+						if(temp != selection) {
+							if(selection == 0)
+								open_project.windows[i].wrapped.table_connection = "";
+							else
+								open_project.windows[i].wrapped.table_connection = open_project.tables[selection - 1].name;
 						}
 					}
-
-					temp = selection;
-					ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
-					if(temp != selection) {
-						if(selection == 0)
-							open_project.windows[i].wrapped.table_connection = "";
-						else
-							open_project.windows[i].wrapped.table_connection = open_project.tables[selection - 1].name;
+					ImGui::Checkbox("Receive updates while hidden", &(open_project.windows[i].wrapped.updates_while_hidden));
+					temp = 0;
+					switch(open_project.windows[i].wrapped.orientation) {
+						case orientation::upper_left: temp = 0; break;
+						case orientation::upper_right: temp = 1; break;
+						case orientation::lower_left: temp = 2; break;
+						case orientation::lower_right: temp = 3; break;
+						case orientation::upper_center: temp = 4; break;
+						case orientation::lower_center: temp = 5; break;
+						case orientation::center: temp = 6; break;
 					}
-				}
-				ImGui::Checkbox("Receive updates while hidden", &(open_project.windows[i].wrapped.updates_while_hidden));
-				temp = 0;
-				switch(open_project.windows[i].wrapped.orientation) {
-					case orientation::upper_left: temp = 0; break;
-					case orientation::upper_right: temp = 1; break;
-					case orientation::lower_left: temp = 2; break;
-					case orientation::lower_right: temp = 3; break;
-					case orientation::upper_center: temp = 4; break;
-					case orientation::lower_center: temp = 5; break;
-					case orientation::center: temp = 6; break;
-				}
-				{
-					const char* items[] = { "upper left", "upper right", "lower left", "lower right", "upper center", "lower center", "center" };
-					ImGui::Combo("Position in parent", &temp, items, 7);
-				}
-				switch(temp) {
-					case 0: open_project.windows[i].wrapped.orientation = orientation::upper_left; break;
-					case 1: open_project.windows[i].wrapped.orientation = orientation::upper_right; break;
-					case 2: open_project.windows[i].wrapped.orientation = orientation::lower_left; break;
-					case 3: open_project.windows[i].wrapped.orientation = orientation::lower_right; break;
-					case 4: open_project.windows[i].wrapped.orientation = orientation::upper_center; break;
-					case 5: open_project.windows[i].wrapped.orientation = orientation::lower_center; break;
-					case 6: open_project.windows[i].wrapped.orientation = orientation::center; break;
-				}
-				ImGui::Checkbox("Ignore rtl flip", &(open_project.windows[i].wrapped.ignore_rtl));
-				ImGui::Checkbox("Draggable", &(open_project.windows[i].wrapped.draggable));
+					{
+						const char* items[] = { "upper left", "upper right", "lower left", "lower right", "upper center", "lower center", "center" };
+						ImGui::Combo("Position in parent", &temp, items, 7);
+					}
+					switch(temp) {
+						case 0: open_project.windows[i].wrapped.orientation = orientation::upper_left; break;
+						case 1: open_project.windows[i].wrapped.orientation = orientation::upper_right; break;
+						case 2: open_project.windows[i].wrapped.orientation = orientation::lower_left; break;
+						case 3: open_project.windows[i].wrapped.orientation = orientation::lower_right; break;
+						case 4: open_project.windows[i].wrapped.orientation = orientation::upper_center; break;
+						case 5: open_project.windows[i].wrapped.orientation = orientation::lower_center; break;
+						case 6: open_project.windows[i].wrapped.orientation = orientation::center; break;
+					}
+					ImGui::Checkbox("Ignore rtl flip", &(open_project.windows[i].wrapped.ignore_rtl));
+					ImGui::Checkbox("Draggable", &(open_project.windows[i].wrapped.draggable));
 
-				ImGui::Text("Member Variables");
-				if(open_project.windows[i].wrapped.members.empty()) {
-					ImGui::Text("[none]");
-				} else {
-					for(uint32_t k = 0; k < open_project.windows[i].wrapped.members.size(); ++k) {
-						ImGui::PushID(int32_t(k));
-						ImGui::Indent();
-						ImGui::InputText("Type", &(open_project.windows[i].wrapped.members[k].type));
-						ImGui::InputText("Name", &(open_project.windows[i].wrapped.members[k].name));
-						if(ImGui::Button("Delete")) {
-							open_project.windows[i].wrapped.members.erase(open_project.windows[i].wrapped.members.begin() + k);
+					ImGui::Text("Member Variables");
+					if(open_project.windows[i].wrapped.members.empty()) {
+						ImGui::Text("[none]");
+					} else {
+						for(uint32_t k = 0; k < open_project.windows[i].wrapped.members.size(); ++k) {
+							ImGui::PushID(int32_t(k));
+							ImGui::Indent();
+							ImGui::InputText("Type", &(open_project.windows[i].wrapped.members[k].type));
+							ImGui::InputText("Name", &(open_project.windows[i].wrapped.members[k].name));
+							if(ImGui::Button("Delete")) {
+								open_project.windows[i].wrapped.members.erase(open_project.windows[i].wrapped.members.begin() + k);
+							}
+							ImGui::Unindent();
+							ImGui::PopID();
 						}
-						ImGui::Unindent();
-						ImGui::PopID();
 					}
-				}
-				if(ImGui::Button("Add Member Variable")) {
-					open_project.windows[i].wrapped.members.emplace_back();
-				}
+					if(ImGui::Button("Add Member Variable")) {
+						open_project.windows[i].wrapped.members.emplace_back();
+					}
 
-				{
-					std::string tex = "Page left: " + (open_project.windows[i].wrapped.page_left_texture.size() > 0 ? open_project.windows[i].wrapped.page_left_texture : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change (pl)")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					{
+						std::string tex = "Page left: " + (open_project.windows[i].wrapped.page_left_texture.size() > 0 ? open_project.windows[i].wrapped.page_left_texture : std::string("[none]"));
+						ImGui::Text(tex.c_str());
+						ImGui::SameLine();
+						if(ImGui::Button("Change (pl)")) {
+							auto new_file = fs::pick_existing_file(L"");
+							//auto breakpt = new_file.find_last_of(L'\\');
+							//open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+						}
+					}
+					{
+						std::string tex = "Page right: " + (open_project.windows[i].wrapped.page_right_texture.size() > 0 ? open_project.windows[i].wrapped.page_right_texture : std::string("[none]"));
+						ImGui::Text(tex.c_str());
+						ImGui::SameLine();
+						if(ImGui::Button("Change (pr)")) {
+							auto new_file = fs::pick_existing_file(L"");
+							//auto breakpt = new_file.find_last_of(L'\\');
+							//open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+						}
+					}
+					{
+						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+						temp = int32_t(open_project.windows[i].wrapped.page_text_color);
+						ImGui::Combo("Page number text color", &temp, items, 16);
+						open_project.windows[i].wrapped.page_text_color = text_color(temp);
 					}
 				}
-				{
-					std::string tex = "Page right: " + (open_project.windows[i].wrapped.page_right_texture.size() > 0 ? open_project.windows[i].wrapped.page_right_texture : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change (pr)")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-					}
-				}
-				{
-					const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-					temp = int32_t(open_project.windows[i].wrapped.page_text_color);
-					ImGui::Combo("Page number text color", &temp, items, 16);
-					open_project.windows[i].wrapped.page_text_color = text_color(temp);
-				}
-
 			}
 
 			if (
@@ -2536,96 +2560,117 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				if(ImGui::Button("Delete")) {
 					win.children.erase(win.children.begin() + selected_control);
 					selected_control = -1;
-					continue;
-				}
-				ImGui::SameLine();
-				if(ImGui::Button("Copy")) {
-					win.children.push_back(win.children[selected_control]);
-					win.children.back().name += "_copy";
-				}
+				} else {
+					ImGui::SameLine();
+					if(ImGui::Button("Copy")) {
+						win.children.push_back(win.children[selected_control]);
+						win.children.back().name += "_copy";
+					}
 
-				ImGui::InputText("Name", &(c.temp_name));
-				ImGui::SameLine();
-				if(ImGui::Button("Change Name")) {
-					if(c.temp_name.empty()) {
-						MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
-					} else {
-						bool found = false;
-						for(auto& w : win.children) {
-							if(w.name == c.temp_name) {
-								found = true;
-								break;
+					ImGui::InputText("Name", &(c.temp_name));
+					ImGui::SameLine();
+					if(ImGui::Button("Change Name")) {
+						if(c.temp_name.empty()) {
+							MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
+						} else {
+							bool found = false;
+							for(auto& w : win.children) {
+								if(w.name == c.temp_name) {
+									found = true;
+									break;
+								}
+							}
+							if(found) {
+								MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
+							} else {
+								rename_control(win.layout, c.name, c.temp_name);
+								c.name = c.temp_name;
 							}
 						}
-						if(found) {
-							MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
-						} else {
-							rename_control(win.layout, c.name, c.temp_name);
-							c.name = c.temp_name;
+					}
+
+					int32_t temp = 0;
+
+					temp = c.x_size;
+					ImGui::InputInt("Width", &temp);
+					c.x_size = int16_t(std::max(0, temp));
+
+					temp = c.y_size;
+					ImGui::InputInt("Height", &temp);
+					c.y_size = int16_t(std::max(0, temp));
+
+					ImVec4 ccolor{ c.rectangle_color.r, c.rectangle_color.b, c.rectangle_color.g, 1.0f };
+					ImGui::ColorEdit3("Outline color", (float*)&ccolor);
+					c.rectangle_color.r = ccolor.x;
+					c.rectangle_color.g = ccolor.z;
+					c.rectangle_color.b = ccolor.y;
+
+					ImGui::Checkbox("Ignore grid", &(c.no_grid));
+
+					{
+						const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut", "border repeat", "corners" };
+						temp = int32_t(c.background);
+						ImGui::Combo("Background", &temp, items, 15);
+						c.background = background_type(temp);
+					}
+
+					if(c.background == background_type::table_columns || c.background == background_type::table_headers) {
+						std::vector<char const*> table_names;
+						table_names.push_back("[none]");
+						int32_t selection = (c.table_connection == "" ? 0 : -1);
+						for(auto& tc : open_project.tables) {
+							table_names.push_back(tc.name.c_str());
+							if(tc.name == c.table_connection) {
+								selection = int32_t(table_names.size() - 1);
+							}
 						}
-					}
-				}
 
-				int32_t temp = 0;
-
-				temp = c.x_size;
-				ImGui::InputInt("Width", &temp);
-				c.x_size = int16_t(std::max(0, temp));
-
-				temp = c.y_size;
-				ImGui::InputInt("Height", &temp);
-				c.y_size = int16_t(std::max(0, temp));
-
-				ImVec4 ccolor{ c.rectangle_color.r, c.rectangle_color.b, c.rectangle_color.g, 1.0f };
-				ImGui::ColorEdit3("Outline color", (float*)&ccolor);
-				c.rectangle_color.r = ccolor.x;
-				c.rectangle_color.g = ccolor.z;
-				c.rectangle_color.b = ccolor.y;
-
-				ImGui::Checkbox("Ignore grid", &(c.no_grid));
-
-				{
-					const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut", "border repeat", "corners" };
-					temp = int32_t(c.background);
-					ImGui::Combo("Background", &temp, items, 15);
-					c.background = background_type(temp);
-				}
-
-				if(c.background == background_type::table_columns || c.background == background_type::table_headers) {
-					std::vector<char const*> table_names;
-					table_names.push_back("[none]");
-					int32_t selection = (c.table_connection == "" ? 0 : -1);
-					for(auto& tc : open_project.tables) {
-						table_names.push_back(tc.name.c_str());
-						if(tc.name == c.table_connection) {
-							selection = int32_t(table_names.size() - 1);
+						temp = selection;
+						ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
+						if(temp != selection) {
+							if(selection == 0)
+								c.table_connection = "";
+							else
+								c.table_connection = open_project.tables[selection - 1].name;
 						}
-					}
+					} else if(c.background == background_type::existing_gfx) {
+						ImGui::InputText("Texture", &(c.texture));
+					} else if(background_type_is_textured(c.background)) {
+						std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
+						ImGui::Text(tex.c_str());
+						ImGui::SameLine();
+						if(ImGui::Button("Change")) {
+							auto new_file = fs::pick_existing_file(L"");
+							//auto breakpt = new_file.find_last_of(L'\\');
+							//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							c.ogl_texture.unload();
+						}
+						ImGui::Checkbox("Has alternate background", &(c.has_alternate_bg));
+						if(c.has_alternate_bg) {
+							std::string tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change Alternate")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							}
+						}
+					} else if(c.background == background_type::progress_bar) {
+						std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
+						ImGui::Text(tex.c_str());
+						ImGui::SameLine();
+						if(ImGui::Button("Change")) {
+							auto new_file = fs::pick_existing_file(L"");
+							//auto breakpt = new_file.find_last_of(L'\\');
+							//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+							c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							c.ogl_texture.unload();
+						}
 
-					temp = selection;
-					ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
-					if(temp != selection) {
-						if(selection == 0)
-							c.table_connection = "";
-						else
-							c.table_connection = open_project.tables[selection - 1].name;
-					}
-				} else if(c.background == background_type::existing_gfx) {
-					ImGui::InputText("Texture", &(c.texture));
-				} else if(background_type_is_textured(c.background)) {
-					std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						c.ogl_texture.unload();
-					}
-					ImGui::Checkbox("Has alternate background", &(c.has_alternate_bg));
-					if(c.has_alternate_bg) {
-						std::string tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
+						tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
 						ImGui::Text(tex.c_str());
 						ImGui::SameLine();
 						if(ImGui::Button("Change Alternate")) {
@@ -2634,334 +2679,313 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
 							c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 						}
-					}
-				} else if(c.background == background_type::progress_bar) {
-					std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						c.ogl_texture.unload();
-					}
-
-					tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change Alternate")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-					}
-				} else if(c.background == background_type::linechart) {
-					temp = c.datapoints;
-					ImGui::InputInt("Data points", &temp);
-					c.datapoints = int16_t(temp);
-					{
-						ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
-						ImGui::ColorEdit4("line color", (float*)&ccolor);
-						c.other_color.r = ccolor.x;
-						c.other_color.g = ccolor.y;
-						c.other_color.b = ccolor.z;
-						c.other_color.a = ccolor.w;
-					}
-				} else if(c.background == background_type::stackedbarchart) {
-					temp = c.datapoints;
-					ImGui::InputInt("Data points", &temp);
-					c.datapoints = int16_t(temp);
-
-					ImGui::InputText("Data key", &c.list_content);
-					ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
-				} else if(c.background == background_type::doughnut) {
-					temp = c.datapoints;
-					ImGui::InputInt("Data points", &temp);
-					c.datapoints = int16_t(temp);
-
-					ImGui::InputText("Data key", &c.list_content);
-					ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
-				} else if(c.background == background_type::colorsquare) {
-					{
-						ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
-						ImGui::ColorEdit4("Default color", (float*)&ccolor);
-						c.other_color.r = ccolor.x;
-						c.other_color.g = ccolor.y;
-						c.other_color.b = ccolor.z;
-						c.other_color.a = ccolor.w;
-					}
-				}
-				if(c.background == background_type::bordered_texture) {
-					temp = c.border_size;
-					ImGui::InputInt("Border size", &temp);
-					c.border_size = int16_t(std::max(0, temp));
-				}
-				ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
-				{
-					const char* items[] = { "none", "list", "grid", "table" };
-					temp = int32_t(c.container_type);
-					ImGui::Combo("Act as container", &temp, items, 4);
-					c.container_type = container_type(temp);
-				}
-
-				if(c.container_type == container_type::none) {
-					ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
-					if(!c.dynamic_text) {
-						ImGui::InputText("Text key", &(c.text_key));
-					}
-					ImGui::InputFloat("Text scale", &(c.text_scale));
-					c.text_scale = std::max(0.01f, c.text_scale);
-
-					{
-						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-						temp = int32_t(c.text_color);
-						ImGui::Combo("Text color", &temp, items, 16);
-						c.text_color = text_color(temp);
-					}
-					{
-						const char* items[] = { "body", "header" };
-						temp = int32_t(c.text_type);
-						ImGui::Combo("Text style", &temp, items, 2);
-						c.text_type = text_type(temp);
-					}
-					{
-						const char* items[] = { "left (leading)", "right (trailing)", "center" };
-						temp = int32_t(c.text_align);
-						ImGui::Combo("Text alignment", &temp, items, 3);
-						c.text_align = aui_text_alignment(temp);
-					}
-
-					ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
-					if(!c.dynamic_tooltip) {
-						ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
-					}
-
-					ImGui::Checkbox("Can be disabled", &(c.can_disable));
-					ImGui::Checkbox("Left-click action", &(c.left_click_action));
-					ImGui::Checkbox("Right-click action", &(c.right_click_action));
-					ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
-					if(c.left_click_action || c.right_click_action || c.shift_click_action) {
-						ImGui::InputText("Hotkey", &(c.hotkey));
-					}
-					ImGui::Checkbox("Hover activation", &(c.hover_activation));
-				} else { // container only
-					{
-						const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
-						temp = int32_t(c.animation_type);
-						ImGui::Combo("Animation", &temp, items, 4);
-						c.animation_type = animation_type(temp);
-					}
-
-					if(c.container_type == container_type::list || c.container_type == container_type::grid) {
-						ImGui::InputText("Child window", &(c.child_window));
-						ImGui::InputText("List content", &(c.list_content));
-					} else if(c.container_type == container_type::table) {
-						ImGui::InputText("Table content", &(c.list_content));
-
-						ImGui::Checkbox("Highlight contents following mouse", &(c.has_table_highlight_color));
-						if(c.has_table_highlight_color) {
-							ImVec4 ccolor{ c.table_highlight_color.r, c.table_highlight_color.g, c.table_highlight_color.b, c.table_highlight_color.a };
-							ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
-							c.table_highlight_color.r = ccolor.x;
-							c.table_highlight_color.g = ccolor.y;
-							c.table_highlight_color.b = ccolor.z;
-							c.table_highlight_color.a = ccolor.w;
+					} else if(c.background == background_type::linechart) {
+						temp = c.datapoints;
+						ImGui::InputInt("Data points", &temp);
+						c.datapoints = int16_t(temp);
+						{
+							ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
+							ImGui::ColorEdit4("line color", (float*)&ccolor);
+							c.other_color.r = ccolor.x;
+							c.other_color.g = ccolor.y;
+							c.other_color.b = ccolor.z;
+							c.other_color.a = ccolor.w;
 						}
+					} else if(c.background == background_type::stackedbarchart) {
+						temp = c.datapoints;
+						ImGui::InputInt("Data points", &temp);
+						c.datapoints = int16_t(temp);
 
-						std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change asc icon")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						}
+						ImGui::InputText("Data key", &c.list_content);
+						ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+					} else if(c.background == background_type::doughnut) {
+						temp = c.datapoints;
+						ImGui::InputInt("Data points", &temp);
+						c.datapoints = int16_t(temp);
 
-						tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change des icon")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+						ImGui::InputText("Data key", &c.list_content);
+						ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+					} else if(c.background == background_type::colorsquare) {
+						{
+							ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
+							ImGui::ColorEdit4("Default color", (float*)&ccolor);
+							c.other_color.r = ccolor.x;
+							c.other_color.g = ccolor.y;
+							c.other_color.b = ccolor.z;
+							c.other_color.a = ccolor.w;
 						}
+					}
+					if(c.background == background_type::bordered_texture) {
+						temp = c.border_size;
+						ImGui::InputInt("Border size", &temp);
+						c.border_size = int16_t(std::max(0, temp));
+					}
+					ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+					{
+						const char* items[] = { "none", "list", "grid", "table" };
+						temp = int32_t(c.container_type);
+						ImGui::Combo("Act as container", &temp, items, 4);
+						c.container_type = container_type(temp);
+					}
+
+					if(c.container_type == container_type::none) {
+						ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+						if(!c.dynamic_text) {
+							ImGui::InputText("Text key", &(c.text_key));
+						}
+						ImGui::InputFloat("Text scale", &(c.text_scale));
+						c.text_scale = std::max(0.01f, c.text_scale);
 
 						{
-							ImVec4 ccolor{ c.table_divider_color.r, c.table_divider_color.b, c.table_divider_color.g, 0.0f };
-							ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
-							c.table_divider_color.r = ccolor.x;
-							c.table_divider_color.g = ccolor.z;
-							c.table_divider_color.b = ccolor.y;
+							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+							temp = int32_t(c.text_color);
+							ImGui::Combo("Text color", &temp, items, 16);
+							c.text_color = text_color(temp);
+						}
+						{
+							const char* items[] = { "body", "header" };
+							temp = int32_t(c.text_type);
+							ImGui::Combo("Text style", &temp, items, 2);
+							c.text_type = text_type(temp);
+						}
+						{
+							const char* items[] = { "left (leading)", "right (trailing)", "center" };
+							temp = int32_t(c.text_align);
+							ImGui::Combo("Text alignment", &temp, items, 3);
+							c.text_align = aui_text_alignment(temp);
 						}
 
-						ImGui::InputFloat("Row height (in grid cells)", &(c.row_height));
-						c.row_height = std::max(0.1f, c.row_height);
-
-						tex = "Row default background: " + (c.row_background_a.size() > 0 ? c.row_background_a : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change row bg")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.row_background_a = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.row_background_a = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+						ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+						if(!c.dynamic_tooltip) {
+							ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
 						}
 
-						tex = "Row alternate background: " + (c.row_background_b.size() > 0 ? c.row_background_b : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change row alt")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.row_background_b = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.row_background_b = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+						ImGui::Checkbox("Can be disabled", &(c.can_disable));
+						ImGui::Checkbox("Left-click action", &(c.left_click_action));
+						ImGui::Checkbox("Right-click action", &(c.right_click_action));
+						ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+						if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+							ImGui::InputText("Hotkey", &(c.hotkey));
+						}
+						ImGui::Checkbox("Hover activation", &(c.hover_activation));
+					} else { // container only
+						{
+							const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
+							temp = int32_t(c.animation_type);
+							ImGui::Combo("Animation", &temp, items, 4);
+							c.animation_type = animation_type(temp);
 						}
 
-						ImGui::Checkbox("Per-section table headers", &(c.table_has_per_section_headers));
+						if(c.container_type == container_type::list || c.container_type == container_type::grid) {
+							ImGui::InputText("Child window", &(c.child_window));
+							ImGui::InputText("List content", &(c.list_content));
+						} else if(c.container_type == container_type::table) {
+							ImGui::InputText("Table content", &(c.list_content));
 
-						ImGui::Text("Inserts");
-						for(uint32_t k = 0; k < c.table_inserts.size(); ++k) {
+							ImGui::Checkbox("Highlight contents following mouse", &(c.has_table_highlight_color));
+							if(c.has_table_highlight_color) {
+								ImVec4 ccolor{ c.table_highlight_color.r, c.table_highlight_color.g, c.table_highlight_color.b, c.table_highlight_color.a };
+								ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
+								c.table_highlight_color.r = ccolor.x;
+								c.table_highlight_color.g = ccolor.y;
+								c.table_highlight_color.b = ccolor.z;
+								c.table_highlight_color.a = ccolor.w;
+							}
+
+							std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change asc icon")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							}
+
+							tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change des icon")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							}
+
+							{
+								ImVec4 ccolor{ c.table_divider_color.r, c.table_divider_color.b, c.table_divider_color.g, 0.0f };
+								ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
+								c.table_divider_color.r = ccolor.x;
+								c.table_divider_color.g = ccolor.z;
+								c.table_divider_color.b = ccolor.y;
+							}
+
+							ImGui::InputFloat("Row height (in grid cells)", &(c.row_height));
+							c.row_height = std::max(0.1f, c.row_height);
+
+							tex = "Row default background: " + (c.row_background_a.size() > 0 ? c.row_background_a : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change row bg")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.row_background_a = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.row_background_a = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							}
+
+							tex = "Row alternate background: " + (c.row_background_b.size() > 0 ? c.row_background_b : std::string("[none]"));
+							ImGui::Text(tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change row alt")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.row_background_b = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.row_background_b = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							}
+
+							ImGui::Checkbox("Per-section table headers", &(c.table_has_per_section_headers));
+
+							ImGui::Text("Inserts");
+							for(uint32_t k = 0; k < c.table_inserts.size(); ++k) {
+								ImGui::PushID(int32_t(k));
+								ImGui::Indent();
+								ImGui::InputText("Container name", &(c.table_inserts[k]));
+								ImGui::SameLine();
+								if(ImGui::Button("Delete insert")) {
+									c.members.erase(c.members.begin() + k);
+								}
+								ImGui::Unindent();
+								ImGui::PopID();
+							}
+							if(ImGui::Button("Add insert")) {
+								c.table_inserts.emplace_back();
+							}
+
+							ImGui::Text("Columns");
+							for(uint32_t k = 0; k < c.table_columns.size(); ++k) {
+								ImGui::PushID(int32_t(k));
+								ImGui::Indent();
+								if(k > 0) {
+									ImGui::Text("-------");
+								}
+								ImGui::InputText("Column name", &(c.table_columns[k].internal_data.column_name));
+
+								if(ImGui::Button("Delete")) {
+									c.table_columns.erase(c.table_columns.begin() + k);
+									ImGui::Unindent();
+									ImGui::PopID();
+									break;
+								}
+								if(k > 0) {
+									ImGui::SameLine();
+									if(ImGui::Button("Move left")) {
+										std::swap(c.table_columns[k- 1], c.table_columns[k]);
+									}
+								}
+								if(k+ 1 < c.table_columns.size()) {
+									ImGui::SameLine();
+									if(ImGui::Button("Move right")) {
+										std::swap(c.table_columns[k + 1], c.table_columns[k]);
+									}
+								}
+
+								temp = c.table_columns[k].display_data.width;
+								ImGui::InputInt("Column width", &temp);
+								c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
+
+								bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+								ImGui::Checkbox("Spacer column", &is_spacer);
+								c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
+
+
+								if(is_spacer == false) {
+									{
+										const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+										temp = int32_t(c.table_columns[k].display_data.cell_text_color);
+										ImGui::Combo("Cell text color", &temp, items, 16);
+										c.table_columns[k].display_data.cell_text_color = text_color(temp);
+									}
+
+									{
+										const char* items[] = { "left (leading)", "right (trailing)", "center" };
+										temp = int32_t(c.table_columns[k].display_data.text_alignment);
+										ImGui::Combo("Cell text alignment", &temp, items, 3);
+										c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
+									}
+
+									{
+										const char* items[] = { "left (leading)", "right (trailing)", "none" };
+										temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
+										ImGui::Combo("Decimal alignment", &temp, items, 3);
+										c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
+									}
+
+									ImGui::Checkbox("Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
+									if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
+										ImGui::InputText("Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
+									}
+
+									ImGui::Checkbox("Column is sortable", &(c.table_columns[k].internal_data.sortable));
+
+									ImGui::InputText("Header key", &(c.table_columns[k].display_data.header_key));
+
+									ImGui::Checkbox("Header has background", &(c.table_columns[k].internal_data.header_background));
+									if(c.table_columns[k].internal_data.header_background) {
+										std::string tex = "Header background: " + (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
+										ImGui::Text(tex.c_str());
+										ImGui::SameLine();
+										if(ImGui::Button("Change row alt")) {
+											auto new_file = fs::pick_existing_file(L"");
+											//auto breakpt = new_file.find_last_of(L'\\');
+											//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+											c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+										}
+									}
+
+									{
+										const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+										temp = int32_t(c.table_columns[k].display_data.header_text_color);
+										ImGui::Combo("Header text color", &temp, items, 16);
+										c.table_columns[k].display_data.header_text_color = text_color(temp);
+									}
+
+									ImGui::Checkbox("Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
+									if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
+										ImGui::InputText("Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
+									}
+								}
+
+								ImGui::Unindent();
+								ImGui::PopID();
+							}
+
+							if(ImGui::Button("Add column")) {
+								c.table_columns.emplace_back();
+							}
+						}
+					}
+
+					ImGui::Checkbox("Ignore rtl flip", &(c.ignore_rtl));
+
+					ImGui::Text("Member Variables");
+					if(c.members.empty()) {
+						ImGui::Text("[none]");
+					} else {
+						for(uint32_t k = 0; k < c.members.size(); ++k) {
 							ImGui::PushID(int32_t(k));
 							ImGui::Indent();
-							ImGui::InputText("Container name", &(c.table_inserts[k]));
-							ImGui::SameLine();
-							if(ImGui::Button("Delete insert")) {
+							ImGui::InputText("Type", &(c.members[k].type));
+							ImGui::InputText("Name", &(c.members[k].name));
+							if(ImGui::Button("Delete")) {
 								c.members.erase(c.members.begin() + k);
 							}
 							ImGui::Unindent();
 							ImGui::PopID();
 						}
-						if(ImGui::Button("Add insert")) {
-							c.table_inserts.emplace_back();
-						}
-
-						ImGui::Text("Columns");
-						for(uint32_t k = 0; k < c.table_columns.size(); ++k) {
-							ImGui::PushID(int32_t(k));
-							ImGui::Indent();
-							if(k > 0) {
-								ImGui::Text("-------");
-							}
-							ImGui::InputText("Column name", &(c.table_columns[k].internal_data.column_name));
-
-							if(ImGui::Button("Delete")) {
-								c.table_columns.erase(c.table_columns.begin() + k);
-								ImGui::Unindent();
-								ImGui::PopID();
-								break;
-							}
-							if(k > 0) {
-								ImGui::SameLine();
-								if(ImGui::Button("Move left")) {
-									std::swap(c.table_columns[k- 1], c.table_columns[k]);
-								}
-							}
-							if(k+ 1 < c.table_columns.size()) {
-								ImGui::SameLine();
-								if(ImGui::Button("Move right")) {
-									std::swap(c.table_columns[k + 1], c.table_columns[k]);
-								}
-							}
-
-							temp = c.table_columns[k].display_data.width;
-							ImGui::InputInt("Column width", &temp);
-							c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
-
-							bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-							ImGui::Checkbox("Spacer column", &is_spacer);
-							c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
-
-
-							if(is_spacer == false) {
-								{
-									const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-									temp = int32_t(c.table_columns[k].display_data.cell_text_color);
-									ImGui::Combo("Cell text color", &temp, items, 16);
-									c.table_columns[k].display_data.cell_text_color = text_color(temp);
-								}
-
-								{
-									const char* items[] = { "left (leading)", "right (trailing)", "center" };
-									temp = int32_t(c.table_columns[k].display_data.text_alignment);
-									ImGui::Combo("Cell text alignment", &temp, items, 3);
-									c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
-								}
-
-								{
-									const char* items[] = { "left (leading)", "right (trailing)", "none" };
-									temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
-									ImGui::Combo("Decimal alignment", &temp, items, 3);
-									c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
-								}
-
-								ImGui::Checkbox("Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
-								if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
-									ImGui::InputText("Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
-								}
-
-								ImGui::Checkbox("Column is sortable", &(c.table_columns[k].internal_data.sortable));
-
-								ImGui::InputText("Header key", &(c.table_columns[k].display_data.header_key));
-
-								ImGui::Checkbox("Header has background", &(c.table_columns[k].internal_data.header_background));
-								if(c.table_columns[k].internal_data.header_background) {
-									std::string tex = "Header background: " + (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
-									ImGui::Text(tex.c_str());
-									ImGui::SameLine();
-									if(ImGui::Button("Change row alt")) {
-										auto new_file = fs::pick_existing_file(L"");
-										//auto breakpt = new_file.find_last_of(L'\\');
-										//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-										c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-									}
-								}
-
-								{
-									const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-									temp = int32_t(c.table_columns[k].display_data.header_text_color);
-									ImGui::Combo("Header text color", &temp, items, 16);
-									c.table_columns[k].display_data.header_text_color = text_color(temp);
-								}
-
-								ImGui::Checkbox("Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
-								if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
-									ImGui::InputText("Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
-								}
-							}
-
-							ImGui::Unindent();
-							ImGui::PopID();
-						}
-
-						if(ImGui::Button("Add column")) {
-							c.table_columns.emplace_back();
-						}
 					}
-				}
-
-				ImGui::Checkbox("Ignore rtl flip", &(c.ignore_rtl));
-
-				ImGui::Text("Member Variables");
-				if(c.members.empty()) {
-					ImGui::Text("[none]");
-				} else {
-					for(uint32_t k = 0; k < c.members.size(); ++k) {
-						ImGui::PushID(int32_t(k));
-						ImGui::Indent();
-						ImGui::InputText("Type", &(c.members[k].type));
-						ImGui::InputText("Name", &(c.members[k].name));
-						if(ImGui::Button("Delete")) {
-							c.members.erase(c.members.begin() + k);
-						}
-						ImGui::Unindent();
-						ImGui::PopID();
+					if(ImGui::Button("Add Member Variable")) {
+						c.members.emplace_back();
 					}
-				}
-				if(ImGui::Button("Add Member Variable")) {
-					c.members.emplace_back();
 				}
 			}
 
@@ -3216,27 +3240,33 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						if (ImGui::MenuItem("Control")) {
 							selected_layout->contents.emplace_back(layout_control_t{ });
 							path_to_selected_layout.clear();
+							current_edit_target = edit_targets::layout_sublayout;
 						}
 						if (ImGui::MenuItem("Window")) {
 							selected_layout->contents.emplace_back(layout_window_t{ });
 							path_to_selected_layout.clear();
+							current_edit_target = edit_targets::layout_sublayout;
 						}
 						if (ImGui::MenuItem("Glue")) {
 							selected_layout->contents.emplace_back(layout_glue_t{ });
 							path_to_selected_layout.clear();
+							current_edit_target = edit_targets::layout_sublayout;
 						}
 						if (ImGui::MenuItem("Generator")) {
 							selected_layout->contents.emplace_back(generator_t{ });
 							path_to_selected_layout.clear();
+							current_edit_target = edit_targets::layout_sublayout;
 						}
 						if (ImGui::MenuItem("Sublayout")) {
 							selected_layout->contents.emplace_back(sub_layout_t{ });
 							std::get<sub_layout_t>(selected_layout->contents.back()).layout = std::make_unique<layout_level_t>();
 							path_to_selected_layout.clear();
+							current_edit_target = edit_targets::layout_sublayout;
 						}
 						if (ImGui::MenuItem("Texture layer")) {
 							selected_layout->contents.emplace_back(texture_layer_t{ });
 							path_to_selected_layout.clear();
+							current_edit_target = edit_targets::layout_sublayout;
 						}
 						ImGui::EndMenu();
 					}
@@ -3398,490 +3428,490 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			if(ImGui::Button("Delete")) {
 				switch_to_window(-1);
 				open_project.tables.erase(open_project.tables.begin() + selected_table);
-				continue;
-			}
+			} else {
+				auto& c = open_project.tables[selected_table];
 
-			auto& c = open_project.tables[selected_table];
+				ImGui::InputText("Name", &(c.temp_name));
+				ImGui::SameLine();
+				if(ImGui::Button("Change Name")) {
+					if(c.temp_name.empty()) {
+						MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
+					} else {
+						bool found = false;
+						for(auto& w : open_project.tables) {
+							if(w.name == c.temp_name) {
+								found = true;
+								break;
+							}
+						}
+						if(found) {
+							MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
+						} else {
+							for(auto& ow : open_project.windows) {
+								if(ow.wrapped.table_connection == c.name)
+									ow.wrapped.table_connection = c.temp_name;
+								for(auto& wc : ow.children) {
+									if(wc.table_connection == c.name)
+										wc.table_connection = c.temp_name;
+								}
+							}
 
-			ImGui::InputText("Name", &(c.temp_name));
-			ImGui::SameLine();
-			if(ImGui::Button("Change Name")) {
-				if(c.temp_name.empty()) {
-					MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
-				} else {
-					bool found = false;
-					for(auto& w : open_project.tables) {
-						if(w.name == c.temp_name) {
-							found = true;
+							c.name = c.temp_name;
+						}
+					}
+				}
+
+				ImGui::Checkbox("Highlight contents following mouse", &(c.has_highlight_color));
+				if(c.has_highlight_color) {
+					ImVec4 ccolor{ c.highlight_color.r, c.highlight_color.g, c.highlight_color.b, c.highlight_color.a };
+					ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
+					c.highlight_color.r = ccolor.x;
+					c.highlight_color.g = ccolor.y;
+					c.highlight_color.b = ccolor.z;
+					c.highlight_color.a = ccolor.w;
+				}
+
+				std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
+				ImGui::Text(tex.c_str());
+				ImGui::SameLine();
+				if(ImGui::Button("Change asc icon")) {
+					auto new_file = fs::pick_existing_file(L"");
+					//auto breakpt = new_file.find_last_of(L'\\');
+					//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+					c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+				}
+
+				tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
+				ImGui::Text(tex.c_str());
+				ImGui::SameLine();
+				if(ImGui::Button("Change des icon")) {
+					auto new_file = fs::pick_existing_file(L"");
+					//auto breakpt = new_file.find_last_of(L'\\');
+					//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+					c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+				}
+
+				{
+					ImVec4 ccolor{ c.divider_color.r, c.divider_color.b, c.divider_color.g, 0.0f };
+					ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
+					c.divider_color.r = ccolor.x;
+					c.divider_color.g = ccolor.z;
+					c.divider_color.b = ccolor.y;
+				}
+
+				size_t amount_of_columns = c.table_columns.size();
+
+				int move_from = -1;
+				int move_to = -1;
+
+				static ImGuiTableFlags flags =
+					ImGuiTableFlags_Borders
+					| ImGuiTableFlags_RowBg
+					| ImGuiTableFlags_ScrollX
+					| ImGuiTableFlags_ScrollY;
+
+				if (ImGui::BeginTable("table_description", amount_of_columns + 1, flags, ImVec2(0.0f, 500.f))) {
+					ImGui::TableSetupScrollFreeze(1, 1);
+
+					ImGui::TableNextRow();
+
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Reorder");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+
+						ImGui::PushID(k);
+						ImGui::Button("drag");
+						if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+						{
+							ImGui::SetDragDropPayload("DRAG_TABLE_COLUMN", &k, sizeof(int));
+							ImGui::Text("Moving column");
+							ImGui::EndDragDropSource();
+						}
+
+						if (ImGui::BeginDragDropTarget()) {
+							if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_TABLE_COLUMN"))
+							{
+								move_from = *(const int*)payload->Data;
+								move_to = k;
+								if (move_from != -1 && move_to != -1) {
+									// Reorder items
+									int copy_dst = (move_from > move_to) ? move_to : move_to - 1;
+									int copy_src = move_from;
+
+									auto item = c.table_columns[copy_src];
+									c.table_columns.erase(c.table_columns.begin() + copy_src);
+									c.table_columns.insert(c.table_columns.begin() + copy_dst, item);
+
+									// ImGui::SetDragDropPayload("DRAG_TABLE_COLUMN", &move_to, sizeof(int));
+								}
+							}
+							ImGui::EndDragDropTarget();
+						}
+						ImGui::PopID();
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Column name");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						ImGui::InputText("##Column name", &(c.table_columns[k].internal_data.column_name));
+						ImGui::PopID();
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Column width");
+
+					int32_t temp;
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+
+						ImGui::PushID(k);
+						temp = c.table_columns[k].display_data.width;
+						ImGui::SetNextItemWidth(100.f);
+						ImGui::InputInt("##Column width", &temp);
+						c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
+						ImGui::PopID();
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Spacer column");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+
+						ImGui::PushID(k);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						ImGui::SetNextItemWidth(50.f);
+						ImGui::Checkbox("##Spacer column", &is_spacer);
+						c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
+						ImGui::PopID();
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Cell text color");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+						temp = int32_t(c.table_columns[k].display_data.cell_text_color);
+						ImGui::SetNextItemWidth(100.f);
+						ImGui::Combo("##Cell text color", &temp, items, 16);
+						c.table_columns[k].display_data.cell_text_color = text_color(temp);
+						ImGui::PopID();
+
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Cell text alignment");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						const char* items[] = { "left (leading)", "right (trailing)", "center" };
+						temp = int32_t(c.table_columns[k].display_data.text_alignment);
+						ImGui::Combo("##Cell text alignment", &temp, items, 3);
+						c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
+						ImGui::PopID();
+
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Decimal alignment");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						const char* items[] = { "left (leading)", "right (trailing)", "none" };
+						temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
+						ImGui::Combo("##Decimal alignment", &temp, items, 3);
+						c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
+						ImGui::PopID();
+
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Dynamic cell tooltip");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						ImGui::Checkbox("##Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
+						ImGui::PopID();
+
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Cell tooltip key");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
+							ImGui::InputText("##Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
+						} else {
+							ImGui::Text("Off");
+						}
+						ImGui::PopID();
+
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Column is sortable");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						ImGui::Checkbox("##Column is sortable", &(c.table_columns[k].internal_data.sortable));
+						ImGui::PopID();
+
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Header key");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						ImGui::InputText("##Header key", &(c.table_columns[k].display_data.header_key));
+						ImGui::PopID();
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Header has background");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						ImGui::Checkbox("##Header has background", &(c.table_columns[k].internal_data.header_background));
+						ImGui::PopID();
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Header background:");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						if(c.table_columns[k].internal_data.header_background) {
+							std::string tex = (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
+							ImGui::Text("%s", tex.c_str());
+							ImGui::SameLine();
+							if(ImGui::Button("Change row alt")) {
+								auto new_file = fs::pick_existing_file(L"");
+								//auto breakpt = new_file.find_last_of(L'\\');
+								//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+							}
+						} else {
+							ImGui::Text("Off");
+						}
+						ImGui::PopID();
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Header text color");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+
+						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+						temp = int32_t(c.table_columns[k].display_data.header_text_color);
+						ImGui::Combo("##Header text color", &temp, items, 16);
+						c.table_columns[k].display_data.header_text_color = text_color(temp);
+
+						ImGui::PopID();
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Dynamic header tooltip");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+
+						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+						temp = int32_t(c.table_columns[k].display_data.header_text_color);
+						ImGui::Checkbox("##Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
+						c.table_columns[k].display_data.header_text_color = text_color(temp);
+
+						ImGui::PopID();
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Header tooltip key");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						if (is_spacer) {
+							ImGui::BeginDisabled();
+						}
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+
+						if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
+							ImGui::InputText("##Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
+						} else {
+							ImGui::Text("Off");
+						}
+
+						ImGui::PopID();
+						if (is_spacer) {
+							ImGui::EndDisabled();
+						}
+					}
+
+					// keep it last to avoid complications
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Delete");
+
+					for (int k = 0; k < amount_of_columns; k++) {
+						ImGui::TableSetColumnIndex(k + 1);
+
+						ImGui::PushID(k);
+						ImGui::SetNextItemWidth(100.f);
+						if(ImGui::Button("DEL")) {
+							c.table_columns.erase(c.table_columns.begin() + k);
+							ImGui::PopID();
 							break;
 						}
-					}
-					if(found) {
-						MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
-					} else {
-						for(auto& ow : open_project.windows) {
-							if(ow.wrapped.table_connection == c.name)
-								ow.wrapped.table_connection = c.temp_name;
-							for(auto& wc : ow.children) {
-								if(wc.table_connection == c.name)
-									wc.table_connection = c.temp_name;
-							}
-						}
-
-						c.name = c.temp_name;
-					}
-				}
-			}
-
-			ImGui::Checkbox("Highlight contents following mouse", &(c.has_highlight_color));
-			if(c.has_highlight_color) {
-				ImVec4 ccolor{ c.highlight_color.r, c.highlight_color.g, c.highlight_color.b, c.highlight_color.a };
-				ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
-				c.highlight_color.r = ccolor.x;
-				c.highlight_color.g = ccolor.y;
-				c.highlight_color.b = ccolor.z;
-				c.highlight_color.a = ccolor.w;
-			}
-
-			std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
-			ImGui::Text(tex.c_str());
-			ImGui::SameLine();
-			if(ImGui::Button("Change asc icon")) {
-				auto new_file = fs::pick_existing_file(L"");
-				//auto breakpt = new_file.find_last_of(L'\\');
-				//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-				c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-			}
-
-			tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
-			ImGui::Text(tex.c_str());
-			ImGui::SameLine();
-			if(ImGui::Button("Change des icon")) {
-				auto new_file = fs::pick_existing_file(L"");
-				//auto breakpt = new_file.find_last_of(L'\\');
-				//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-				c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-			}
-
-			{
-				ImVec4 ccolor{ c.divider_color.r, c.divider_color.b, c.divider_color.g, 0.0f };
-				ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
-				c.divider_color.r = ccolor.x;
-				c.divider_color.g = ccolor.z;
-				c.divider_color.b = ccolor.y;
-			}
-
-			size_t amount_of_columns = c.table_columns.size();
-
-			int move_from = -1;
-			int move_to = -1;
-
-			static ImGuiTableFlags flags =
-				ImGuiTableFlags_Borders
-				| ImGuiTableFlags_RowBg
-				| ImGuiTableFlags_ScrollX
-				| ImGuiTableFlags_ScrollY;
-
-			if (ImGui::BeginTable("table_description", amount_of_columns + 1, flags, ImVec2(0.0f, 500.f))) {
-				ImGui::TableSetupScrollFreeze(1, 1);
-
-				ImGui::TableNextRow();
-
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Reorder");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-
-					ImGui::PushID(k);
-					ImGui::Button("drag");
-					if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-					{
-						ImGui::SetDragDropPayload("DRAG_TABLE_COLUMN", &k, sizeof(int));
-						ImGui::Text("Moving column");
-						ImGui::EndDragDropSource();
-					}
-
-					if (ImGui::BeginDragDropTarget()) {
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DRAG_TABLE_COLUMN"))
-						{
-							move_from = *(const int*)payload->Data;
-							move_to = k;
-							if (move_from != -1 && move_to != -1) {
-								// Reorder items
-								int copy_dst = (move_from > move_to) ? move_to : move_to - 1;
-								int copy_src = move_from;
-
-								auto item = c.table_columns[copy_src];
-								c.table_columns.erase(c.table_columns.begin() + copy_src);
-								c.table_columns.insert(c.table_columns.begin() + copy_dst, item);
-
-								// ImGui::SetDragDropPayload("DRAG_TABLE_COLUMN", &move_to, sizeof(int));
-							}
-						}
-						ImGui::EndDragDropTarget();
-					}
-					ImGui::PopID();
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Column name");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					ImGui::InputText("##Column name", &(c.table_columns[k].internal_data.column_name));
-					ImGui::PopID();
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Column width");
-
-				int32_t temp;
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-
-					ImGui::PushID(k);
-					temp = c.table_columns[k].display_data.width;
-					ImGui::SetNextItemWidth(100.f);
-					ImGui::InputInt("##Column width", &temp);
-					c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
-					ImGui::PopID();
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Spacer column");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-
-					ImGui::PushID(k);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					ImGui::SetNextItemWidth(50.f);
-					ImGui::Checkbox("##Spacer column", &is_spacer);
-					c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
-					ImGui::PopID();
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Cell text color");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-					temp = int32_t(c.table_columns[k].display_data.cell_text_color);
-					ImGui::SetNextItemWidth(100.f);
-					ImGui::Combo("##Cell text color", &temp, items, 16);
-					c.table_columns[k].display_data.cell_text_color = text_color(temp);
-					ImGui::PopID();
-
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Cell text alignment");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					const char* items[] = { "left (leading)", "right (trailing)", "center" };
-					temp = int32_t(c.table_columns[k].display_data.text_alignment);
-					ImGui::Combo("##Cell text alignment", &temp, items, 3);
-					c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
-					ImGui::PopID();
-
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Decimal alignment");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					const char* items[] = { "left (leading)", "right (trailing)", "none" };
-					temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
-					ImGui::Combo("##Decimal alignment", &temp, items, 3);
-					c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
-					ImGui::PopID();
-
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Dynamic cell tooltip");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					ImGui::Checkbox("##Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
-					ImGui::PopID();
-
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Cell tooltip key");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
-						ImGui::InputText("##Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
-					} else {
-						ImGui::Text("Off");
-					}
-					ImGui::PopID();
-
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Column is sortable");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					ImGui::Checkbox("##Column is sortable", &(c.table_columns[k].internal_data.sortable));
-					ImGui::PopID();
-
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Header key");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					ImGui::InputText("##Header key", &(c.table_columns[k].display_data.header_key));
-					ImGui::PopID();
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Header has background");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					ImGui::Checkbox("##Header has background", &(c.table_columns[k].internal_data.header_background));
-					ImGui::PopID();
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Header background:");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					if(c.table_columns[k].internal_data.header_background) {
-						std::string tex = (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
-						ImGui::Text("%s", tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change row alt")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						}
-					} else {
-						ImGui::Text("Off");
-					}
-					ImGui::PopID();
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Header text color");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-
-					const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-					temp = int32_t(c.table_columns[k].display_data.header_text_color);
-					ImGui::Combo("##Header text color", &temp, items, 16);
-					c.table_columns[k].display_data.header_text_color = text_color(temp);
-
-					ImGui::PopID();
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Dynamic header tooltip");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-
-					const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-					temp = int32_t(c.table_columns[k].display_data.header_text_color);
-					ImGui::Checkbox("##Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
-					c.table_columns[k].display_data.header_text_color = text_color(temp);
-
-					ImGui::PopID();
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-
-
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Header tooltip key");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-					bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-					if (is_spacer) {
-						ImGui::BeginDisabled();
-					}
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-
-					if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
-						ImGui::InputText("##Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
-					} else {
-						ImGui::Text("Off");
-					}
-
-					ImGui::PopID();
-					if (is_spacer) {
-						ImGui::EndDisabled();
-					}
-				}
-
-				// keep it last to avoid complications
-				ImGui::TableNextRow();
-				ImGui::TableSetColumnIndex(0);
-				ImGui::Text("Delete");
-
-				for (int k = 0; k < amount_of_columns; k++) {
-					ImGui::TableSetColumnIndex(k + 1);
-
-					ImGui::PushID(k);
-					ImGui::SetNextItemWidth(100.f);
-					if(ImGui::Button("DEL")) {
-						c.table_columns.erase(c.table_columns.begin() + k);
 						ImGui::PopID();
-						break;
 					}
-					ImGui::PopID();
+
+					ImGui::EndTable();
+
 				}
 
-				ImGui::EndTable();
-			}
-
-			if(ImGui::Button("Add column")) {
-				c.table_columns.emplace_back();
+				if(ImGui::Button("Add column")) {
+					c.table_columns.emplace_back();
+				}
 			}
 
 			ImGui::End();

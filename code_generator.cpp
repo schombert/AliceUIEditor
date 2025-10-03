@@ -513,7 +513,15 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 			result += "\t" "\t" "} else if(type == ui::mouse_probe_type::tooltip) {\n";
 			if(c.dynamic_tooltip || c.tooltip_text_key.length() > 0 || c.background == background_type::flag || c.background == background_type::table_headers || c.background == background_type::table_columns) {
-				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
+				if (c.background == background_type::doughnut) {
+					result += "\t" "\t" "\t" "auto cx = (float)(x - base_data.size.x / 2) / (float)(base_data.size.x);\n";
+					result += "\t" "\t" "\t" "auto cy = (float)(y - base_data.size.y / 2) / (float)(base_data.size.y);\n";
+					result += "\t" "\t" "\t" "auto d = std::sqrt(cx * cx + cy * cy);\n";
+					result += "\t" "\t" "\t" "if (d > 0.3f && d < 0.5f) return ui::message_result::consumed;\n";
+					result += "\t" "\t" "\t" "else return ui::message_result::unseen;\n";
+				} else {
+					result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
+				}
 			} else {
 				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
 			}
@@ -1861,7 +1869,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "int32_t index = 0;\n";
 				result += "\t" "float offset = 0.0f;\n";
 				result += "\t" "for(int32_t k = 0; k < " + std::to_string(c.datapoints) + "; k++) {\n";
-				result += "\t" "\t" "if(graph_content[index].amount + offset < (float(k) + 0.5f) * total /  float(" + std::to_string(c.datapoints) + ")) {\n";
+				result += "\t" "\t" "while(graph_content[index].amount + offset < (float(k) + 0.5f) * total /  float(" + std::to_string(c.datapoints) + ")) {\n";
 				result += "\t" "\t" "\t" "offset += graph_content[index].amount;\n";
 				result += "\t" "\t" "\t" "++index;\n";
 				result += "\t" "\t" "}\n";
