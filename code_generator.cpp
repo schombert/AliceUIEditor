@@ -209,6 +209,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 	// predeclare
 	for(auto& win : proj.windows) {
 		for(auto& c : win.children) {
+			if (is_lua_element(c)) {
+				// lua elements are not declared as structs
+				continue;
+			}
 			result += "struct " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t;\n";
 		}
 		result += "struct " + project_name + "_" + win.wrapped.name + "_t;\n";
@@ -217,6 +221,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 	// type declarations
 	for(auto& win : proj.windows) {
 		for(auto& c : win.children) {
+			if (is_lua_element(c)) {
+				// lua elements are not declared as structs
+				continue;
+			}
 			std::string base_type = "ui::element_base";
 			if(c.container_type != container_type::none) {
 				if(c.container_type == container_type::table) {
@@ -669,8 +677,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		for(auto& dm : win.wrapped.members) {
 			result += "\t" + dm.type + " " + dm.name + ";\n";
 		}
+		result += "\tankerl::unordered_dense::map<std::string, std::unique_ptr<ui::lua_scripted_element>> scripted_elements;\n";
 		for(auto& c : win.children) {
-			result += "\t" "std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t> " + c.name + ";\n";
+			if (!is_lua_element(c))
+				result += "\t" "std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t> " + c.name + ";\n";
 		}
 		auto gens = make_generators_list(win.layout);
 		for(auto g : gens) {
@@ -1084,6 +1094,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		}
 
 		for(auto& c : win.children) { // child functions
+			if (is_lua_element(c))
+				continue;
 
 			// TABLE
 			//
@@ -2641,6 +2653,15 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			for(auto& c : win.children) {
 				result += "\t" "\t" "\t" "\t" "if(cname == \"" + c.name + "\") {\n";
 				result += "\t" "\t" "\t" "\t" "\t" "temp.ptr = " + c.name +".get();\n";
+				result += "\t" "\t" "\t" "\t" "} else\n";
+			}
+			{
+				result += "\t" "\t" "\t" "\t" "{\n";
+				result += "\t" "\t" "\t" "\t" "\t" "std::string str_cname {cname};\n";
+				result += "\t" "\t" "\t" "\t" "\t" "auto found = scripted_elements.find(str_cname);\n";
+				result += "\t" "\t" "\t" "\t" "\t" "if (found != scripted_elements.end()) {\n";
+				result += "\t" "\t" "\t" "\t" "\t" "\t" "temp.ptr = found->second.get();\n";
+				result += "\t" "\t" "\t" "\t" "\t" "}\n";
 				result += "\t" "\t" "\t" "\t" "}\n";
 			}
 			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
@@ -2747,6 +2768,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		result += "\t" "while(!pending_children.empty()) {\n";
 		result += "\t" "\t" "auto child_data = read_child_bytes(pending_children.back().data, pending_children.back().size);\n";
 		for(auto& c : win.children) {
+			if (is_lua_element(c)) {
+				continue;
+			}
 			result += "\t" "\t" "if(child_data.name == \"" + c.name + "\") {\n";
 			result += "\t" "\t" "\t" + c.name + " = std::make_unique<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t>();\n";
 			result += "\t" "\t" "\t" + c.name + "->parent = this;\n";
@@ -2834,7 +2858,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "cptr->on_create(state);\n";
 			result += "\t" "\t" "\t" "children.push_back(cptr);\n";
 			result += "\t" "\t" "\t" "pending_children.pop_back(); continue;\n";
-			result += "\t" "\t" "}\n";
+			result += "\t" "\t" "} else \n";
 		}
 		auto tabs = tables_in_window(proj, win);
 		for(auto t : tabs) {
@@ -2883,6 +2907,30 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "\t" "col_section.read<text::alignment>(); // discard\n";
 				}
 			}
+			result += "\t" "\t" "\t" "pending_children.pop_back(); continue;\n";
+			result += "\t" "\t" "} else \n";
+		}
+		{
+			result += "\t" "\t" "if (child_data.is_lua) { \n";
+			result += "\t" "\t" "\t" "std::string str_name {child_data.name};\n";
+			result += "\t" "\t" "\t" "scripted_elements[str_name] = std::make_unique<ui::lua_scripted_element>();\n";
+			result += "\t" "\t" "\t" "auto cptr = scripted_elements[str_name].get();\n";
+			result += "\t" "\t" "\t" "cptr->base_data.position.x = child_data.x_pos;\n";
+			result += "\t" "\t" "\t" "cptr->base_data.position.y = child_data.y_pos;\n";
+			result += "\t" "\t" "\t" "cptr->base_data.size.x = child_data.x_size;\n";
+			result += "\t" "\t" "\t" "cptr->base_data.size.y = child_data.y_size;\n";
+			result += "\t" "\t" "\t" "cptr->texture_key = child_data.texture;\n";
+			result += "\t" "\t" "\t" "cptr->text_scale = child_data.text_scale;\n";
+			result += "\t" "\t" "\t" "cptr->text_is_header = (child_data.text_type == aui_text_type::header);\n";
+			result += "\t" "\t" "\t" "cptr->text_alignment = child_data.text_alignment;\n";
+			result += "\t" "\t" "\t" "cptr->text_color = child_data.text_color;\n";
+			result += "\t" "\t" "\t" "cptr->on_update_lname = child_data.text_key;\n";
+			result += "\t" "\t" "\t" "if(child_data.tooltip_text_key.length() > 0) {\n";
+			result += "\t" "\t" "\t" "\t" "cptr->tooltip_key = state.lookup_key(child_data.tooltip_text_key);\n";
+			result += "\t" "\t" "\t" "}\n";
+			result += "\t" "\t" "\t" "cptr->parent = this;\n";
+			result += "\t" "\t" "\t" "cptr->on_create(state);\n";
+			result += "\t" "\t" "\t" "children.push_back(cptr);\n";
 			result += "\t" "\t" "\t" "pending_children.pop_back(); continue;\n";
 			result += "\t" "\t" "}\n";
 		}

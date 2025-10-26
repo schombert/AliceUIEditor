@@ -351,6 +351,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 				buffer.write(property::text_color);
 				buffer.write(c.text_color);
 			}
+			if(c.is_lua) {
+				buffer.write(property::is_lua);
+				buffer.write(c.is_lua);
+			}
 			if(c.tooltip_text_key.size() > 0) {
 				buffer.write(property::tooltip_text_key);
 				buffer.write(c.tooltip_text_key);
@@ -751,6 +755,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 						auto ptype = essential_child_section.read< property>();
 						if(ptype == property::text_color) {
 							essential_child_section.read(c.text_color);
+						} else if(ptype == property::is_lua) {
+							essential_child_section.read(c.is_lua);
 						} else if(ptype == property::texture) {
 							essential_child_section.read(c.texture);
 						} else if(ptype == property::alternate_bg) {
