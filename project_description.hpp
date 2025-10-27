@@ -33,6 +33,7 @@ inline bool background_type_is_textured(background_type bg) {
 	return false;
 }
 
+
 inline bool background_type_requires_border_width(background_type bg) {
 	if (bg == background_type::bordered_texture) return true;
 	return false;
@@ -216,6 +217,7 @@ enum class property : uint8_t {
 	page_button_textures = 44,
 	layout_information = 45,
 	table_connection = 46,
+	is_lua = 47
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -305,7 +307,13 @@ struct ui_element_t {
 	bool has_table_highlight_color = false;
 	bool table_has_per_section_headers = false;
 	bool hover_activation = false;
+	bool is_lua = false;
 };
+
+
+inline bool is_lua_element(ui_element_t& target) {
+	return target.is_lua;
+}
 
 enum class layout_type : uint8_t {
 	single_horizontal,

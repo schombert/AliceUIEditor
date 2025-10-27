@@ -6,7 +6,7 @@ debug_flags_link = -g -gdwarf-3
 #debug_flags_link =
 
 rule clone_imgui
-  command = cmd /c "git clone --depth=1 https://github.com/ocornut/imgui.git && touch $out"
+  command = cmd /c "git clone --depth=1 https://github.com/ocornut/imgui.git && touch $out || touch $out"
   description = cloning imgui
 
 rule compile_cpp

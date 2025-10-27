@@ -2557,6 +2557,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				auto& win = open_project.windows[selected_window];
 				auto& c = win.children[selected_control];
 
+
+
 				if(ImGui::Button("Delete")) {
 					win.children.erase(win.children.begin() + selected_control);
 					selected_control = -1;
@@ -2589,6 +2591,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 					}
 
+					ImGui::Text("Lua elements allow to add dynamic elements without generation and recompilation of c++ code. Current supports only a subset of features.");
+					ImGui::Checkbox("Lua", &(c.is_lua));
+
 					int32_t temp = 0;
 
 					temp = c.x_size;
@@ -2606,6 +2611,34 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					c.rectangle_color.b = ccolor.y;
 
 					ImGui::Checkbox("Ignore grid", &(c.no_grid));
+
+					if (is_lua_element(c)) {
+						c.dynamic_tooltip = false;
+						ImGui::InputText("Tooltip key##lua_tooltip_key", &(c.tooltip_text_key));
+						ImGui::InputText("On update function", &(c.text_key));
+						{
+							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+							temp = int32_t(c.text_color);
+							ImGui::Combo("Text color#lua_text_color", &temp, items, 16);
+							c.text_color = text_color(temp);
+						}
+						{
+							const char* items[] = { "body", "header" };
+							temp = int32_t(c.text_type);
+							ImGui::Combo("Text style#lua_text_style", &temp, items, 2);
+							c.text_type = text_type(temp);
+						}
+						{
+							const char* items[] = { "left (leading)", "right (trailing)", "center" };
+							temp = int32_t(c.text_align);
+							ImGui::Combo("Text alignment#lua_text_align", &temp, items, 3);
+							c.text_align = aui_text_alignment(temp);
+						}
+					}
+
+					if (is_lua_element(c)) {
+						ImGui::BeginDisabled();
+					}
 
 					{
 						const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut", "border repeat", "corners" };
@@ -2759,7 +2792,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						if(!c.dynamic_tooltip) {
 							ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
 						}
-
 						ImGui::Checkbox("Can be disabled", &(c.can_disable));
 						ImGui::Checkbox("Left-click action", &(c.left_click_action));
 						ImGui::Checkbox("Right-click action", &(c.right_click_action));
@@ -2985,6 +3017,10 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					}
 					if(ImGui::Button("Add Member Variable")) {
 						c.members.emplace_back();
+					}
+
+					if (is_lua_element(c)) {
+						ImGui::EndDisabled();
 					}
 				}
 			}
