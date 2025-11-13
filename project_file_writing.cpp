@@ -252,6 +252,10 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 			buffer.write(property::share_table_highlight);
 			buffer.write(win.wrapped.share_table_highlight);
 		}
+		if(win.wrapped.on_hide_action) {
+			buffer.write(property::hide_action);
+			buffer.write(win.wrapped.on_hide_action);
+		}
 		if(win.wrapped.table_connection.size() > 0) {
 			buffer.write(property::table_connection);
 			buffer.write(win.wrapped.table_connection);
@@ -670,6 +674,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 					optional_section.read(win.wrapped.share_table_highlight);
 				} else if(ptype == property::table_connection) {
 					optional_section.read(win.wrapped.table_connection);
+				} else if(ptype == property::hide_action) {
+					optional_section.read(win.wrapped.on_hide_action);
 				} else if(ptype == property::data_member) {
 					data_member m;
 					optional_section.read(m.type);

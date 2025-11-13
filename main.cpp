@@ -3370,6 +3370,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 					}
 					ImGui::Checkbox("Receive updates while hidden", &(open_project.windows[i].wrapped.updates_while_hidden));
+					ImGui::Checkbox("On hide/close action", &(open_project.windows[i].wrapped.on_hide_action));
 					temp = 0;
 					switch(open_project.windows[i].wrapped.orientation) {
 						case orientation::upper_left: temp = 0; break;

@@ -173,6 +173,7 @@ struct window_element_t {
 	bool share_table_highlight = false;
 	bool parent_is_layout = false;
 	bool auto_close_button = false;
+	bool on_hide_action = false;
 };
 
 struct texture_layer_t {
@@ -231,7 +232,8 @@ enum class property : uint8_t {
 	is_lua = 47,
 	template_type = 48,
 	icon = 49,
-	alternate_set = 50
+	alternate_set = 50,
+	hide_action = 51
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,

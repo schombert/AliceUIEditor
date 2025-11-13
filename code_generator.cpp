@@ -2120,6 +2120,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
 		if(win.wrapped.template_id != -1 && !win.alternates.empty())
 			result += "\t" "void set_alternate(bool alt) noexcept;\n";
+		if(win.wrapped.on_hide_action) 
+			result += "\t" "void on_hide(sys::state& state) noexcept override;\n";
 
 		if(win.wrapped.background != background_type::none || win.wrapped.template_id != -1) {
 			result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
@@ -3256,6 +3258,19 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 		}
 
+
+		//HIDE/CLOSE
+		if(win.wrapped.on_hide_action) {
+			result += "void " + project_name + "_" + win.wrapped.name + "_t::on_hide(sys::state& state) noexcept {\n";
+			make_parent_var_text(true);
+			result += "// BEGIN " + win.wrapped.name + "::on_hide\n";
+			if(auto it = old_code.found_code.find(win.wrapped.name + "::on_hide"); it != old_code.found_code.end()) {
+				it->second.used = true;
+				result += it->second.text;
+			}
+			result += "// END\n";
+			result += "}\n";
+		}
 
 		//UPDATE
 		result += "void " + project_name + "_" + win.wrapped.name + "_t::on_update(sys::state& state) noexcept {\n";
