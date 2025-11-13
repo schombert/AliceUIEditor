@@ -27,6 +27,7 @@
 #include "imgui_stdlib.h"
 #include "stools.hpp"
 #include "code_generator.hpp"
+#include "templateproject.hpp"
 
 namespace edit_targets {
 	inline constexpr int window = 0;
@@ -68,6 +69,11 @@ size_t retrieve_texture_layer_type(background_type x) {
 open_project_t bytes_to_project(serialization::in_buffer& buffer);
 void project_to_aui_bytes(open_project_t const& p, serialization::out_buffer& buffer);
 void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer);
+
+namespace template_project {
+void project_to_bytes(project const& p, serialization::out_buffer& buffer);
+project bytes_to_project(serialization::in_buffer& buffer);
+}
 
 GLint compile_shader(std::string_view source, GLenum type) {
 	GLuint return_value = glCreateShader(type);
@@ -508,6 +514,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 }
 
 open_project_t open_project;
+template_project::project open_templates;
 
 float drag_offset_x = 0.0f;
 float drag_offset_y = 0.0f;
@@ -613,35 +620,90 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int
 
 void render_window(window_element_wrapper_t& win, float x, float y, bool highlightwin, float ui_scale) {
 	// bg
-	if(
-		win.wrapped.background == background_type::none
-		|| win.wrapped.background == background_type::existing_gfx
-		|| win.wrapped.texture.empty()
-		|| win.wrapped.background == background_type::linechart
-		|| win.wrapped.background == background_type::stackedbarchart
-		|| win.wrapped.background == background_type::doughnut
-		|| win.wrapped.background == background_type::colorsquare
-		|| win.wrapped.background == background_type::border_texture_repeat
-		|| win.wrapped.background == background_type::textured_corners
-	) {
-		render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
-	} else if(win.wrapped.background == background_type::texture) {
-		if(win.wrapped.ogl_texture.loaded == false) {
-			win.wrapped.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(win.wrapped.texture));
-		}
-		if(win.wrapped.ogl_texture.texture_handle == 0) {
-			render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
+	if(win.wrapped.template_id != -1) {
+		auto render_asvg_rect = [&](asvg::svg& s, float hcursor, float vcursor, float x_sz, float y_sz, int32_t gsz) {
+			render_hollow_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f),
+				hcursor,
+				vcursor,
+				std::max(1, int32_t(x_sz * ui_scale)),
+				std::max(1, int32_t(y_sz * ui_scale)));
+
+			render_textured_rect(color3f{ 0.f, 0.f, 0.f },
+				hcursor,
+				vcursor,
+				std::max(1, int32_t(x_sz * ui_scale)),
+				std::max(1, int32_t(y_sz * ui_scale)),
+				s.get_render(x_sz / float(gsz), y_sz / float(gsz), gsz, 2.0f));
+
+		};
+		auto render_svg_rect = [&](asvg::simple_svg& s, float hcursor, float vcursor, int32_t x_sz, int32_t y_sz, color3f c) {
+			render_textured_rect(color3f{ 0.f, 0.f, 0.f },
+				hcursor,
+				vcursor,
+				std::max(1, int32_t(x_sz * ui_scale)),
+				std::max(1, int32_t(y_sz * ui_scale)),
+				s.get_render(x_sz, y_sz, 2.0f, c.r, c.g, c.b));
+		};
+
+		auto& thm = open_templates;
+		auto selected_template = win.wrapped.template_id;
+
+		if(thm.window_t[selected_template].bg != -1) {
+			render_asvg_rect(thm.backgrounds[thm.window_t[selected_template].bg].renders, x * ui_scale, y * ui_scale, win.wrapped.x_size, win.wrapped.y_size, open_project.grid_size);
 		} else {
-			render_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.ogl_texture.texture_handle);
-		}
-	} else if(win.wrapped.background == background_type::bordered_texture) {
-		if(win.wrapped.ogl_texture.loaded == false) {
-			win.wrapped.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(win.wrapped.texture));
-		}
-		if(win.wrapped.ogl_texture.texture_handle == 0) {
 			render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
-		} else {
-			render_stretch_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), ui_scale, std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.border_size, win.wrapped.ogl_texture.texture_handle);
+		}
+		auto vcursor = (y + thm.window_t[selected_template].v_close_button_margin * open_project.grid_size) * ui_scale;
+		auto hcursor = (x+ win.wrapped.x_size - thm.window_t[selected_template].h_close_button_margin * open_project.grid_size - open_project.grid_size * 3.0f) * ui_scale;
+		if(win.wrapped.auto_close_button && thm.window_t[selected_template].close_button_definition != -1) {
+			auto l = thm.iconic_button_t[thm.window_t[selected_template].close_button_definition].primary.icon_left.resolve(float(3 * open_project.grid_size), float(3 * open_project.grid_size), open_project.grid_size) * ui_scale + hcursor;
+			auto t = thm.iconic_button_t[thm.window_t[selected_template].close_button_definition].primary.icon_top.resolve(float(3 * open_project.grid_size), float(3 * open_project.grid_size), open_project.grid_size) * ui_scale + vcursor;
+			auto r = thm.iconic_button_t[thm.window_t[selected_template].close_button_definition].primary.icon_right.resolve(float(3 * open_project.grid_size), float(3 * open_project.grid_size), open_project.grid_size) * ui_scale + hcursor;
+			auto b = thm.iconic_button_t[thm.window_t[selected_template].close_button_definition].primary.icon_bottom.resolve(float(3 * open_project.grid_size), float(3 * open_project.grid_size), open_project.grid_size) * ui_scale + vcursor;
+
+			if(thm.iconic_button_t[thm.window_t[selected_template].close_button_definition].primary.bg != -1)
+				render_asvg_rect(thm.backgrounds[thm.iconic_button_t[thm.window_t[selected_template].close_button_definition].primary.bg].renders, hcursor, vcursor, 3 * open_project.grid_size, 3 * open_project.grid_size, open_project.grid_size);
+
+			hcursor = l;
+			vcursor = t;
+
+			if(thm.window_t[selected_template].close_button_icon != -1) {
+				render_svg_rect(thm.icons[thm.window_t[selected_template].close_button_icon].renders,
+					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
+					thm.colors[thm.iconic_button_t[thm.window_t[selected_template].close_button_definition].primary.icon_color]);
+			}
+		}
+	} else {
+		if(
+			win.wrapped.background == background_type::none
+			|| win.wrapped.background == background_type::existing_gfx
+			|| win.wrapped.texture.empty()
+			|| win.wrapped.background == background_type::linechart
+			|| win.wrapped.background == background_type::stackedbarchart
+			|| win.wrapped.background == background_type::doughnut
+			|| win.wrapped.background == background_type::colorsquare
+			|| win.wrapped.background == background_type::border_texture_repeat
+			|| win.wrapped.background == background_type::textured_corners
+			) {
+			render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
+		} else if(win.wrapped.background == background_type::texture) {
+			if(win.wrapped.ogl_texture.loaded == false) {
+				win.wrapped.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(win.wrapped.texture));
+			}
+			if(win.wrapped.ogl_texture.texture_handle == 0) {
+				render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
+			} else {
+				render_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.ogl_texture.texture_handle);
+			}
+		} else if(win.wrapped.background == background_type::bordered_texture) {
+			if(win.wrapped.ogl_texture.loaded == false) {
+				win.wrapped.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(win.wrapped.texture));
+			}
+			if(win.wrapped.ogl_texture.texture_handle == 0) {
+				render_empty_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)));
+			} else {
+				render_stretch_textured_rect(win.wrapped.rectangle_color * (highlightwin ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), ui_scale, std::max(1, int32_t(win.wrapped.x_size * ui_scale)), std::max(1, int32_t(win.wrapped.y_size * ui_scale)), win.wrapped.border_size, win.wrapped.ogl_texture.texture_handle);
+			}
 		}
 	}
 
@@ -675,7 +737,104 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 	}
 
+	auto render_asvg_rect = [&](asvg::svg& s, float hcursor, float vcursor, float x_sz, float y_sz, int32_t gsz) {
+		render_hollow_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f),
+			hcursor,
+			vcursor,
+			std::max(1, int32_t(x_sz * ui_scale)),
+			std::max(1, int32_t(y_sz * ui_scale)));
 
+		render_textured_rect(color3f{ 0.f, 0.f, 0.f },
+			hcursor,
+			vcursor,
+			std::max(1, int32_t(x_sz * ui_scale)),
+			std::max(1, int32_t(y_sz * ui_scale)),
+			s.get_render(x_sz / float(gsz), y_sz / float(gsz), gsz, 2.0f));
+
+	};
+	auto render_svg_rect = [&](asvg::simple_svg& s, float hcursor, float vcursor, int32_t x_sz, int32_t y_sz, color3f c) {
+		render_textured_rect(color3f{ 0.f, 0.f, 0.f },
+			hcursor,
+			vcursor,
+			std::max(1, int32_t(x_sz * ui_scale)),
+			std::max(1, int32_t(y_sz * ui_scale)),
+			s.get_render(x_sz, y_sz, 2.0f, c.r, c.g, c.b));
+	};
+
+	if(c.ttype == template_project::template_type::label) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.label_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale),  c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	} 
+	if(c.ttype == template_project::template_type::button) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.button_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::iconic_button) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.iconic_button_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+
+			auto vcursor = y * ui_scale;
+			auto hcursor = x * ui_scale;
+			if(c.icon_id != -1) {
+				auto l = open_templates.iconic_button_t[c.template_id].primary.icon_left.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto t = open_templates.iconic_button_t[c.template_id].primary.icon_top.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+				auto r = open_templates.iconic_button_t[c.template_id].primary.icon_right.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto b = open_templates.iconic_button_t[c.template_id].primary.icon_bottom.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+
+				hcursor = l;
+				vcursor = t;
+
+				render_svg_rect(open_templates.icons[c.icon_id].renders,
+					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
+					open_templates.colors[open_templates.iconic_button_t[c.template_id].primary.icon_color]);
+				
+			}
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::mixed_button) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.mixed_button_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+
+			auto vcursor = y * ui_scale;
+			auto hcursor = x * ui_scale;
+			if(c.icon_id != -1) {
+				auto l = open_templates.mixed_button_t[c.template_id].primary.icon_left.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto t = open_templates.mixed_button_t[c.template_id].primary.icon_top.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+				auto r = open_templates.mixed_button_t[c.template_id].primary.icon_right.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto b = open_templates.mixed_button_t[c.template_id].primary.icon_bottom.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+
+				hcursor = l;
+				vcursor = t;
+
+				render_svg_rect(open_templates.icons[c.icon_id].renders,
+					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
+					open_templates.colors[open_templates.mixed_button_t[c.template_id].primary.shared_color]);
+
+			}
+		}
+		return;
+	}
 	if(c.background == background_type::table_columns || c.background == background_type::table_headers) {
 		auto t = table_from_name(open_project, c.table_connection);
 		if(t) {
@@ -932,11 +1091,28 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int
 	auto right_margin = layout.margin_right != -1 ? int32_t(layout.margin_right) : left_margin;
 	auto effective_x_size = base_x_size - (left_margin + right_margin);
 	auto effective_y_size = base_y_size - (top_margin + bottom_margin);
+	
+	auto id = layout.template_id;
+	if(id == -1 && window.wrapped.template_id != -1) {
+		id = open_templates.window_t[window.wrapped.template_id].layout_region_definition;
+	}
+	if(id != -1) {
+		auto bg = open_templates.layout_region_t[id].bg;
+		if(bg != -1) {
+			render_textured_rect(color3f{ 0.f, 0.f, 0.f },
+				x * scale,
+				y * scale,
+				std::max(1, int32_t(base_x_size * scale)),
+				std::max(1, int32_t(base_y_size * scale)),
+				open_templates.backgrounds[bg].renders.get_render(base_x_size / float(open_project.grid_size), base_y_size / float(open_project.grid_size), open_project.grid_size, 2.0f));
+		}
+	}
+
 	if(layout.paged) {
 		effective_y_size -= int32_t(2 * open_project.grid_size);
 	}
 
-	if (layout.open_in_ui) {
+	if(layout.open_in_ui) {
 		render_layout_rect(outline_color * 2.f * layer, ((x + left_margin) * scale), ((y + top_margin) * scale), std::max(1, int32_t(effective_x_size * scale)), std::max(1, int32_t(effective_y_size * scale)));
 	} else {
 		render_layout_rect(outline_color * 0.5f * layer, ((x + left_margin) * scale), ((y + top_margin) * scale), std::max(1, int32_t(effective_x_size * scale)), std::max(1, int32_t(effective_y_size * scale)));
@@ -1618,31 +1794,712 @@ void apply_layout_style(layout_level_t& layout, int16_t margins, int16_t header_
 	}
 }
 
+void template_type_options(template_project::template_type& ttype, int16_t& template_id) {
+	std::vector<char const*> opts;
+	opts.push_back("None");
+	opts.push_back("Label");
+	opts.push_back("Text button");
+	opts.push_back("Icon button");
+	opts.push_back("Text & icon button");
+
+	int32_t current = 0;
+	switch(ttype) {
+		case template_project::template_type::none:
+			current = 0; break;
+		case template_project::template_type::label:
+			current = 1; break;
+		case template_project::template_type::button:
+			current = 2; break;
+		case template_project::template_type::iconic_button:
+			current = 3; break;
+		case template_project::template_type::mixed_button:
+			current = 4; break;
+	}
+
+	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
+		switch(current) {
+			case 0:
+				ttype = template_project::template_type::none; break;
+			case 1:
+				ttype = template_project::template_type::label; break;
+			case 2:
+				ttype = template_project::template_type::button; break;
+			case 3:
+				ttype = template_project::template_type::iconic_button; break;
+			case 4:
+				ttype = template_project::template_type::mixed_button; break;
+			default:
+				break;
+		}
+	}
+
+	switch(ttype) {
+		case template_project::template_type::none:
+			break;
+		case template_project::template_type::label:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.label_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::button:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::iconic_button:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.iconic_button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::mixed_button:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.mixed_button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::progress_bar:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.progress_bar_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+	}
+}
+
+void control_options(window_element_wrapper_t& win, ui_element_t& c) {
+
+	if(ImGui::Button("Delete")) {
+		win.children.erase(win.children.begin() + selected_control);
+		selected_control = -1;
+		return;
+	}
+
+	ImGui::SameLine();
+	if(ImGui::Button("Copy")) {
+		win.children.push_back(win.children[selected_control]);
+		win.children.back().name += "_copy";
+	}
+
+	ImGui::InputText("Name", &(c.temp_name));
+	ImGui::SameLine();
+	if(ImGui::Button("Change Name")) {
+		if(c.temp_name.empty()) {
+			MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
+		} else {
+			bool found = false;
+			for(auto& w : win.children) {
+				if(w.name == c.temp_name) {
+					found = true;
+					break;
+				}
+			}
+			if(found) {
+				MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
+			} else {
+				for(auto& alt : win.alternates) {
+					if(alt.control_name == c.name)
+						alt.control_name = c.temp_name;
+				}
+				rename_control(win.layout, c.name, c.temp_name);
+				c.name = c.temp_name;
+			}
+		}
+	}
+
+
+
+	int32_t temp = 0;
+
+	temp = c.x_size;
+	ImGui::InputInt("Width", &temp);
+	c.x_size = int16_t(std::max(0, temp));
+
+	temp = c.y_size;
+	ImGui::InputInt("Height", &temp);
+	c.y_size = int16_t(std::max(0, temp));
+
+	ImVec4 ccolor{ c.rectangle_color.r, c.rectangle_color.b, c.rectangle_color.g, 1.0f };
+	ImGui::ColorEdit3("Outline color", (float*)&ccolor);
+	c.rectangle_color.r = ccolor.x;
+	c.rectangle_color.g = ccolor.z;
+	c.rectangle_color.b = ccolor.y;
+
+	ImGui::Checkbox("Ignore grid", &(c.no_grid));
+
+	template_type_options(c.ttype, c.template_id);
+
+	switch(c.ttype) {
+		case template_project::template_type::label:
+		{
+			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+			if(!c.dynamic_text) 
+				ImGui::InputText("Text key", &(c.text_key));
+			
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip) 
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::button:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+
+			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+			if(!c.dynamic_text)
+				ImGui::InputText("Text key", &(c.text_key));
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::iconic_button:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+
+			{
+				std::vector<char const*> inner_opts;
+				inner_opts.push_back("None");
+				for(auto& i : open_templates.icons) {
+					inner_opts.push_back(i.file_name.c_str());
+				}
+				int32_t chosen = c.icon_id + 1;
+				if(ImGui::Combo("Default icon", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+					c.icon_id = int16_t(chosen - 1);
+				}
+			}
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::mixed_button:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+
+			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+			if(!c.dynamic_text)
+				ImGui::InputText("Text key", &(c.text_key));
+
+			{
+				std::vector<char const*> inner_opts;
+				inner_opts.push_back("None");
+				for(auto& i : open_templates.icons) {
+					inner_opts.push_back(i.file_name.c_str());
+				}
+				int32_t chosen = c.icon_id + 1;
+				if(ImGui::Combo("Default icon", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+					c.icon_id = int16_t(chosen - 1);
+				}
+			}
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		default:
+		{
+			ImGui::Text("Lua elements allow to add dynamic elements without generation and recompilation of c++ code. Current supports only a subset of features.");
+			ImGui::Checkbox("Lua", &(c.is_lua));
+
+			if(is_lua_element(c)) {
+				c.dynamic_tooltip = false;
+				ImGui::InputText("Tooltip key##lua_tooltip_key", &(c.tooltip_text_key));
+				ImGui::InputText("On update function", &(c.text_key));
+				{
+					const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+					temp = int32_t(c.text_color);
+					ImGui::Combo("Text color#lua_text_color", &temp, items, 16);
+					c.text_color = text_color(temp);
+				}
+				{
+					const char* items[] = { "body", "header" };
+					temp = int32_t(c.text_type);
+					ImGui::Combo("Text style#lua_text_style", &temp, items, 2);
+					c.text_type = text_type(temp);
+				}
+				{
+					const char* items[] = { "left (leading)", "right (trailing)", "center" };
+					temp = int32_t(c.text_align);
+					ImGui::Combo("Text alignment#lua_text_align", &temp, items, 3);
+					c.text_align = aui_text_alignment(temp);
+				}
+			}
+
+			if(is_lua_element(c)) {
+				ImGui::BeginDisabled();
+			}
+
+			{
+				const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut", "border repeat", "corners" };
+				temp = int32_t(c.background);
+				ImGui::Combo("Background", &temp, items, 15);
+				c.background = background_type(temp);
+			}
+
+			if(c.background == background_type::table_columns || c.background == background_type::table_headers) {
+				std::vector<char const*> table_names;
+				table_names.push_back("[none]");
+				int32_t selection = (c.table_connection == "" ? 0 : -1);
+				for(auto& tc : open_project.tables) {
+					table_names.push_back(tc.name.c_str());
+					if(tc.name == c.table_connection) {
+						selection = int32_t(table_names.size() - 1);
+					}
+				}
+
+				temp = selection;
+				ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
+				if(temp != selection) {
+					if(selection == 0)
+						c.table_connection = "";
+					else
+						c.table_connection = open_project.tables[selection - 1].name;
+				}
+			} else if(c.background == background_type::existing_gfx) {
+				ImGui::InputText("Texture", &(c.texture));
+			} else if(background_type_is_textured(c.background)) {
+				std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
+				ImGui::Text(tex.c_str());
+				ImGui::SameLine();
+				if(ImGui::Button("Change")) {
+					auto new_file = fs::pick_existing_file(L"");
+					//auto breakpt = new_file.find_last_of(L'\\');
+					//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+					c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					c.ogl_texture.unload();
+				}
+				ImGui::Checkbox("Has alternate background", &(c.has_alternate_bg));
+				if(c.has_alternate_bg) {
+					std::string tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change Alternate")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+				}
+			} else if(c.background == background_type::progress_bar) {
+				std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
+				ImGui::Text(tex.c_str());
+				ImGui::SameLine();
+				if(ImGui::Button("Change")) {
+					auto new_file = fs::pick_existing_file(L"");
+					//auto breakpt = new_file.find_last_of(L'\\');
+					//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+					c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					c.ogl_texture.unload();
+				}
+
+				tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
+				ImGui::Text(tex.c_str());
+				ImGui::SameLine();
+				if(ImGui::Button("Change Alternate")) {
+					auto new_file = fs::pick_existing_file(L"");
+					//auto breakpt = new_file.find_last_of(L'\\');
+					//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+					c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+				}
+			} else if(c.background == background_type::linechart) {
+				temp = c.datapoints;
+				ImGui::InputInt("Data points", &temp);
+				c.datapoints = int16_t(temp);
+				{
+					ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
+					ImGui::ColorEdit4("line color", (float*)&ccolor);
+					c.other_color.r = ccolor.x;
+					c.other_color.g = ccolor.y;
+					c.other_color.b = ccolor.z;
+					c.other_color.a = ccolor.w;
+				}
+			} else if(c.background == background_type::stackedbarchart) {
+				temp = c.datapoints;
+				ImGui::InputInt("Data points", &temp);
+				c.datapoints = int16_t(temp);
+
+				ImGui::InputText("Data key", &c.list_content);
+				ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+			} else if(c.background == background_type::doughnut) {
+				temp = c.datapoints;
+				ImGui::InputInt("Data points", &temp);
+				c.datapoints = int16_t(temp);
+
+				ImGui::InputText("Data key", &c.list_content);
+				ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+			} else if(c.background == background_type::colorsquare) {
+				{
+					ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
+					ImGui::ColorEdit4("Default color", (float*)&ccolor);
+					c.other_color.r = ccolor.x;
+					c.other_color.g = ccolor.y;
+					c.other_color.b = ccolor.z;
+					c.other_color.a = ccolor.w;
+				}
+			}
+			if(c.background == background_type::bordered_texture) {
+				temp = c.border_size;
+				ImGui::InputInt("Border size", &temp);
+				c.border_size = int16_t(std::max(0, temp));
+			}
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			{
+				const char* items[] = { "none", "list", "grid", "table" };
+				temp = int32_t(c.container_type);
+				ImGui::Combo("Act as container", &temp, items, 4);
+				c.container_type = container_type(temp);
+			}
+
+			if(c.container_type == container_type::none) {
+				ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+				if(!c.dynamic_text) {
+					ImGui::InputText("Text key", &(c.text_key));
+				}
+				ImGui::InputFloat("Text scale", &(c.text_scale));
+				c.text_scale = std::max(0.01f, c.text_scale);
+
+				{
+					const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+					temp = int32_t(c.text_color);
+					ImGui::Combo("Text color", &temp, items, 16);
+					c.text_color = text_color(temp);
+				}
+				{
+					const char* items[] = { "body", "header" };
+					temp = int32_t(c.text_type);
+					ImGui::Combo("Text style", &temp, items, 2);
+					c.text_type = text_type(temp);
+				}
+				{
+					const char* items[] = { "left (leading)", "right (trailing)", "center" };
+					temp = int32_t(c.text_align);
+					ImGui::Combo("Text alignment", &temp, items, 3);
+					c.text_align = aui_text_alignment(temp);
+				}
+
+				ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+				if(!c.dynamic_tooltip) {
+					ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+				}
+				ImGui::Checkbox("Can be disabled", &(c.can_disable));
+				ImGui::Checkbox("Left-click action", &(c.left_click_action));
+				ImGui::Checkbox("Right-click action", &(c.right_click_action));
+				ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+				if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+					ImGui::InputText("Hotkey", &(c.hotkey));
+				}
+				ImGui::Checkbox("Hover activation", &(c.hover_activation));
+			} else { // container only
+				{
+					const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
+					temp = int32_t(c.animation_type);
+					ImGui::Combo("Animation", &temp, items, 4);
+					c.animation_type = animation_type(temp);
+				}
+
+				if(c.container_type == container_type::list || c.container_type == container_type::grid) {
+					ImGui::InputText("Child window", &(c.child_window));
+					ImGui::InputText("List content", &(c.list_content));
+				} else if(c.container_type == container_type::table) {
+					ImGui::InputText("Table content", &(c.list_content));
+
+					ImGui::Checkbox("Highlight contents following mouse", &(c.has_table_highlight_color));
+					if(c.has_table_highlight_color) {
+						ImVec4 ccolor{ c.table_highlight_color.r, c.table_highlight_color.g, c.table_highlight_color.b, c.table_highlight_color.a };
+						ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
+						c.table_highlight_color.r = ccolor.x;
+						c.table_highlight_color.g = ccolor.y;
+						c.table_highlight_color.b = ccolor.z;
+						c.table_highlight_color.a = ccolor.w;
+					}
+
+					std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change asc icon")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+
+					tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change des icon")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+
+					{
+						ImVec4 ccolor{ c.table_divider_color.r, c.table_divider_color.b, c.table_divider_color.g, 0.0f };
+						ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
+						c.table_divider_color.r = ccolor.x;
+						c.table_divider_color.g = ccolor.z;
+						c.table_divider_color.b = ccolor.y;
+					}
+
+					ImGui::InputFloat("Row height (in grid cells)", &(c.row_height));
+					c.row_height = std::max(0.1f, c.row_height);
+
+					tex = "Row default background: " + (c.row_background_a.size() > 0 ? c.row_background_a : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change row bg")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.row_background_a = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.row_background_a = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+
+					tex = "Row alternate background: " + (c.row_background_b.size() > 0 ? c.row_background_b : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change row alt")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.row_background_b = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.row_background_b = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+
+					ImGui::Checkbox("Per-section table headers", &(c.table_has_per_section_headers));
+
+					ImGui::Text("Inserts");
+					for(uint32_t k = 0; k < c.table_inserts.size(); ++k) {
+						ImGui::PushID(int32_t(k));
+						ImGui::Indent();
+						ImGui::InputText("Container name", &(c.table_inserts[k]));
+						ImGui::SameLine();
+						if(ImGui::Button("Delete insert")) {
+							c.members.erase(c.members.begin() + k);
+						}
+						ImGui::Unindent();
+						ImGui::PopID();
+					}
+					if(ImGui::Button("Add insert")) {
+						c.table_inserts.emplace_back();
+					}
+
+					ImGui::Text("Columns");
+					for(uint32_t k = 0; k < c.table_columns.size(); ++k) {
+						ImGui::PushID(int32_t(k));
+						ImGui::Indent();
+						if(k > 0) {
+							ImGui::Text("-------");
+						}
+						ImGui::InputText("Column name", &(c.table_columns[k].internal_data.column_name));
+
+						if(ImGui::Button("Delete")) {
+							c.table_columns.erase(c.table_columns.begin() + k);
+							ImGui::Unindent();
+							ImGui::PopID();
+							break;
+						}
+						if(k > 0) {
+							ImGui::SameLine();
+							if(ImGui::Button("Move left")) {
+								std::swap(c.table_columns[k - 1], c.table_columns[k]);
+							}
+						}
+						if(k + 1 < c.table_columns.size()) {
+							ImGui::SameLine();
+							if(ImGui::Button("Move right")) {
+								std::swap(c.table_columns[k + 1], c.table_columns[k]);
+							}
+						}
+
+						temp = c.table_columns[k].display_data.width;
+						ImGui::InputInt("Column width", &temp);
+						c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
+
+						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
+						ImGui::Checkbox("Spacer column", &is_spacer);
+						c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
+
+
+						if(is_spacer == false) {
+							{
+								const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+								temp = int32_t(c.table_columns[k].display_data.cell_text_color);
+								ImGui::Combo("Cell text color", &temp, items, 16);
+								c.table_columns[k].display_data.cell_text_color = text_color(temp);
+							}
+
+							{
+								const char* items[] = { "left (leading)", "right (trailing)", "center" };
+								temp = int32_t(c.table_columns[k].display_data.text_alignment);
+								ImGui::Combo("Cell text alignment", &temp, items, 3);
+								c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
+							}
+
+							{
+								const char* items[] = { "left (leading)", "right (trailing)", "none" };
+								temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
+								ImGui::Combo("Decimal alignment", &temp, items, 3);
+								c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
+							}
+
+							ImGui::Checkbox("Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
+							if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
+								ImGui::InputText("Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
+							}
+
+							ImGui::Checkbox("Column is sortable", &(c.table_columns[k].internal_data.sortable));
+
+							ImGui::InputText("Header key", &(c.table_columns[k].display_data.header_key));
+
+							ImGui::Checkbox("Header has background", &(c.table_columns[k].internal_data.header_background));
+							if(c.table_columns[k].internal_data.header_background) {
+								std::string tex = "Header background: " + (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
+								ImGui::Text(tex.c_str());
+								ImGui::SameLine();
+								if(ImGui::Button("Change row alt")) {
+									auto new_file = fs::pick_existing_file(L"");
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+								}
+							}
+
+							{
+								const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+								temp = int32_t(c.table_columns[k].display_data.header_text_color);
+								ImGui::Combo("Header text color", &temp, items, 16);
+								c.table_columns[k].display_data.header_text_color = text_color(temp);
+							}
+
+							ImGui::Checkbox("Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
+							if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
+								ImGui::InputText("Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
+							}
+						}
+
+						ImGui::Unindent();
+						ImGui::PopID();
+					}
+
+					if(ImGui::Button("Add column")) {
+						c.table_columns.emplace_back();
+					}
+				}
+			}
+
+			ImGui::Checkbox("Ignore rtl flip", &(c.ignore_rtl));
+
+			if(is_lua_element(c)) {
+				ImGui::EndDisabled();
+			}
+
+		}break;
+	}
+
+	ImGui::Text("Member Variables");
+	if(c.members.empty()) {
+		ImGui::Text("[none]");
+	} else {
+		for(uint32_t k = 0; k < c.members.size(); ++k) {
+			ImGui::PushID(int32_t(k));
+			ImGui::Indent();
+			ImGui::InputText("Type", &(c.members[k].type));
+			ImGui::InputText("Name", &(c.members[k].name));
+			if(ImGui::Button("Delete")) {
+				c.members.erase(c.members.begin() + k);
+			}
+			ImGui::Unindent();
+			ImGui::PopID();
+		}
+	}
+	if(ImGui::Button("Add Member Variable")) {
+		c.members.emplace_back();
+	}
+
+}
+
 auto base_tree_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_DrawLinesFull;
 
 std::string produce_label(layout_item& m) {
 	if(std::holds_alternative< layout_control_t>(m)) {
 		auto& i = std::get<layout_control_t>(m);
-		return "\uED1E\u2003" + i.name;
+		return (char const*)(u8"\uED1E control: ") + i.name;
 	} else if(std::holds_alternative<layout_window_t>(m)) {
 		auto& i = std::get<layout_window_t>(m);
-		return "\uE8A7\u2003" + i.name;
+		return (char const*)(u8"\uE8A7 window: ") + i.name;
 	} else if(std::holds_alternative<layout_glue_t>(m)) {
 		auto& i = std::get<layout_glue_t>(m);
-		std::string label = "\uE75D\u2003";
+		std::string label = (char const*)(u8"\uE75D glue: ");
 		label += glue_names[int32_t(i.type)];
 		label += " " + std::to_string(i.amount);
 		return label;
 	} else if (std::holds_alternative<texture_layer_t>(m)) {
 		auto& i = std::get<texture_layer_t>(m);
 		std::string label = texture_layer_names[retrieve_texture_layer_type(i.texture_type)];
-		label = "\uE8B9\u2003" + label + " ";
+		label = (char const*)(u8"\uE8B9 texture layer: ") + label + " ";
 		label += i.texture;
 		return label;
 	} else if(std::holds_alternative<generator_t>(m)) {
 		auto& i = std::get<generator_t>(m);
 
-		std::string label = "\uE8EE\u2003";
+		std::string label = (char const*)(u8"\uE8EE generator: ");
 		label += i.name;
 
 		return label;
@@ -1650,13 +2507,14 @@ std::string produce_label(layout_item& m) {
 		auto& i = std::get<sub_layout_t>(m);
 		std::string label = "(";
 		if (!(i.layout->open_in_ui)) {
-			label = "\uED41 " + label;
+			label = (char const*)(u8"\uED41 sub-layout: ") + label;
 		} else {
-			label = "\uED43 " + label;
+			label = (char const*)(u8"\uED43 sub-layout: ") + label;
 		}
 		label += std::to_string(i.layout->contents.size()) + ")###SUBLAYOUT";
 		return label;
 	}
+	return "";
 }
 
 struct tree_location {
@@ -1802,7 +2660,7 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 void imgui_layout_contents(layout_level_t& root, layout_level_t& layout, std::vector<size_t> path) {
 	bool root_expanded = true;
 	if (path.size() == 0) {
-		root_expanded = ImGui::TreeNodeEx("\uEC4E", base_tree_flags);
+		root_expanded = ImGui::TreeNodeEx((char const*)(u8"\uEC4E"), base_tree_flags);
 		if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
 			path_to_selected_layout = {};
 			current_edit_target = edit_targets::layout_sublayout;
@@ -2170,12 +3028,32 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						auto breakpt = new_file.find_last_of(L'\\');
 						auto rem = new_file.substr(breakpt + 1);
 						auto ext_pos = rem.find_last_of(L'.');
-						fs::file loaded_file{ new_file };
-						serialization::in_buffer file_content{ loaded_file.content().data, loaded_file.content().file_size };
-						open_project = bytes_to_project(file_content);
-						open_project.project_name = rem.substr(0, ext_pos);
-						open_project.project_directory = new_file.substr(0, breakpt + 1);
-						switch_to_window(0);
+						{
+							fs::file loaded_file{ new_file };
+							serialization::in_buffer file_content{ loaded_file.content().data, loaded_file.content().file_size };
+							open_project = bytes_to_project(file_content);
+							open_project.project_name = rem.substr(0, ext_pos);
+							open_project.project_directory = new_file.substr(0, breakpt + 1);
+							switch_to_window(0);
+						}
+
+						{
+							fs::file loaded_file{ open_project.project_directory + L"the.tui" };
+							serialization::in_buffer file_content{ loaded_file.content().data, loaded_file.content().file_size };
+							open_templates = template_project::bytes_to_project(file_content);
+							open_templates.project_name = rem.substr(0, ext_pos);
+							open_templates.project_directory = open_project.project_directory;
+							asvg::common_file_bank::bank.root_directory = open_templates.project_directory + open_templates.svg_directory;
+
+							for(auto& i : open_templates.icons) {
+								fs::file loaded_file{ open_templates.project_directory + open_templates.svg_directory + fs::utf8_to_native(i.file_name) };
+								i.renders = asvg::simple_svg(loaded_file.content().data, size_t(loaded_file.content().file_size));
+							}
+							for(auto& b : open_templates.backgrounds) {
+								fs::file loaded_file{ open_templates.project_directory + open_templates.svg_directory + fs::utf8_to_native(b.file_name) };
+								b.renders = asvg::svg(loaded_file.content().data, size_t(loaded_file.content().file_size), b.base_x, b.base_y);
+							}
+						}
 					}
 				}
 
@@ -2409,45 +3287,66 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 					ImGui::Checkbox("Ignore grid", &(open_project.windows[selected_window].wrapped.no_grid));
 
+					{
+						int32_t combo_selection = open_project.windows[selected_window].wrapped.template_id + 1;
+						std::vector<char const*> options;
+						options.push_back("--None--");
+
+						for(auto& c : open_templates.window_t) {
+							options.push_back(c.display_name.c_str());
+						}
+
+						if(ImGui::Combo("Window template", &combo_selection, options.data(), int32_t(options.size()))) {
+							open_project.windows[selected_window].wrapped.template_id = combo_selection - 1;
+						}
+					}
+
 					auto i = selected_window;
 
-					{
+					if(open_project.windows[selected_window].wrapped.template_id != -1) {
+						if(open_templates.window_t[open_project.windows[selected_window].wrapped.template_id].close_button_definition != -1)
+							ImGui::Checkbox("Add close button", &(open_project.windows[selected_window].wrapped.auto_close_button));
+					}
+
+					if(open_project.windows[selected_window].wrapped.template_id == -1) {
 						const char* items[] = { "none", "texture", "bordered texture", "legacy GFX" };
 						temp = int32_t(open_project.windows[i].wrapped.background);
 						ImGui::Combo("Background", &temp, items, 4);
 						open_project.windows[i].wrapped.background = background_type(temp);
 					}
 
-					if(open_project.windows[selected_window].wrapped.background == background_type::existing_gfx) {
-						ImGui::InputText("Texture", &(open_project.windows[i].wrapped.texture));
-					} else if(open_project.windows[i].wrapped.background != background_type::none) {
-						std::string tex = "Texture: " + (open_project.windows[i].wrapped.texture.size() > 0 ? open_project.windows[i].wrapped.texture : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							open_project.windows[i].wrapped.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							open_project.windows[i].wrapped.ogl_texture.unload();
-						}
-						ImGui::Checkbox("Has alternate background", &(open_project.windows[i].wrapped.has_alternate_bg));
-						if(open_project.windows[selected_window].wrapped.has_alternate_bg) {
-							std::string tex = "Alternate texture: " + (open_project.windows[i].wrapped.alternate_bg.size() > 0 ? open_project.windows[i].wrapped.alternate_bg : std::string("[none]"));
+					if(open_project.windows[selected_window].wrapped.template_id == -1) {
+						if(open_project.windows[selected_window].wrapped.background == background_type::existing_gfx) {
+							ImGui::InputText("Texture", &(open_project.windows[i].wrapped.texture));
+						} else if(open_project.windows[i].wrapped.background != background_type::none) {
+							std::string tex = "Texture: " + (open_project.windows[i].wrapped.texture.size() > 0 ? open_project.windows[i].wrapped.texture : std::string("[none]"));
 							ImGui::Text(tex.c_str());
 							ImGui::SameLine();
-							if(ImGui::Button("Change Alternate")) {
+							if(ImGui::Button("Change")) {
 								auto new_file = fs::pick_existing_file(L"");
 								//auto breakpt = new_file.find_last_of(L'\\');
-								//open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
-								open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+								//open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
+								open_project.windows[i].wrapped.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+								open_project.windows[i].wrapped.ogl_texture.unload();
+							}
+							ImGui::Checkbox("Has alternate background", &(open_project.windows[i].wrapped.has_alternate_bg));
+							if(open_project.windows[selected_window].wrapped.has_alternate_bg) {
+								std::string tex = "Alternate texture: " + (open_project.windows[i].wrapped.alternate_bg.size() > 0 ? open_project.windows[i].wrapped.alternate_bg : std::string("[none]"));
+								ImGui::Text(tex.c_str());
+								ImGui::SameLine();
+								if(ImGui::Button("Change Alternate")) {
+									auto new_file = fs::pick_existing_file(L"");
+									//auto breakpt = new_file.find_last_of(L'\\');
+									//open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
+									open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+								}
 							}
 						}
-					}
-					if(open_project.windows[selected_window].wrapped.background == background_type::bordered_texture) {
-						temp = open_project.windows[selected_window].wrapped.border_size;
-						ImGui::InputInt("Border size", &temp);
-						open_project.windows[selected_window].wrapped.border_size = int16_t(std::max(0, temp));
+						if(open_project.windows[selected_window].wrapped.background == background_type::bordered_texture) {
+							temp = open_project.windows[selected_window].wrapped.border_size;
+							ImGui::InputInt("Border size", &temp);
+							open_project.windows[selected_window].wrapped.border_size = int16_t(std::max(0, temp));
+						}
 					}
 					ImGui::Checkbox("Share table highlight", &(open_project.windows[selected_window].wrapped.share_table_highlight));
 					if(open_project.windows[i].wrapped.share_table_highlight) {
@@ -2517,7 +3416,119 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						open_project.windows[i].wrapped.members.emplace_back();
 					}
 
-					{
+					if(open_project.windows[selected_window].wrapped.template_id != -1) {
+						bool has_alt_list = (open_project.windows[selected_window].alternates.empty() == false);
+						if(ImGui::Checkbox("Has alternate template set", &has_alt_list)) {
+							if(has_alt_list && open_project.windows[selected_window].alternates.empty()) {
+								open_project.windows[selected_window].alternates.push_back(template_alternate{ "", -1 });
+							}
+							if(!has_alt_list) {
+								open_project.windows[selected_window].alternates.clear();
+							}
+						}
+						if(has_alt_list) {
+							auto get_alt_id = [&](std::string_view s) {
+								for(auto& alt : open_project.windows[selected_window].alternates) {
+									if(alt.control_name == s)
+										return alt.tempalte_id;
+								}
+								return -1;
+							};
+							auto set_alt_id = [&](std::string_view s, int32_t id) {
+								for(auto& alt : open_project.windows[selected_window].alternates) {
+									if(alt.control_name == s) {
+										alt.tempalte_id = id;
+										return;
+									}
+								}
+								open_project.windows[selected_window].alternates.push_back(template_alternate{ std::string(s), id });
+							};
+							{
+								std::vector<char const*> inner_opts;
+								inner_opts.push_back("--Don't change--");
+								for(auto& i : open_templates.window_t) {
+									inner_opts.push_back(i.display_name.c_str());
+								}
+								int32_t chosen = get_alt_id("") + 1;
+								if(ImGui::Combo("Alternate window template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+									set_alt_id("", chosen - 1);
+								}
+							}
+							for(auto& c : open_project.windows[selected_window].children) {
+								switch(c.ttype) {
+									case template_project::template_type::none:
+										break;
+									case template_project::template_type::label:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.label_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::button:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.button_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::iconic_button:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.iconic_button_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::mixed_button:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.mixed_button_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::progress_bar:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.progress_bar_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+								}
+							}
+						}
+					}
+
+					if(open_project.windows[selected_window].wrapped.template_id == -1) {
 						std::string tex = "Page left: " + (open_project.windows[i].wrapped.page_left_texture.size() > 0 ? open_project.windows[i].wrapped.page_left_texture : std::string("[none]"));
 						ImGui::Text(tex.c_str());
 						ImGui::SameLine();
@@ -2528,7 +3539,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 						}
 					}
-					{
+					if(open_project.windows[selected_window].wrapped.template_id == -1) {
 						std::string tex = "Page right: " + (open_project.windows[i].wrapped.page_right_texture.size() > 0 ? open_project.windows[i].wrapped.page_right_texture : std::string("[none]"));
 						ImGui::Text(tex.c_str());
 						ImGui::SameLine();
@@ -2539,7 +3550,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
 						}
 					}
-					{
+					if(open_project.windows[selected_window].wrapped.template_id == -1) {
 						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
 						temp = int32_t(open_project.windows[i].wrapped.page_text_color);
 						ImGui::Combo("Page number text color", &temp, items, 16);
@@ -2557,472 +3568,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				auto& win = open_project.windows[selected_window];
 				auto& c = win.children[selected_control];
 
+				control_options(win, c);
 
-
-				if(ImGui::Button("Delete")) {
-					win.children.erase(win.children.begin() + selected_control);
-					selected_control = -1;
-				} else {
-					ImGui::SameLine();
-					if(ImGui::Button("Copy")) {
-						win.children.push_back(win.children[selected_control]);
-						win.children.back().name += "_copy";
-					}
-
-					ImGui::InputText("Name", &(c.temp_name));
-					ImGui::SameLine();
-					if(ImGui::Button("Change Name")) {
-						if(c.temp_name.empty()) {
-							MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
-						} else {
-							bool found = false;
-							for(auto& w : win.children) {
-								if(w.name == c.temp_name) {
-									found = true;
-									break;
-								}
-							}
-							if(found) {
-								MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
-							} else {
-								rename_control(win.layout, c.name, c.temp_name);
-								c.name = c.temp_name;
-							}
-						}
-					}
-
-					ImGui::Text("Lua elements allow to add dynamic elements without generation and recompilation of c++ code. Current supports only a subset of features.");
-					ImGui::Checkbox("Lua", &(c.is_lua));
-
-					int32_t temp = 0;
-
-					temp = c.x_size;
-					ImGui::InputInt("Width", &temp);
-					c.x_size = int16_t(std::max(0, temp));
-
-					temp = c.y_size;
-					ImGui::InputInt("Height", &temp);
-					c.y_size = int16_t(std::max(0, temp));
-
-					ImVec4 ccolor{ c.rectangle_color.r, c.rectangle_color.b, c.rectangle_color.g, 1.0f };
-					ImGui::ColorEdit3("Outline color", (float*)&ccolor);
-					c.rectangle_color.r = ccolor.x;
-					c.rectangle_color.g = ccolor.z;
-					c.rectangle_color.b = ccolor.y;
-
-					ImGui::Checkbox("Ignore grid", &(c.no_grid));
-
-					if (is_lua_element(c)) {
-						c.dynamic_tooltip = false;
-						ImGui::InputText("Tooltip key##lua_tooltip_key", &(c.tooltip_text_key));
-						ImGui::InputText("On update function", &(c.text_key));
-						{
-							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-							temp = int32_t(c.text_color);
-							ImGui::Combo("Text color#lua_text_color", &temp, items, 16);
-							c.text_color = text_color(temp);
-						}
-						{
-							const char* items[] = { "body", "header" };
-							temp = int32_t(c.text_type);
-							ImGui::Combo("Text style#lua_text_style", &temp, items, 2);
-							c.text_type = text_type(temp);
-						}
-						{
-							const char* items[] = { "left (leading)", "right (trailing)", "center" };
-							temp = int32_t(c.text_align);
-							ImGui::Combo("Text alignment#lua_text_align", &temp, items, 3);
-							c.text_align = aui_text_alignment(temp);
-						}
-					}
-
-					if (is_lua_element(c)) {
-						ImGui::BeginDisabled();
-					}
-
-					{
-						const char* items[] = { "none", "texture", "bordered texture", "legacy GFX", "line chart", "stacked bar chart", "solid color", "flag", "table columns", "table headers", "progress bar", "icon strip", "doughnut", "border repeat", "corners" };
-						temp = int32_t(c.background);
-						ImGui::Combo("Background", &temp, items, 15);
-						c.background = background_type(temp);
-					}
-
-					if(c.background == background_type::table_columns || c.background == background_type::table_headers) {
-						std::vector<char const*> table_names;
-						table_names.push_back("[none]");
-						int32_t selection = (c.table_connection == "" ? 0 : -1);
-						for(auto& tc : open_project.tables) {
-							table_names.push_back(tc.name.c_str());
-							if(tc.name == c.table_connection) {
-								selection = int32_t(table_names.size() - 1);
-							}
-						}
-
-						temp = selection;
-						ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
-						if(temp != selection) {
-							if(selection == 0)
-								c.table_connection = "";
-							else
-								c.table_connection = open_project.tables[selection - 1].name;
-						}
-					} else if(c.background == background_type::existing_gfx) {
-						ImGui::InputText("Texture", &(c.texture));
-					} else if(background_type_is_textured(c.background)) {
-						std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							c.ogl_texture.unload();
-						}
-						ImGui::Checkbox("Has alternate background", &(c.has_alternate_bg));
-						if(c.has_alternate_bg) {
-							std::string tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
-							ImGui::Text(tex.c_str());
-							ImGui::SameLine();
-							if(ImGui::Button("Change Alternate")) {
-								auto new_file = fs::pick_existing_file(L"");
-								//auto breakpt = new_file.find_last_of(L'\\');
-								//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
-								c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							}
-						}
-					} else if(c.background == background_type::progress_bar) {
-						std::string tex = "Texture: " + (c.texture.size() > 0 ? c.texture : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							c.ogl_texture.unload();
-						}
-
-						tex = "Alternate texture: " + (c.alternate_bg.size() > 0 ? c.alternate_bg : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change Alternate")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//c.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							c.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						}
-					} else if(c.background == background_type::linechart) {
-						temp = c.datapoints;
-						ImGui::InputInt("Data points", &temp);
-						c.datapoints = int16_t(temp);
-						{
-							ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
-							ImGui::ColorEdit4("line color", (float*)&ccolor);
-							c.other_color.r = ccolor.x;
-							c.other_color.g = ccolor.y;
-							c.other_color.b = ccolor.z;
-							c.other_color.a = ccolor.w;
-						}
-					} else if(c.background == background_type::stackedbarchart) {
-						temp = c.datapoints;
-						ImGui::InputInt("Data points", &temp);
-						c.datapoints = int16_t(temp);
-
-						ImGui::InputText("Data key", &c.list_content);
-						ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
-					} else if(c.background == background_type::doughnut) {
-						temp = c.datapoints;
-						ImGui::InputInt("Data points", &temp);
-						c.datapoints = int16_t(temp);
-
-						ImGui::InputText("Data key", &c.list_content);
-						ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
-					} else if(c.background == background_type::colorsquare) {
-						{
-							ImVec4 ccolor{ c.other_color.r, c.other_color.g, c.other_color.b, c.other_color.a };
-							ImGui::ColorEdit4("Default color", (float*)&ccolor);
-							c.other_color.r = ccolor.x;
-							c.other_color.g = ccolor.y;
-							c.other_color.b = ccolor.z;
-							c.other_color.a = ccolor.w;
-						}
-					}
-					if(c.background == background_type::bordered_texture) {
-						temp = c.border_size;
-						ImGui::InputInt("Border size", &temp);
-						c.border_size = int16_t(std::max(0, temp));
-					}
-					ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
-					{
-						const char* items[] = { "none", "list", "grid", "table" };
-						temp = int32_t(c.container_type);
-						ImGui::Combo("Act as container", &temp, items, 4);
-						c.container_type = container_type(temp);
-					}
-
-					if(c.container_type == container_type::none) {
-						ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
-						if(!c.dynamic_text) {
-							ImGui::InputText("Text key", &(c.text_key));
-						}
-						ImGui::InputFloat("Text scale", &(c.text_scale));
-						c.text_scale = std::max(0.01f, c.text_scale);
-
-						{
-							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-							temp = int32_t(c.text_color);
-							ImGui::Combo("Text color", &temp, items, 16);
-							c.text_color = text_color(temp);
-						}
-						{
-							const char* items[] = { "body", "header" };
-							temp = int32_t(c.text_type);
-							ImGui::Combo("Text style", &temp, items, 2);
-							c.text_type = text_type(temp);
-						}
-						{
-							const char* items[] = { "left (leading)", "right (trailing)", "center" };
-							temp = int32_t(c.text_align);
-							ImGui::Combo("Text alignment", &temp, items, 3);
-							c.text_align = aui_text_alignment(temp);
-						}
-
-						ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
-						if(!c.dynamic_tooltip) {
-							ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
-						}
-						ImGui::Checkbox("Can be disabled", &(c.can_disable));
-						ImGui::Checkbox("Left-click action", &(c.left_click_action));
-						ImGui::Checkbox("Right-click action", &(c.right_click_action));
-						ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
-						if(c.left_click_action || c.right_click_action || c.shift_click_action) {
-							ImGui::InputText("Hotkey", &(c.hotkey));
-						}
-						ImGui::Checkbox("Hover activation", &(c.hover_activation));
-					} else { // container only
-						{
-							const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
-							temp = int32_t(c.animation_type);
-							ImGui::Combo("Animation", &temp, items, 4);
-							c.animation_type = animation_type(temp);
-						}
-
-						if(c.container_type == container_type::list || c.container_type == container_type::grid) {
-							ImGui::InputText("Child window", &(c.child_window));
-							ImGui::InputText("List content", &(c.list_content));
-						} else if(c.container_type == container_type::table) {
-							ImGui::InputText("Table content", &(c.list_content));
-
-							ImGui::Checkbox("Highlight contents following mouse", &(c.has_table_highlight_color));
-							if(c.has_table_highlight_color) {
-								ImVec4 ccolor{ c.table_highlight_color.r, c.table_highlight_color.g, c.table_highlight_color.b, c.table_highlight_color.a };
-								ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
-								c.table_highlight_color.r = ccolor.x;
-								c.table_highlight_color.g = ccolor.y;
-								c.table_highlight_color.b = ccolor.z;
-								c.table_highlight_color.a = ccolor.w;
-							}
-
-							std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
-							ImGui::Text(tex.c_str());
-							ImGui::SameLine();
-							if(ImGui::Button("Change asc icon")) {
-								auto new_file = fs::pick_existing_file(L"");
-								//auto breakpt = new_file.find_last_of(L'\\');
-								//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-								c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							}
-
-							tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
-							ImGui::Text(tex.c_str());
-							ImGui::SameLine();
-							if(ImGui::Button("Change des icon")) {
-								auto new_file = fs::pick_existing_file(L"");
-								//auto breakpt = new_file.find_last_of(L'\\');
-								//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-								c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							}
-
-							{
-								ImVec4 ccolor{ c.table_divider_color.r, c.table_divider_color.b, c.table_divider_color.g, 0.0f };
-								ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
-								c.table_divider_color.r = ccolor.x;
-								c.table_divider_color.g = ccolor.z;
-								c.table_divider_color.b = ccolor.y;
-							}
-
-							ImGui::InputFloat("Row height (in grid cells)", &(c.row_height));
-							c.row_height = std::max(0.1f, c.row_height);
-
-							tex = "Row default background: " + (c.row_background_a.size() > 0 ? c.row_background_a : std::string("[none]"));
-							ImGui::Text(tex.c_str());
-							ImGui::SameLine();
-							if(ImGui::Button("Change row bg")) {
-								auto new_file = fs::pick_existing_file(L"");
-								//auto breakpt = new_file.find_last_of(L'\\');
-								//c.row_background_a = fs::native_to_utf8(new_file.substr(breakpt + 1));
-								c.row_background_a = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							}
-
-							tex = "Row alternate background: " + (c.row_background_b.size() > 0 ? c.row_background_b : std::string("[none]"));
-							ImGui::Text(tex.c_str());
-							ImGui::SameLine();
-							if(ImGui::Button("Change row alt")) {
-								auto new_file = fs::pick_existing_file(L"");
-								//auto breakpt = new_file.find_last_of(L'\\');
-								//c.row_background_b = fs::native_to_utf8(new_file.substr(breakpt + 1));
-								c.row_background_b = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-							}
-
-							ImGui::Checkbox("Per-section table headers", &(c.table_has_per_section_headers));
-
-							ImGui::Text("Inserts");
-							for(uint32_t k = 0; k < c.table_inserts.size(); ++k) {
-								ImGui::PushID(int32_t(k));
-								ImGui::Indent();
-								ImGui::InputText("Container name", &(c.table_inserts[k]));
-								ImGui::SameLine();
-								if(ImGui::Button("Delete insert")) {
-									c.members.erase(c.members.begin() + k);
-								}
-								ImGui::Unindent();
-								ImGui::PopID();
-							}
-							if(ImGui::Button("Add insert")) {
-								c.table_inserts.emplace_back();
-							}
-
-							ImGui::Text("Columns");
-							for(uint32_t k = 0; k < c.table_columns.size(); ++k) {
-								ImGui::PushID(int32_t(k));
-								ImGui::Indent();
-								if(k > 0) {
-									ImGui::Text("-------");
-								}
-								ImGui::InputText("Column name", &(c.table_columns[k].internal_data.column_name));
-
-								if(ImGui::Button("Delete")) {
-									c.table_columns.erase(c.table_columns.begin() + k);
-									ImGui::Unindent();
-									ImGui::PopID();
-									break;
-								}
-								if(k > 0) {
-									ImGui::SameLine();
-									if(ImGui::Button("Move left")) {
-										std::swap(c.table_columns[k- 1], c.table_columns[k]);
-									}
-								}
-								if(k+ 1 < c.table_columns.size()) {
-									ImGui::SameLine();
-									if(ImGui::Button("Move right")) {
-										std::swap(c.table_columns[k + 1], c.table_columns[k]);
-									}
-								}
-
-								temp = c.table_columns[k].display_data.width;
-								ImGui::InputInt("Column width", &temp);
-								c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
-
-								bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-								ImGui::Checkbox("Spacer column", &is_spacer);
-								c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
-
-
-								if(is_spacer == false) {
-									{
-										const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-										temp = int32_t(c.table_columns[k].display_data.cell_text_color);
-										ImGui::Combo("Cell text color", &temp, items, 16);
-										c.table_columns[k].display_data.cell_text_color = text_color(temp);
-									}
-
-									{
-										const char* items[] = { "left (leading)", "right (trailing)", "center" };
-										temp = int32_t(c.table_columns[k].display_data.text_alignment);
-										ImGui::Combo("Cell text alignment", &temp, items, 3);
-										c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
-									}
-
-									{
-										const char* items[] = { "left (leading)", "right (trailing)", "none" };
-										temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
-										ImGui::Combo("Decimal alignment", &temp, items, 3);
-										c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
-									}
-
-									ImGui::Checkbox("Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
-									if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
-										ImGui::InputText("Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
-									}
-
-									ImGui::Checkbox("Column is sortable", &(c.table_columns[k].internal_data.sortable));
-
-									ImGui::InputText("Header key", &(c.table_columns[k].display_data.header_key));
-
-									ImGui::Checkbox("Header has background", &(c.table_columns[k].internal_data.header_background));
-									if(c.table_columns[k].internal_data.header_background) {
-										std::string tex = "Header background: " + (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
-										ImGui::Text(tex.c_str());
-										ImGui::SameLine();
-										if(ImGui::Button("Change row alt")) {
-											auto new_file = fs::pick_existing_file(L"");
-											//auto breakpt = new_file.find_last_of(L'\\');
-											//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-											c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-										}
-									}
-
-									{
-										const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-										temp = int32_t(c.table_columns[k].display_data.header_text_color);
-										ImGui::Combo("Header text color", &temp, items, 16);
-										c.table_columns[k].display_data.header_text_color = text_color(temp);
-									}
-
-									ImGui::Checkbox("Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
-									if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
-										ImGui::InputText("Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
-									}
-								}
-
-								ImGui::Unindent();
-								ImGui::PopID();
-							}
-
-							if(ImGui::Button("Add column")) {
-								c.table_columns.emplace_back();
-							}
-						}
-					}
-
-					ImGui::Checkbox("Ignore rtl flip", &(c.ignore_rtl));
-
-					ImGui::Text("Member Variables");
-					if(c.members.empty()) {
-						ImGui::Text("[none]");
-					} else {
-						for(uint32_t k = 0; k < c.members.size(); ++k) {
-							ImGui::PushID(int32_t(k));
-							ImGui::Indent();
-							ImGui::InputText("Type", &(c.members[k].type));
-							ImGui::InputText("Name", &(c.members[k].name));
-							if(ImGui::Button("Delete")) {
-								c.members.erase(c.members.begin() + k);
-							}
-							ImGui::Unindent();
-							ImGui::PopID();
-						}
-					}
-					if(ImGui::Button("Add Member Variable")) {
-						c.members.emplace_back();
-					}
-
-					if (is_lua_element(c)) {
-						ImGui::EndDisabled();
-					}
-				}
 			}
 
 			if (
@@ -3339,6 +3886,18 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				temp = selected_layout->margin_right;
 				ImGui::InputInt("Right margin", &temp);
 				selected_layout->margin_right = int16_t(temp);
+
+				{
+					std::vector<char const*> inner_opts;
+					inner_opts.push_back("Default");
+					for(auto& i : open_templates.layout_region_t) {
+						inner_opts.push_back(i.display_name.c_str());
+					}
+					int32_t chosen = selected_layout->template_id + 1;
+					if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+						selected_layout->template_id = int16_t(chosen - 1);
+					}
+				}
 
 				{
 					const char* items[] = { "leading", "trailing", "centered" };

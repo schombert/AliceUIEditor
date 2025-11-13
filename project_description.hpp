@@ -6,6 +6,14 @@
 #include <memory>
 #include "texture.hpp"
 
+namespace template_project {
+
+enum class template_type : uint8_t {
+	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button
+};
+
+}
+
 enum class background_type : uint8_t {
 	none,
 	texture,
@@ -147,11 +155,13 @@ struct window_element_t {
 	std::string table_connection;
 	color3f rectangle_color{ 0.2f, 0.2f, 0.2f };
 	ogl::texture ogl_texture;
+	int32_t template_id = -1;
 	int16_t x_size = 0;
 	int16_t y_size = 0;
 	int16_t x_pos = 0;
 	int16_t y_pos = 0;
 	int16_t border_size = 0;
+	int16_t stored_gird_size = 0;
 	background_type background = background_type::none;
 	text_color page_text_color = text_color::black;
 	bool no_grid = false;
@@ -162,6 +172,7 @@ struct window_element_t {
 	bool ignore_rtl = false;
 	bool share_table_highlight = false;
 	bool parent_is_layout = false;
+	bool auto_close_button = false;
 };
 
 struct texture_layer_t {
@@ -217,7 +228,10 @@ enum class property : uint8_t {
 	page_button_textures = 44,
 	layout_information = 45,
 	table_connection = 46,
-	is_lua = 47
+	is_lua = 47,
+	template_type = 48,
+	icon = 49,
+	alternate_set = 50
 };
 enum class table_cell_type : uint8_t {
 	spacer = 0, text = 1, container = 2,
@@ -287,6 +301,8 @@ struct ui_element_t {
 	int16_t y_pos = 0;
 	int16_t border_size = 0;
 	int16_t datapoints = 100;
+	int16_t template_id = -1;
+	int16_t icon_id = -1;
 	text_color text_color = text_color::black;
 	text_type text_type = text_type::body;
 	background_type background = background_type::none;
@@ -294,6 +310,7 @@ struct ui_element_t {
 	bool no_grid = false;
 	aui_text_alignment text_align = aui_text_alignment::left;
 	animation_type animation_type = animation_type::none;
+	template_project::template_type ttype = template_project::template_type::none;
 	bool dynamic_element = false;
 	bool dynamic_tooltip = false;
 	bool can_disable = false;
@@ -311,7 +328,7 @@ struct ui_element_t {
 };
 
 
-inline bool is_lua_element(ui_element_t& target) {
+inline bool is_lua_element(ui_element_t const& target) {
 	return target.is_lua;
 }
 
@@ -401,6 +418,7 @@ struct layout_level_t {
 	int16_t margin_bottom = -1;
 	int16_t margin_left = -1;
 	int16_t margin_right = -1;
+	int16_t template_id = -1;
 	layout_line_alignment line_alignment = layout_line_alignment::leading;
 	layout_line_alignment line_internal_alignment = layout_line_alignment::leading;
 	// text_color page_display_color = text_color::black;
@@ -410,11 +428,17 @@ struct layout_level_t {
 	bool paged = false;
 };
 
+struct template_alternate {
+	std::string control_name;
+	int32_t tempalte_id = -1;
+};
+
 struct window_element_wrapper_t {
 	window_element_t wrapped;
 	std::vector<ui_element_t> children;
 	layout_level_t layout;
 	std::vector<layout_item> buffer;
+	std::vector<template_alternate> alternates;
 };
 
 struct open_project_t {

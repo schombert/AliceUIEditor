@@ -78,6 +78,72 @@
     <ClInclude Include="code_generator.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="plutovg\plutovg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-ft-math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-ft-raster.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-ft-stroker.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-ft-types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-private.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-stb-image.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-stb-image-write.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-stb-truetype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="plutovg\plutovg-utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\graphics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\lunasvg.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svgelement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svggeometryelement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svglayoutstate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svgpaintelement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svgparserutils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svgproperty.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svgrenderstate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lunasvg\svgtextelement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="asvg.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="templateproject.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="imgui.cpp">
@@ -120,6 +186,75 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="code_generator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-blend.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-canvas.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-font.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-ft-math.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-ft-raster.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-ft-stroker.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-matrix.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-paint.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-path.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-rasterize.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="plutovg\plutovg-surface.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\graphics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\lunasvg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svgelement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svggeometryelement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svglayoutstate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svgpaintelement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svgparser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svgproperty.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svgrenderstate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="lunasvg\svgtextelement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="asvg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="project_serialization.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
