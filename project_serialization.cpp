@@ -435,6 +435,46 @@ project bytes_to_project(serialization::in_buffer& buffer) {
 			indv_mb.read(i.animate_active_transition);
 		}
 	
+		auto tb_section = buffer.read_section();
+		while(tb_section) {
+			result.toggle_button_t.emplace_back();
+			auto indv_tb = tb_section.read_section();
+			auto& i = result.toggle_button_t.back();
+
+			indv_tb.read(i.display_name);
+			indv_tb.read(i.on_region.primary.bg);
+			indv_tb.read(i.on_region.primary.color);
+			indv_tb.read(i.on_region.active.bg);
+			indv_tb.read(i.on_region.active.color);
+			indv_tb.read(i.on_region.disabled.bg);
+			indv_tb.read(i.on_region.disabled.color);
+			indv_tb.read(i.on_region.font_choice);
+			indv_tb.read(i.on_region.font_scale);
+			indv_tb.read(i.on_region.h_text_alignment);
+			indv_tb.read(i.on_region.v_text_alignment);
+			indv_tb.read(i.on_region.text_margin_left);
+			indv_tb.read(i.on_region.text_margin_right);
+			indv_tb.read(i.on_region.text_margin_top);
+			indv_tb.read(i.on_region.text_margin_bottom);
+
+			indv_tb.read(i.off_region.primary.bg);
+			indv_tb.read(i.off_region.primary.color);
+			indv_tb.read(i.off_region.active.bg);
+			indv_tb.read(i.off_region.active.color);
+			indv_tb.read(i.off_region.disabled.bg);
+			indv_tb.read(i.off_region.disabled.color);
+			indv_tb.read(i.off_region.font_choice);
+			indv_tb.read(i.off_region.font_scale);
+			indv_tb.read(i.off_region.h_text_alignment);
+			indv_tb.read(i.off_region.v_text_alignment);
+			indv_tb.read(i.off_region.text_margin_left);
+			indv_tb.read(i.off_region.text_margin_right);
+			indv_tb.read(i.off_region.text_margin_top);
+			indv_tb.read(i.off_region.text_margin_bottom);
+
+			indv_tb.read(i.animate_active_transition);
+		}
+
 	return result;
 }
 

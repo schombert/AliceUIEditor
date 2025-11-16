@@ -835,6 +835,16 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 		return;
 	}
+	if(c.ttype == template_project::template_type::toggle_button) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.toggle_button_t[c.template_id].on_region.primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	}
 	if(c.background == background_type::table_columns || c.background == background_type::table_headers) {
 		auto t = table_from_name(open_project, c.table_connection);
 		if(t) {
@@ -1801,6 +1811,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Text button");
 	opts.push_back("Icon button");
 	opts.push_back("Text & icon button");
+	opts.push_back("Toggle button");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -1814,6 +1825,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 3; break;
 		case template_project::template_type::mixed_button:
 			current = 4; break;
+		case template_project::template_type::toggle_button:
+			current = 5; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -1828,6 +1841,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::iconic_button; break;
 			case 4:
 				ttype = template_project::template_type::mixed_button; break;
+			case 5:
+				ttype = template_project::template_type::toggle_button; break;
 			default:
 				break;
 		}
@@ -1877,6 +1892,18 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			std::vector<char const*> inner_opts;
 			inner_opts.push_back("None");
 			for(auto& i : open_templates.mixed_button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::toggle_button:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.toggle_button_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
 			int32_t chosen = template_id + 1;
@@ -1975,6 +2002,26 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
 		case template_project::template_type::button:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+
+			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+			if(!c.dynamic_text)
+				ImGui::InputText("Text key", &(c.text_key));
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::toggle_button:
 		{
 			ImGui::Checkbox("Left-click action", &(c.left_click_action));
 			ImGui::Checkbox("Right-click action", &(c.right_click_action));
@@ -3477,6 +3524,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 										std::vector<char const*> inner_opts;
 										inner_opts.push_back("--Don't change--");
 										for(auto& i : open_templates.button_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::toggle_button:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.toggle_button_t) {
 											inner_opts.push_back(i.display_name.c_str());
 										}
 										int32_t chosen = get_alt_id(c.name) + 1;
