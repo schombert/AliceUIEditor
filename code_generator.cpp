@@ -2272,6 +2272,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			std::vector<std::string> header_list;
 			for(auto& inserts : g->inserts) {
 				insert_params.clear();
+				bool found = false;
 				for(auto& window : proj.windows) {
 					if(window.wrapped.name == inserts.name) {
 						insert_types += ", " + inserts.name + "_option";
@@ -2281,18 +2282,21 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 							result += dm.type + " " + dm.name + "; ";
 						}
 						result += "};\n";
+						found = true;
 					}
 				}
-				if(inserts.header.size() > 0 && std::find(header_list.begin(), header_list.end(), inserts.header) == header_list.end()) {
-					header_list.push_back(inserts.header);
+				if(found) {
+					if(inserts.header.size() > 0 && std::find(header_list.begin(), header_list.end(), inserts.header) == header_list.end()) {
+						header_list.push_back(inserts.header);
+					}
+					result += "\t" "std::vector<std::unique_ptr<ui::element_base>> " + inserts.name + "_pool;\n";
+					result += "\t" "int32_t " + inserts.name + "_pool_used = 0;\n";
+					if(insert_params.size() >= 2) {
+						insert_params.pop_back();
+						insert_params.pop_back();
+					}
+					result += "\t" "void add_" + inserts.name + "(" + insert_params + ");\n";
 				}
-				result += "\t" "std::vector<std::unique_ptr<ui::element_base>> " + inserts.name + "_pool;\n";
-				result += "\t" "int32_t " + inserts.name + "_pool_used = 0;\n";
-				if(insert_params.size() >= 2) {
-					insert_params.pop_back();
-					insert_params.pop_back();
-				}
-				result += "\t" "void add_" + inserts.name + "(" + insert_params + ");\n";
 			}
 			for(auto& h : header_list) {
 				result += "\t" "std::vector<std::unique_ptr<ui::element_base>> " + h + "_pool;\n";
@@ -2310,7 +2314,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		}
 	}
 	for(auto& win : proj.windows) {
-		if(win.layout.contents.empty())
+		if(win.layout.contents.empty() && win.wrapped.template_id == -1)
 			result += "struct " + project_name + "_" + win.wrapped.name + "_t : public ui::non_owning_container_base {\n";
 		else
 			result += "struct " + project_name + "_" + win.wrapped.name + "_t : public layout_window_element {\n";
@@ -2548,12 +2552,14 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			for(auto& inserts : g->inserts) {
 				insert_vals.clear();
 				insert_params.clear();
+				bool found = false;
 				for(auto& window : proj.windows) {
 					if(window.wrapped.name == inserts.name) {
 						for(auto& dm : window.wrapped.members) {
 							insert_params += dm.type + " " + dm.name + ", ";
 							insert_vals += dm.name + ", ";
 						}
+						found = true;
 					}
 				}
 				if(insert_params.size() > 2) {
@@ -2564,9 +2570,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					insert_vals.pop_back();
 					insert_vals.pop_back();
 				}
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::add_" + inserts.name + "(" + insert_params + ") {\n";
-				result += "\t" "values.emplace_back(" + inserts.name + "_option{" + insert_vals + "});\n";
-				result += "}\n";
+				if(found) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::add_" + inserts.name + "(" + insert_params + ") {\n";
+					result += "\t" "values.emplace_back(" + inserts.name + "_option{" + insert_vals + "});\n";
+					result += "}\n";
+				}
 			}
 
 			result += "void  " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::on_create(sys::state& state, layout_window_element* parent) {\n";
@@ -2653,6 +2661,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "\t" "if(index >= values.size()) return measure_result{0,0,measure_result::special::none};\n";
 			for(auto& inserts : g->inserts) {
+				if(auto w = window_from_name(proj, inserts.name);  !w)
+					continue;
+
 				std::string shared_header_test;
 				for(auto& oinserts : g->inserts) {
 					if(oinserts.header == inserts.header) {
@@ -2760,6 +2771,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 			result += "void  " + project_name + "_" + win.wrapped.name + "_" + g->name + "_t::reset_pools() {\n";
 			for(auto& inserts : g->inserts) {
+				if(auto w = window_from_name(proj, inserts.name);  !w)
+					continue;
 				if(inserts.header.size() > 0)
 					result += "\t" + inserts.header + "_pool_used = 0;\n";
 				result += "\t" + inserts.name + "_pool_used = 0;\n";
