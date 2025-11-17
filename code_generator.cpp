@@ -198,6 +198,10 @@ bool element_needs_class(ui_element_t const& c) {
 			return true;
 		case template_project::template_type::toggle_button:
 			return true;
+		case template_project::template_type::table_header:
+			return true;
+		case template_project::template_type::table_row:
+			return true;
 		default:
 			return true;
 	}
@@ -283,6 +287,14 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			result += "\t" "\t" "\t"  "if(child_data.text_key.length() > 0)\n";
 			result += "\t" "\t" "\t" "\t" "cptr->default_text = state.lookup_key(child_data.text_key);\n";
 		} break;
+		case template_project::template_type::table_header:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+		} break;
+		case template_project::template_type::table_row:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+		} break;
 		default:
 		{
 			if(c.background == background_type::existing_gfx) {
@@ -313,45 +325,6 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			}
 			if(c.background == background_type::colorsquare) {
 				result += "\t" "\t" "\t"  "cptr->color = child_data.table_highlight_color;\n";
-			}
-			if(c.container_type == container_type::table) {
-				int32_t cindex = 0;
-				result += "\t" "\t" "\t" "int16_t col_sz_used = 0;\n";
-				for(auto& col : c.table_columns) {
-					if(col.internal_data.cell_type == table_cell_type::text) {
-						result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_text_color = child_data.table_columns[" + std::to_string(cindex) + "].header_text_color;\n";
-						result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_text_key = state.lookup_key(child_data.table_columns[" + std::to_string(cindex) + "].header_key);\n";
-						if(col.internal_data.header_background && col.display_data.header_texture.length() > 0) {
-							result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_texture_key = child_data.table_columns[" + std::to_string(cindex) + "].header_texture;\n";
-						}
-						if(col.display_data.header_tooltip_key.length() > 0 && !col.internal_data.has_dy_header_tooltip) {
-							result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_tooltip_key = state.lookup_key(child_data.table_columns[" + std::to_string(cindex) + "].header_tooltip_key);\n";
-						}
-
-						result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_default_text_color = child_data.table_columns[" + std::to_string(cindex) + "].cell_text_color;\n";
-						result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_text_alignment = child_data.table_columns[" + std::to_string(cindex) + "].text_alignment;\n";
-						if(col.display_data.cell_tooltip_key.length() > 0 && !col.internal_data.has_dy_cell_tooltip) {
-							result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_tooltip_key = state.lookup_key(child_data.table_columns[" + std::to_string(cindex) + "].cell_tooltip_key);\n";
-						}
-					}
-
-					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_column_start = col_sz_used;\n";
-					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_column_width = child_data.table_columns[" + std::to_string(cindex) + "].width;\n";
-					result += "\t" "\t" "\t" "col_sz_used += child_data.table_columns[" + std::to_string(cindex) + "].width; \n";
-
-					++cindex;
-				}
-				if(c.ascending_sort_icon.length() > 0)
-					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::ascending_icon_key = child_data.ascending_sort_icon;\n";
-				if(c.descending_sort_icon.length() > 0)
-					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::descending_icon_key = child_data.descending_sort_icon;\n";
-				if(c.row_background_a.length() > 0)
-					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_texture_key = child_data.row_background_a;\n";
-				if(c.row_background_b.length() > 0)
-					result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::alt_row_texture_key = child_data.row_background_b;\n";
-				result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::row_height = child_data.row_height;\n";
-				result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_divider_color = child_data.table_divider_color;\n";
-				result += "\t" "\t" "\t" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color = child_data.table_highlight_color;\n";
 			}
 		} break;
 	}
@@ -391,127 +364,7 @@ std::string element_type_declarations(std::string const& project_name, window_el
 			default:
 				break;
 		}
-	} else if(c.container_type != container_type::none) {
-		if(c.container_type == container_type::table) {
-			base_type = "ui::non_owning_container_base";
-		} else {
-			base_type = "ui::container_base";
-		}
 	}
-
-	if(c.container_type == container_type::table) {
-		// generic header type
-		result += "struct " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t : public ui::element_base {\n";
-
-		for(auto& col : c.table_columns) {
-			if(col.internal_data.cell_type == table_cell_type::text) {
-				result += "\t"  "text::layout " + col.internal_data.column_name + "_internal_layout;\n";
-				result += "\t"  "inline static text::text_color  " + col.internal_data.column_name + "_text_color = text::text_color::" + color_to_name(col.display_data.header_text_color) + ";\n";
-				result += "\t"  "std::string " + col.internal_data.column_name + "_cached_text;\n";
-				result += "\t"  "inline static dcon::text_key " + col.internal_data.column_name + "_text_key;\n";
-
-				if(col.internal_data.header_background && col.display_data.header_texture.length() > 0) {
-					result += "\t"  "inline static std::string_view " + col.internal_data.column_name + "_texture_key;\n";
-					result += "\t"  "inline static dcon::texture_id " + col.internal_data.column_name + "_texture;\n";
-				}
-				if(col.display_data.header_tooltip_key.length() > 0 && !col.internal_data.has_dy_header_tooltip) {
-					result += "\t"  "inline static std::string_view " + col.internal_data.column_name + "_tooltip_key;\n";
-				}
-
-				if(col.internal_data.sortable) {
-					result += "\t"  "inline static int8_t " + col.internal_data.column_name + "_sort_direction = 0;\n";
-				}
-			}
-			result += "\t"  "inline static int16_t " + col.internal_data.column_name + "_column_start = 0;\n";
-			result += "\t"  "inline static int16_t " + col.internal_data.column_name + "_column_width = 0;\n";
-		}
-
-		if(c.ascending_sort_icon.length() > 0) {
-			result += "\t"  "inline static std::string_view ascending_icon_key;\n";
-			result += "\t"  "inline static dcon::texture_id ascending_icon;\n";
-		}
-		if(c.descending_sort_icon.length() > 0) {
-			result += "\t"  "inline static std::string_view descending_icon_key;\n";
-			result += "\t"  "inline static dcon::texture_id descending_icon;\n";
-		}
-
-		result += "\t"  "void on_reset_text(sys::state & state) noexcept override;\n";
-		result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
-		result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
-		result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
-		result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
-		result += "\t"  "void tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept override;\n";
-		result += "\t" "void on_create(sys::state& state) noexcept override;\n";
-
-		result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
-		result += "\t" "\t" "if(type == ui::mouse_probe_type::click) {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
-		result += "\t" "\t" "} else if(type == ui::mouse_probe_type::tooltip) {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
-		result += "\t" "\t" "} else if(type == ui::mouse_probe_type::scroll) {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
-		result += "\t" "\t" "} else {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
-		result += "\t" "\t" "}\n";
-		result += "\t" "}\n";
-
-		result += "};\n";
-
-		// generic row type
-		result += "struct " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t : public ui::element_base {\n";
-		result += "\t" + c.list_content + " value;\n";
-		result += "\t" "bool alternate_row = false;\n";
-
-		for(auto& col : c.table_columns) {
-			if(col.internal_data.cell_type == table_cell_type::text) {
-				result += "\t"  "text::layout " + col.internal_data.column_name + "_internal_layout;\n";
-				result += "\t"  "inline static text::text_color  " + col.internal_data.column_name + "_default_text_color = text::text_color::" + color_to_name(col.display_data.cell_text_color) + ";\n";
-				result += "\t"  "text::text_color  " + col.internal_data.column_name + "_text_color = " + col.internal_data.column_name + "_default_text_color ;\n";
-				result += "\t"  "std::string " + col.internal_data.column_name + "_cached_text;\n";
-				result += "\t" "inline static text::alignment " + col.internal_data.column_name + "_text_alignment = text::alignment::" + alignment_to_name(col.display_data.text_alignment) + ";\n";
-				if(col.display_data.cell_tooltip_key.length() > 0 && !col.internal_data.has_dy_cell_tooltip) {
-					result += "\t"  "inline static std::string_view " + col.internal_data.column_name + "_tooltip_key;\n";
-				}
-				if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
-					result += "\t" "float " + col.internal_data.column_name + "_decimal_pos = 0.0f;";
-				}
-				result += "\t"  "void set_" + col.internal_data.column_name + "_text(sys::state & state, std::string const& new_text);\n";
-			}
-		}
-
-		if(c.row_background_a.length() > 0) {
-			result += "\t"  "inline static std::string_view row_texture_key;\n";
-			result += "\t"  "inline static dcon::texture_id row_background_texture;\n";
-		}
-		if(c.row_background_b.length() > 0) {
-			result += "\t"  "inline static std::string_view alt_row_texture_key;\n";
-			result += "\t"  "inline static dcon::texture_id alt_row_background_texture;\n";
-		}
-
-		result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
-		result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
-		result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
-		result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
-		result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
-		result += "\t"  "void tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept override;\n";
-		result += "\t" "void on_create(sys::state& state) noexcept override;\n";
-
-		result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
-		result += "\t" "\t" "if(type == ui::mouse_probe_type::click) {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
-		result += "\t" "\t" "} else if(type == ui::mouse_probe_type::tooltip) {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
-		result += "\t" "\t" "} else if(type == ui::mouse_probe_type::scroll) {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
-		result += "\t" "\t" "} else {\n";
-		result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
-		result += "\t" "\t" "}\n";
-		result += "\t" "}\n";
-
-		result += "};\n";
-	}
-
-	// END c.container_type == container_type::table header generation
 
 	result += "struct " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t : public " + base_type + " {\n";
 
@@ -524,45 +377,6 @@ std::string element_type_declarations(std::string const& project_name, window_el
 
 	for(auto& dm : c.members) {
 		result += "\t" + dm.type + " " + dm.name + ";\n";
-	}
-
-	if(c.container_type != container_type::none) {
-		if(c.container_type == container_type::table) {
-			std::string insert_types;
-			for(auto& inserts : c.table_inserts) {
-				for(auto& window : proj.windows) {
-					if(window.wrapped.name == inserts) {
-						insert_types += ", " + inserts + "_option";
-						result += "\t" "struct " + inserts + "_option { ";
-						for(auto& dm : window.wrapped.members) {
-							result += dm.type + " " + dm.name + "; ";
-						}
-						result += "};\n";
-					}
-				}
-				result += "\t" "std::vector<std::unique_ptr<ui::element_base>> " + inserts + "_pool;\n";
-			}
-			result += "\t" "std::vector<std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t>> row_pool;\n";
-			result += "\t" "std::vector<std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t>> header_pool;\n";
-			result += "\t" "struct value_option { " + c.list_content + " value; };\n";
-			result += "\t" "int32_t page = 0;\n";
-			result += "\t" "inline static float row_height = 0;\n";
-			result += "\t" "inline static ogl::color4f table_highlight_color{float(" + std::to_string(c.table_highlight_color.r) + "), float(" + std::to_string(c.table_highlight_color.g) + "), float(" + std::to_string(c.table_highlight_color.b) + "), float(" + std::to_string(c.table_highlight_color.a) + ")};\n";
-			result += "\t" "inline static ogl::color3f table_divider_color{float(" + std::to_string(c.table_divider_color.r) + "), float(" + std::to_string(c.table_divider_color.g) + "), float(" + std::to_string(c.table_divider_color.b) + ")};\n";
-			result += "\t" "std::vector<std::variant<std::monostate, value_option" + insert_types + ">> values;\n";
-			result += "\t" "std::vector<int32_t> page_starts;\n";
-			result += "\t" "bool open_page = false;\n";
-			result += "\t" "int16_t layout_space = 0;\n";
-			for(auto& col : c.table_columns) {
-				if(col.internal_data.cell_type == table_cell_type::text && col.internal_data.decimal_alignment != aui_text_alignment::center) {
-					result += "\t" "float " + col.internal_data.column_name + "_decimal_pos = 0.0f;";
-				}
-			}
-		} else {
-			result += "\t" "int32_t page = 0;\n";
-			result += "\t" "std::vector<" + c.list_content + "> values;\n";
-			result += "\t" "std::vector<ui::element_base*> visible_items;\n";
-		}
 	}
 
 	if(c.ttype != template_project::template_type::none) {
@@ -681,6 +495,82 @@ std::string element_type_declarations(std::string const& project_name, window_el
 					result += "\t"  "void button_on_hover(sys::state& state) noexcept override;\n";
 					result += "\t"  "void button_on_hover_end(sys::state& state) noexcept override;\n";
 				}
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::table_row: 
+			{
+				result += "\t" "int32_t template_id = -1;\n";
+				auto t = table_from_name(proj, c.table_connection);
+				if(t) {
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t"  "text::layout " + col.internal_data.column_name + "_internal_layout;\n";
+							result += "\t"  "int32_t  " + col.internal_data.column_name + "_text_color = " + std::to_string(int32_t(col.display_data.cell_text_color)) + ";\n";
+							result += "\t"  "std::string " + col.internal_data.column_name + "_cached_text;\n";
+
+							if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
+								result += "\t" "float " + col.internal_data.column_name + "_decimal_pos = 0.0f;";
+							}
+							result += "\t"  "void set_" + col.internal_data.column_name + "_text(sys::state & state, std::string const& new_text);\n";
+						}
+					}
+				}
+
+				result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
+
+				result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+				result += "\t" "\t" "return ui::tooltip_behavior::tooltip;\n";
+				result += "\t" "}\n";
+
+
+				result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
+				result += "\t" "\t" "if(type == ui::mouse_probe_type::click || type == ui::mouse_probe_type::tooltip) {\n";
+				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
+				result += "\t" "\t" "} else  {\n";
+				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "}\n";
+
+				result += "\t"  "void tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept override;\n";
+				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
+				result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
+				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
+				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::table_header:
+			{
+				result += "\t" "int32_t template_id = -1;\n";
+				auto t = table_from_name(proj, c.table_connection);
+				if(t) {
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text && col.display_data.header_key.size() > 0) {
+							result += "\t"  "text::layout " + col.internal_data.column_name + "_internal_layout;\n";
+							result += "\t"  "std::string " + col.internal_data.column_name + "_cached_text;\n";
+						}
+					}
+				}
+
+				result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
+
+				result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+				result += "\t" "\t" "return ui::tooltip_behavior::tooltip;\n";
+				result += "\t" "}\n";
+
+				result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
+				result += "\t" "\t" "if(type == ui::mouse_probe_type::click || type == ui::mouse_probe_type::tooltip) {\n";
+				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
+				result += "\t" "\t" "} else  {\n";
+				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "}\n";
+
+				result += "\t"  "void tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept override;\n";
+				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
+				result += "\t"  "void on_reset_text(sys::state & state) noexcept override;\n";
+				result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
+				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
+				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
 			default: break;
@@ -820,15 +710,7 @@ std::string element_type_declarations(std::string const& project_name, window_el
 			result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
 		}
 		result += "\t" "\t" "} else if(type == ui::mouse_probe_type::scroll) {\n";
-		if(c.container_type != container_type::none) {
-			if(c.container_type == container_type::table) {
-				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
-			} else {
-				result += "\t" "\t" "\t" "return (values.size() > visible_items.size()) ? ui::message_result::consumed : ui::message_result::unseen;\n";
-			}
-		} else {
-			result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
-		}
+		result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
 		result += "\t" "\t" "} else {\n";
 		result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
 		result += "\t" "\t" "}\n";
@@ -853,31 +735,6 @@ std::string element_type_declarations(std::string const& project_name, window_el
 		}
 		if(c.dynamic_tooltip || c.tooltip_text_key.length() > 0 || c.background == background_type::flag || c.background == background_type::table_columns || c.background == background_type::table_headers) {
 			result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
-		}
-		if(c.container_type != container_type::none) {
-			result += "\t" "ui::message_result on_scroll(sys::state & state, int32_t x, int32_t y, float amount, sys::key_modifiers mods) noexcept override; \n";
-			result += "\t" "void change_page(sys::state & state, int32_t new_page); \n";
-			result += "\t" "int32_t max_page(); \n";
-			if(c.container_type == container_type::table) {
-				result += "\t" "void clear_table(); \n";
-				result += "\t" "void impl_change_page(sys::state & state, int32_t new_page); \n";
-				result += "\t" "void add_value(" + c.list_content + " const& v); \n";
-				for(auto& inserts : c.table_inserts) {
-					std::string insert_types;
-					for(auto& window : proj.windows) {
-						if(window.wrapped.name == inserts) {
-							for(auto& dm : window.wrapped.members) {
-								insert_types += ", " + dm.type + " const& " + dm.name;
-							}
-						}
-					}
-					result += "\t" "void add_insert_" + inserts + "(sys::state& state" + insert_types + "); \n";
-				}
-				result += "\t" "std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t> make_row(sys::state& state);\n";
-				result += "\t" "std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t> make_headers(sys::state& state);\n";
-				result += "\t" "void apply_sort(sys::state& state); \n";
-				result += "\t" "void impl_apply_sort(sys::state& state); \n";
-			}
 		}
 		result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 	}
@@ -1334,6 +1191,400 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "}\n";
 				}
 
+			} break;
+			case template_project::template_type::table_row:
+			{
+				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
+				result += "\t" "return ui::message_result::consumed;\n";
+				result += "}\n";
+
+				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
+				result += "\t" "return ui::message_result::consumed;\n";
+				result += "}\n";
+
+				auto t = table_from_name(proj, c.table_connection);
+
+				if(t) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept {\n";
+
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					int32_t ccountb = 0;
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t" "if(x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x < table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
+							if(col.internal_data.has_dy_header_tooltip || col.display_data.header_tooltip_key.length() > 0) {
+								result += "\t" "\t" "ident = " + std::to_string(ccountb) + ";\n";
+								result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
+								result += "\t" "\t" "subrect.top_left.x += int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start);\n";
+								result += "\t" "\t" "subrect.size = base_data.size;\n";
+								result += "\t" "\t" "subrect.size.x = int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width);\n";
+								result += "\t" "\t" "return;\n";
+							}
+							result += "\t" "}\n";
+							++ccountb;
+						}
+					}
+					result += "\t" "\t" "ident = -1;\n";
+					result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
+					result += "\t" "\t" "subrect.size = base_data.size;\n";
+					result += "}\n";
+
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t" "if(x >=  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x <  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start +  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
+							
+							if(col.internal_data.has_dy_cell_tooltip) {
+								make_parent_var_text();
+								result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::column_tooltip\n";
+								if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::column_tooltip"); it != old_code.found_code.end()) {
+									it->second.used = true;
+									result += it->second.text;
+								}
+								result += "// END\n";
+
+							} else if(col.display_data.cell_tooltip_key.length() > 0) {
+								result += "\t" "text::add_line(state, contents, table_source->" + t->name + "_" + col.internal_data.column_name + "_column_tooltip_key);\n";
+							}
+							result += "\t" "}\n";
+						}
+					}
+					result += "}\n";
+				}
+
+				if(t) {
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::set_" + col.internal_data.column_name + "_text(sys::state & state, std::string const& new_text) {\n";
+							result += "\t" "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+							result += "\t" "if(new_text !=  " + col.internal_data.column_name + "_cached_text) {\n";
+							result += "\t" "\t" + col.internal_data.column_name + "_cached_text = new_text;\n";
+							result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
+							result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
+							result += "\t" "\t" "{\n";
+							result += "\t" "\t" "text::single_line_layout sl{ " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" + t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr }; \n";
+							result += "\t" "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
+							result += "\t" "\t" "}\n";
+
+							if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
+								result += "\t" "auto font_size_factor = float(text::size_from_font_id(text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "))) / (float((1 << 6) * 64.0f * text::magnification_factor));\n";
+								result += "\t" "float temp_decimal_pos = -1.0f;\n";
+								result += "\t" "float running_total = 0.0f;\n";
+								result += "\t" "auto best_cluster = std::string::npos;\n";
+								result += "\t" "auto found_decimal_pos =  " + col.internal_data.column_name + "_cached_text.find_last_of('.');";
+								result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
+								result += "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) { \n";
+								result += "\t" "\t" "running_total = float(t.x);\n";
+								result += "\t" "\t" "for(auto& ch : t.unicodechars.glyph_info) {\n";
+								result += "\t" "\t" "\t" "if(found_decimal_pos <= size_t(ch.cluster) && size_t(ch.cluster) < best_cluster) {\n";
+								result += "\t" "\t" "\t" "\t" "temp_decimal_pos = running_total ;\n";
+								result += "\t" "\t" "\t" "\t" "best_cluster = size_t(ch.cluster);\n";
+								result += "\t" "\t" "\t" "}\n";
+								result += "\t" "\t" "\t" "running_total += ch.x_advance * font_size_factor;\n";
+								result += "\t" "\t" "}\n";
+								result += "\t" "} \n";
+								result += "\t" "if(best_cluster == std::string::npos) {\n";
+								result += "\t" "\t" "running_total = 0.0f;\n";
+								result += "\t" "\t" "temp_decimal_pos = -1000000.0f;\n";
+								result += "\t" "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) {\n";
+								result += "\t" "\t" "\t" "running_total = float(t.x);\n";
+								result += "\t" "\t" "\t" "for(auto& ch : t.unicodechars.glyph_info) {\n";
+								result += "\t" "\t" "\t" "\t" "temp_decimal_pos = std::max(temp_decimal_pos, running_total);\n";
+								result += "\t" "\t" "\t" "\t" "running_total += ch.x_advance * font_size_factor;\n";
+								result += "\t" "\t" "\t" "}\n";
+								result += "\t" "\t" "}\n";
+								result += "\t" "}\n";
+								result += "\t" + col.internal_data.column_name + "_decimal_pos = temp_decimal_pos;\n";
+								result += "\t" "if(left_align)\n";
+								result += "\t" "\t" "table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos = std::min(" + col.internal_data.column_name + "_decimal_pos, table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos);\n";
+								result += "\t" "else\n";
+								result += "\t" "\t" "table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos = std::max(" + col.internal_data.column_name + "_decimal_pos, table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos);\n";
+							}
+							result += "\t" "} else {\n";
+							if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
+								result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
+								result += "\t" "if(left_align)\n";
+								result += "\t" "\t" "table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos = std::min(" + col.internal_data.column_name + "_decimal_pos, table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos);\n";
+								result += "\t" "else\n";
+								result += "\t" "\t" "table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos = std::max(" + col.internal_data.column_name + "_decimal_pos, table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos);\n";
+							}
+							result += "\t" "}\n";
+
+							result += "}\n";
+						}
+					}
+				}
+
+				
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
+				if(t) {
+					result += "\t" "auto fh = text::make_font_id(state, false, 1.0f * " + std::to_string(proj.grid_size * 2) + ");\n";
+					result += "\t"  "auto linesz = state.font_collection.line_height(state, fh); \n";
+					result += "\t" "auto ycentered = (base_data.size.y - linesz) / 2;\n";
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					result += "\t" "auto abs_location = ui::get_absolute_location(state, *this);\n";
+					result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - abs_location.x;\n";
+					result += "\t" "int32_t rel_mouse_y = int32_t(state.mouse_y_position / state.user_settings.ui_scale) - abs_location.y;\n";
+					result += "\t" "auto ink_color =template_id != -1 ? ogl::color3f(state.ui_templates.colors[state.ui_templates.table_t[template_id].table_color]) : ogl::color3f{}; ";
+
+					for(auto& col : t->table_columns) {
+						result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && rel_mouse_x < (table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width);\n";
+
+						result += "\t" "if(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y && col_um_" + col.internal_data.column_name + "){\n"; // case over this cell
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y + base_data.size.y - 2), float(2), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(1), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y), float(2), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y + base_data.size.y - 2), float(1), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width * 0.25f), float(y + base_data.size.y - 1), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width * 0.5f), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+
+						result += "\t" "} else if(!(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y) && col_um_" + col.internal_data.column_name + "){\n"; // case over this cell above/below
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(1), float(base_data.size.y), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y), float(2), float(base_data.size.y), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+
+						result += "\t" "} else if(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y && !col_um_" + col.internal_data.column_name + "){\n"; // case over another cell in line
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result +="\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y + base_data.size.y - 2), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t}\n";
+
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t" "auto col_color_" + col.internal_data.column_name + " = state.ui_templates.colors[" + col.internal_data.column_name + "_text_color]; ";
+							result += "\t"  "if(!" + col.internal_data.column_name + "_internal_layout.contents.empty() && linesz > 0.0f) {\n";
+
+							result += "\t" "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) {\n";
+							if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
+								result += "\t" "\t"  "\t" "ui::render_text_chunk(state, t, float(x) + t.x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + " + table_source->" + t->name + "_" + col.internal_data.column_name + "_decimal_pos - " + col.internal_data.column_name + "_decimal_pos, float(y + int32_t(ycentered)),  fh, ogl::color3f{ col_color_" + col.internal_data.column_name + ".r, col_color_" + col.internal_data.column_name + ".g, col_color_" + col.internal_data.column_name + ".b }, ogl::color_modification::none);\n";
+							} else {
+								result += "\t" "\t"  "\t" "ui::render_text_chunk(state, t, float(x) + t.x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + ", float(y + int32_t(ycentered)),  fh, ogl::color3f{ col_color_" + col.internal_data.column_name + ".r, col_color_" + col.internal_data.column_name + ".g, col_color_" + col.internal_data.column_name + ".b }, ogl::color_modification::none);\n";
+							}
+							result += "\t" "\t" "}\n";
+							result += "\t"  "}\n";
+						}
+					}
+
+				}
+				result += "}\n";
+			
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+
+				//ON CREATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_create(sys::state& state) noexcept {\n";
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::create\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::create"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+			} break;
+			case template_project::template_type::table_header:
+			{
+				auto t = table_from_name(proj, c.table_connection);
+
+				if(t) {
+					result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.sortable && col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t" "if(x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x < table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
+							result += "\t" "\t" "sound::play_interface_sound(state, sound::get_click_sound(state), state.user_settings.interface_volume* state.user_settings.master_volume);\n";
+							result += "\t" "\t" "auto old_direction = table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction;\n";
+							for(auto& colb : t->table_columns) {
+								if(colb.internal_data.sortable) {
+									result += "\t" "\t" "table_source->" + t->name + "_" + colb.internal_data.column_name + "_sort_direction = 0;\n";
+								}
+							}
+							result += "\t" "\t" "table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction = int8_t(old_direction <= 0 ? 1 : -1);\n";
+							result += "\t" "\t" "parent->parent->impl_on_update(state);\n";
+							result += "\t" "}\n";
+						}
+					}
+					result += "\t" "return ui::message_result::consumed;";
+					result += "}\n";
+				}
+				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
+				result += "\t" "return ui::message_result::consumed;\n";
+				result += "}\n";
+
+				if(t) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept {\n";
+
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					int32_t ccountb = 0;
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t" "if(x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x < table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
+							if(col.internal_data.has_dy_header_tooltip || col.display_data.header_tooltip_key.length() > 0) {
+								result += "\t" "\t" "ident = " + std::to_string(ccountb) + ";\n";
+								result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
+								result += "\t" "\t" "subrect.top_left.x += int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start);\n";
+								result += "\t" "\t" "subrect.size = base_data.size;\n";
+								result += "\t" "\t" "subrect.size.x = int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width);\n";
+								result += "\t" "\t" "return;\n";
+							}
+							result += "\t" "}\n";
+							++ccountb;
+						}
+					}
+					result += "\t" "\t" "ident = -1;\n";
+					result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
+					result += "\t" "\t" "subrect.size = base_data.size;\n";
+					result += "}\n";
+
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t" "if(x >=  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x <  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start +  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
+							
+							if(col.internal_data.has_dy_header_tooltip) {
+								make_parent_var_text();
+								result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::header_tooltip\n";
+								if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::header_tooltip"); it != old_code.found_code.end()) {
+									it->second.used = true;
+									result += it->second.text;
+								}
+								result += "// END\n";
+
+							} else if(col.display_data.header_tooltip_key.length() > 0) {
+								result += "\t" "text::add_line(state, contents, table_source->" + t->name + "_" + col.internal_data.column_name + "_header_tooltip_key);\n";
+							}
+							result += "\t" "}\n";
+						}
+					}
+					result += "}\n";
+				}
+
+				if(t) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_reset_text(sys::state& state) noexcept {\n";
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					for(auto& col : t->table_columns) {
+						if(col.internal_data.cell_type == table_cell_type::text && col.display_data.header_key.size() > 0) {
+							result += "\t" "{\n";
+							result += "\t" "" + col.internal_data.column_name + "_cached_text = text::produce_simple_string(state, table_source->" + t->name + "_" + col.internal_data.column_name + "_header_text_key);\n";
+							result += "\t" " " + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
+							result += "\t" " " + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
+							result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 0) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, table_source->" + t->name + "_" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
+							result += "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
+							result += "\t" "}\n";
+						}
+					}
+					result += "}\n";
+				}
+
+				
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
+				if(t) {
+					result += "\t" "auto fh = text::make_font_id(state, false, 1.0f * " + std::to_string(proj.grid_size * 2) + ");\n";
+					result += "\t"  "auto linesz = state.font_collection.line_height(state, fh); \n";
+					result += "\t" "auto ycentered = (base_data.size.y - linesz) / 2;\n";
+					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					result += "\t" "auto abs_location = ui::get_absolute_location(state, *this);\n";
+					result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - abs_location.x;\n";
+					result += "\t" "int32_t rel_mouse_y = int32_t(state.mouse_y_position / state.user_settings.ui_scale) - abs_location.y;\n";
+					result += "\t" "auto ink_color =template_id != -1 ? ogl::color3f(state.ui_templates.colors[state.ui_templates.table_t[template_id].table_color]) : ogl::color3f{}; ";
+
+					for(auto& col : t->table_columns) {
+						result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && rel_mouse_x < (table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width);\n";
+
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							if(col.internal_data.sortable) {
+								result += "\t" "\t" "{\n";
+								result += "\t" "\t" "auto bg = template_id != -1 ? ((0 <= rel_mouse_y && rel_mouse_y < base_data.size.y && col_um_" + col.internal_data.column_name + ") ? state.ui_templates.table_t[template_id].active_header_bg : state.ui_templates.table_t[template_id].interactable_header_bg) : -1;\n";
+								result += "\t" "\t" "if(bg != -1)\n";
+								result += "\t" "\t" "ogl::render_textured_rect_direct(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(base_data.size.y), "
+									"state.ui_templates.backgrounds[bg].renders.get_render(state, float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) / float(table_source->grid_size), float(base_data.size.y) / float(table_source->grid_size), int32_t(table_source->grid_size), state.user_settings.ui_scale)"
+									"); \n";
+								result += "\t" "\t" "}\n";
+							}
+						}
+
+						result += "\t" "if(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y && col_um_" + col.internal_data.column_name + "){\n"; // case over this cell
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y + base_data.size.y - 2), float(2), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(1), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y), float(2), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y + base_data.size.y - 2), float(1), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width * 0.25f), float(y + base_data.size.y - 1), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width * 0.5f), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+
+						result += "\t" "} else if(!(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y) && col_um_" + col.internal_data.column_name + "){\n"; // case over this cell above/below
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(1), float(base_data.size.y), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y), float(2), float(base_data.size.y), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+
+						result += "\t" "} else if(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y && !col_um_" + col.internal_data.column_name + "){\n"; // case over another cell in line
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y + base_data.size.y - 2), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t}\n";
+
+						if(col.internal_data.cell_type == table_cell_type::text) {
+							result += "\t" "auto col_color_" + col.internal_data.column_name + " = state.ui_templates.colors[table_source->" + t->name + "_" + col.internal_data.column_name + "_header_text_color]; ";
+
+							if(col.internal_data.sortable) {
+								result += "\t" "if(table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction > 0) {\n";
+								result += "\t" "\t" "auto icon = template_id != -1 ? state.ui_templates.table_t[template_id].arrow_increasing : -1;\n";
+								result += "\t" "\t" "if(icon != -1)\n";
+								result += "\t" "\t" "ogl::render_textured_rect_direct(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(0) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 1) + "), float(" + std::to_string(proj.grid_size * 2) + "), "
+									"state.ui_templates.icons[icon].renders.get_render(state, " + std::to_string(proj.grid_size * 1) + ", " + std::to_string(proj.grid_size * 2) + ", state.user_settings.ui_scale, ink_color.r, ink_color.g, ink_color.b)"
+									"); \n";
+								result += "\t" "}\n";
+							
+								result += "\t" "if(table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction < 0) {\n";
+								result += "\t" "\t" "auto icon = template_id != -1 ? state.ui_templates.table_t[template_id].arrow_decreasing : -1;\n";
+								result += "\t" "\t" "if(icon != -1)\n";
+								result += "\t" "\t" "ogl::render_textured_rect_direct(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + " + std::to_string(0) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 1) + "), float(" + std::to_string(proj.grid_size * 2) + "), "
+									"state.ui_templates.icons[icon].renders.get_render(state, " + std::to_string(proj.grid_size * 1) + ", " + std::to_string(proj.grid_size * 2) + ", state.user_settings.ui_scale, ink_color.r, ink_color.g, ink_color.b)"
+								"); \n";
+								result += "\t" "}\n";
+							}
+							
+
+							if(col.display_data.header_key.size() > 0) {
+								result += "\t"  "if(!" + col.internal_data.column_name + "_internal_layout.contents.empty() && linesz > 0.0f) {\n";
+
+								result += "\t" "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) {\n";
+								result += "\t" "\t" "\t" "ui::render_text_chunk(state, t, float(x) + t.x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start" + (col.internal_data.sortable ? " + " + std::to_string(proj.grid_size * 0) : std::string("")) + " + " + std::to_string(proj.grid_size) + ", float(y + int32_t(ycentered)),  fh, ogl::color3f{ col_color_" + col.internal_data.column_name + ".r, col_color_" + col.internal_data.column_name + ".g, col_color_" + col.internal_data.column_name + ".b }, ogl::color_modification::none);\n";
+								result += "\t" "\t" "}\n";
+								result += "\t"  "}\n";
+							}
+						}
+					}
+
+					result += "\t" "if(!(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y)){\n";
+					result += "\t" "ogl::render_alpha_colored_rect(state, float(x), float(y + base_data.size.y - 1), float(base_data.size.x), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+					result += "\t" "}\n";
+				}
+				result += "}\n";
+			
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+				//ON CREATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_create(sys::state& state) noexcept {\n";
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::create\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::create"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
 			} break;
 			default: break;
 		}
@@ -1934,52 +2185,6 @@ std::string element_member_functions(std::string const& project_name, window_ele
 		result += "}\n";
 	}
 
-	//SCROLL
-	if(c.container_type != container_type::none) {
-		if(c.container_type == container_type::list || c.container_type == container_type::grid) {
-			result += "int32_t " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::max_page(){\n";
-			result += "\t" "if(values.size() == 0) return 0;\n";
-			result += "\t" "if(visible_items.size() == 0) return 0;\n";
-			result += "\t" "return int32_t(values.size() - 1) / int32_t(visible_items.size());\n";
-			result += "}\n";
-			result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::change_page(sys::state & state, int32_t new_page) {\n";
-			if(c.animation_type != animation_type::none) {
-				std::string aninam;
-				switch(c.animation_type) {
-					case animation_type::page_left: aninam = "page_flip_left"; break;
-					case animation_type::page_right: aninam = "page_flip_right"; break;
-					case animation_type::page_up: aninam = "page_flip_up"; break;
-					case animation_type::page_middle: aninam = "page_flip_mid"; break;
-					default: break;
-				}
-
-				result += "\t""bool lflip = new_page < page && page > 0;\n";
-				result += "\t""bool rflip = new_page > page && page < max_page();\n";
-				result += "\t""if(rflip) {\n";
-				result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
-				result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + ", 200); \n";
-				result += "\t" "} else if(lflip) {\n";
-				result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
-				result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + "_rev, 200);\n";
-				result += "\t" "}\n";
-			}
-			result += "\t" "page = std::clamp(new_page, 0, max_page());\n";
-			result += "\t" "state.game_state_updated.store(true, std::memory_order::release);\n";
-
-			if(c.animation_type != animation_type::none) {
-				result += "\t""if(rflip || lflip) {\n";
-				result += "\t" "\t" "impl_on_update(state);\n";
-				result += "\t" "\t" "state.ui_animation.post_update_frame(state);\n";
-				result += "\t" "}\n";
-			}
-			result += "}\n";
-		}
-
-		result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_scroll(sys::state& state, int32_t x, int32_t y, float amount, sys::key_modifiers mods) noexcept {\n";
-		result += "\t""change_page(state, page + ((amount < 0) ? 1 : -1));\n";
-		result += "\t" "return ui::message_result::consumed;\n";
-		result += "}\n";
-	}
 
 	//UPDATE
 	result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
@@ -1990,34 +2195,6 @@ std::string element_member_functions(std::string const& project_name, window_ele
 		result += it->second.text;
 	}
 	result += "// END\n";
-	if(c.container_type == container_type::table) {
-		for(auto& col : c.table_columns) {
-			if(col.internal_data.cell_type == table_cell_type::text && col.internal_data.decimal_alignment != aui_text_alignment::center) {
-				result += "\t" "{\n";
-				result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
-				result += "\t" "if(left_align)\n";
-				result += "\t" "\t" + col.internal_data.column_name + "_decimal_pos = 1000000.0f;\n";
-				result += "\t" "else\n";
-				result += "\t" "\t" + col.internal_data.column_name + "_decimal_pos = -1000000.0f;\n";
-				result += "\t" "}\n";
-			}
-		}
-		result += "\t" "impl_apply_sort(state);\n";
-		result += "\t" "impl_change_page(state, page);\n";
-	} else if(c.container_type != container_type::none) {
-		auto child_type = project_name + "_" + c.child_window + "_t";
-		result += "\t" "page = std::clamp(page, 0, max_page());\n";
-		result += "\t" "auto fill_count = visible_items.size();\n";
-		result += "\t" "auto fill_start = size_t(page) * fill_count;\n";
-		result += "\t" "for(size_t fill_position = 0; fill_position < fill_count; ++fill_position) {\n";
-		result += "\t" "\t" "if(fill_position + fill_start < values.size()) {\n";
-		result += "\t" "\t" "\t" "((" + child_type + "*)visible_items[fill_position])->value = values[fill_position + fill_start];\n";
-		result += "\t" "\t" "\t" "visible_items[fill_position]->flags &= ~ui::element_base::is_invisible_mask;\n";
-		result += "\t" "\t" "} else {\n";
-		result += "\t" "\t" "\t" "visible_items[fill_position]->set_visible(state, false);\n";
-		result += "\t" "\t" "}\n";
-		result += "\t" "}\n";
-	}
 	result += "}\n";
 
 	//ON CREATE
@@ -2029,36 +2206,6 @@ std::string element_member_functions(std::string const& project_name, window_ele
 	}
 	if(c.text_key.size() > 0) {
 		result += "\t" "on_reset_text(state);\n";
-	}
-	if(c.container_type == container_type::list) {
-		result += "\t" "auto ptr = make_" + project_name + "_" + c.child_window + "(state);\n";
-		result += "\t" "int32_t item_y_size = ptr->base_data.size.y;\n";
-		result += "\t" "visible_items.push_back(ptr.get());\n";
-		result += "\t" "add_child_to_back(std::move(ptr));\n";
-		result += "\t" "auto total_rows = int32_t(base_data.size.y) / item_y_size;\n";
-		result += "\t" "for(int32_t i = 1; i < total_rows; ++i) {\n";
-		result += "\t" "\t" "auto ptrb = make_" + project_name + "_" + c.child_window + "(state);\n";
-		result += "\t" "\t" "ptrb->base_data.position.y = int16_t(i * item_y_size);\n";
-		result += "\t" "\t" "visible_items.push_back(ptrb.get());\n";
-		result += "\t" "\t" "add_child_to_back(std::move(ptrb));\n";
-		result += "\t" "}\n";
-	} else if(c.container_type == container_type::grid) {
-		result += "\t" "auto ptr = make_" + project_name + "_" + c.child_window + "(state);\n";
-		result += "\t" "int32_t item_y_size = ptr->base_data.size.y;\n";
-		result += "\t" "int32_t item_x_size = ptr->base_data.size.x;\n";
-		result += "\t" "visible_items.push_back(ptr.get());\n";
-		result += "\t" "add_child_to_back(std::move(ptr));\n";
-		result += "\t" "auto total_rows = int32_t(base_data.size.y) / item_y_size;\n";
-		result += "\t" "auto total_columns = int32_t(base_data.size.x) / item_x_size;\n";
-		result += "\t" "for(int32_t i = 0; i < total_rows; ++i) {\n";
-		result += "\t" "\t"  "for(int32_t j = (i == 0 ? 1 : 0); j < total_columns; ++j) {\n";
-		result += "\t" "\t" "\t" "auto ptrb = make_" + project_name + "_" + c.child_window + "(state);\n";
-		result += "\t" "\t" "\t" "ptrb->base_data.position.y = int16_t(i * item_y_size);\n";
-		result += "\t" "\t" "\t" "ptrb->base_data.position.x = int16_t(j * item_x_size);\n";
-		result += "\t" "\t" "\t" "visible_items.push_back(ptrb.get());\n";
-		result += "\t" "\t" "\t" "add_child_to_back(std::move(ptrb));\n";
-		result += "\t" "\t" "}\n";
-		result += "\t" "}\n";
 	}
 	result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::create\n";
 	if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::create"); it != old_code.found_code.end()) {
@@ -2198,8 +2345,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					if(col.display_data.header_tooltip_key.size() > 0 && !col.internal_data.has_dy_header_tooltip)
 						result += "\t"  "std::string_view " + t->name + "_" + col.internal_data.column_name + "_header_tooltip_key;\n";
 
-					result += "\t"  "text::text_color " + t->name + "_" + col.internal_data.column_name + "_header_text_color = text::text_color::" + color_to_name(col.display_data.header_text_color) + ";\n";
-					result += "\t"  "text::text_color " + t->name + "_" + col.internal_data.column_name + "_column_text_color = text::text_color::" + color_to_name(col.display_data.cell_text_color) + ";\n";
+					if(t->template_id == -1) {
+						result += "\t"  "text::text_color " + t->name + "_" + col.internal_data.column_name + "_header_text_color = text::text_color::" + color_to_name(col.display_data.header_text_color) + ";\n";
+						result += "\t"  "text::text_color " + t->name + "_" + col.internal_data.column_name + "_column_text_color = text::text_color::" + color_to_name(col.display_data.cell_text_color) + ";\n";
+					} else {
+						result += "\t"  "uint8_t " + t->name + "_" + col.internal_data.column_name + "_header_text_color = " + std::to_string(int32_t(col.display_data.header_text_color)) + ";\n";
+						result += "\t"  "uint8_t " + t->name + "_" + col.internal_data.column_name + "_column_text_color = " + std::to_string(int32_t(col.display_data.cell_text_color)) + ";\n";
+					}
 					result += "\t" "text::alignment " + t->name + "_" + col.internal_data.column_name + "_text_alignment = text::alignment::" + alignment_to_name(col.display_data.text_alignment) + ";\n";
 
 					if(col.display_data.cell_tooltip_key.length() > 0 && !col.internal_data.has_dy_cell_tooltip) {
@@ -2224,7 +2376,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t"  "std::string_view " + t->name + "_descending_icon_key;\n";
 				result += "\t"  "dcon::texture_id " + t->name + "_descending_icon;\n";
 			}
-			result += "\t" "ogl::color3f " + t->name + "_divider_color{float(" + std::to_string(t->divider_color.r) + "), float(" + std::to_string(t->divider_color.g) + "), float(" + std::to_string(t->divider_color.b) + ")};\n";
+			if(t->template_id == -1) {
+				result += "\t" "ogl::color3f " + t->name + "_divider_color{float(" + std::to_string(t->divider_color.r) + "), float(" + std::to_string(t->divider_color.g) + "), float(" + std::to_string(t->divider_color.b) + ")};\n";
+			}
 		}
 
 		if(win.wrapped.background == background_type::existing_gfx && win.wrapped.template_id == -1) {
@@ -2617,620 +2771,6 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			if (is_lua_element(c))
 				continue;
 
-			// TABLE
-			//
-			// HEADER
-			//
-			if(c.container_type == container_type::table) {
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::on_reset_text(sys::state & state) noexcept {\n";
-				for(auto& col : c.table_columns) {
-					if(col.internal_data.cell_type == table_cell_type::text) {
-						result += "\t" "{\n";
-						result += "\t" "" + col.internal_data.column_name + "_cached_text = text::produce_simple_string(state, " + col.internal_data.column_name + "_text_key);\n";
-						result += "\t" " " + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
-						result += "\t" " " + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
-						result += "\t" "text::single_line_layout sl{  " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(" + col.internal_data.column_name + "_column_width" + (col.internal_data.sortable ? " - " + std::to_string(proj.grid_size * 3) : std::string("")) + " - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::" + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr };\n";
-						result += "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
-						result += "\t" "}\n";
-					}
-				}
-				result += "}\n";
-
-				result += "void  " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
-
-				result += "\t" "auto fh = text::make_font_id(state, false, 1.0f * " + std::to_string(proj.grid_size * 2) + ");\n";
-				result += "\t" "auto linesz = state.font_collection.line_height(state, fh); \n";
-				result += "\t" "auto ycentered = (base_data.size.y - linesz) / 2;\n";
-				result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - ui::get_absolute_location(state, *this).x;\n";
-
-				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_background_texture, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
-
-				for(auto& col : c.table_columns) {
-					result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= " + col.internal_data.column_name + "_column_start && rel_mouse_x < (" + col.internal_data.column_name + "_column_start + " + col.internal_data.column_name + "_column_width);\n";
-					if(col.internal_data.cell_type == table_cell_type::text) {
-						if(c.has_table_highlight_color) {
-							result += "\t" "if(col_um_" + col.internal_data.column_name + ") {\n";
-							result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + " + col.internal_data.column_name + "_column_start), float(y), float(" + col.internal_data.column_name + "_column_width), float(base_data.size.y)," + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
-							result += "\t" "}\n";
-						}
-
-						if(col.internal_data.header_background && col.display_data.header_texture.length() > 0) {
-							result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start), float(y), float(" + col.internal_data.column_name + "_column_width), float(base_data.size.y), ogl::get_late_load_texture_handle(state, " + col.internal_data.column_name + "_texture, " + col.internal_data.column_name + "_texture_key), ui::rotation::upright, false, state_is_rtl(state));\n";
-
-						}
-
-						if(col.internal_data.sortable) {
-							if(c.ascending_sort_icon.length() > 0) {
-								result += "if(" + col.internal_data.column_name + "_sort_direction > 0) {\n";
-								result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 2) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, ascending_icon, ascending_icon_key), ui::rotation::upright, false, state_is_rtl(state));\n";
-								result += "}\n";
-							}
-							if(c.descending_sort_icon.length() > 0) {
-								result += "if(" + col.internal_data.column_name + "_sort_direction < 0) {\n";
-								result += "\t" "ogl::render_textured_rect(state, ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + ", " + std::string(c.can_disable ? "disabled" : "false") + ", " + std::string(col.internal_data.sortable ? "true" : "false") + "), float(x + " + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + "), float(y + base_data.size.y / 2 - " + std::to_string(proj.grid_size) + "), float(" + std::to_string(proj.grid_size * 2) + "), float(" + std::to_string(proj.grid_size * 2) + "), ogl::get_late_load_texture_handle(state, descending_icon, descending_icon_key), ui::rotation::upright, false, state_is_rtl(state));\n";
-								result += "}\n";
-							}
-						}
-
-						result += "\t"  "if(!" + col.internal_data.column_name + "_internal_layout.contents.empty() && linesz > 0.0f) {\n";
-						result += "\t"  "\t" "auto cmod = ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + " , false, " + std::string(col.internal_data.sortable ? "true" : "false") + "); \n";
-						result += "\t" "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) {\n";
-						result += "\t" "\t" "\t" "ui::render_text_chunk(state, t, float(x) + t.x + " + col.internal_data.column_name + "_column_start" + (col.internal_data.sortable ? " + " + std::to_string(proj.grid_size * 0) : std::string("")) + " + " + std::to_string(proj.grid_size) + ", float(y + int32_t(ycentered)),  fh, ui::get_text_color(state, " + col.internal_data.column_name + "_text_color), cmod);\n";
-						result += "\t" "\t" "}\n";
-
-						result += "\t"  "}\n";
-					}
-				}
-
-				result += "\t" "ogl::render_alpha_colored_rect(state, float(x), float(y + base_data.size.y - 1), float(base_data.size.x), float(1), " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_divider_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_divider_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_divider_color.b, 1.0f);\n";
-				result += "}\n";
-
-				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
-				for(auto& col : c.table_columns) {
-					if(col.internal_data.sortable) {
-						result += "\t" "if(x >= " + col.internal_data.column_name + "_column_start && x < " + col.internal_data.column_name + "_column_start + " + col.internal_data.column_name + "_column_width) {\n";
-						result += "\t" "\t" "sound::play_interface_sound(state, sound::get_click_sound(state), state.user_settings.interface_volume* state.user_settings.master_volume);\n";
-						result += "\t" "\t" "auto old_direction = " + col.internal_data.column_name + "_sort_direction;\n";
-						for(auto& colb : c.table_columns) {
-							if(colb.internal_data.sortable) {
-								result += "\t" "\t" + colb.internal_data.column_name + "_sort_direction = 0;\n";
-							}
-						}
-						result += "\t" "\t" + col.internal_data.column_name + "_sort_direction = int8_t(old_direction <= 0 ? 1 : -1);\n";
-						result += "\t" "\t" "(( " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->apply_sort(state);\n";
-						result += "\t" "}\n";
-					}
-				}
-				result += "\t" "return ui::message_result::consumed;";
-				result += "}\n";
-
-				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
-				result += "\t" "return ui::message_result::consumed;";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
-				for(auto& col : c.table_columns) {
-					result += "\t" "if(x >= " + col.internal_data.column_name + "_column_start && x < " + col.internal_data.column_name + "_column_start + " + col.internal_data.column_name + "_column_width) {\n";
-
-					if(col.internal_data.has_dy_header_tooltip) {
-						make_sub_obj_parent_var_text(c);
-						result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::header_tooltip\n";
-						if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::header_tooltip"); it != old_code.found_code.end()) {
-							it->second.used = true;
-							result += it->second.text;
-						}
-						result += "// END\n";
-
-					} else if(col.display_data.header_tooltip_key.length() > 0) {
-						result += "\t" "text::add_line(state, contents, " + col.internal_data.column_name + "_tooltip_key);\n";
-					}
-					result += "\t" "}\n";
-				}
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept {\n";
-
-				int32_t ccount = 0;
-				for(auto& col : c.table_columns) {
-					result += "\t" "if(x >= " + col.internal_data.column_name + "_column_start && x < " + col.internal_data.column_name + "_column_start + " + col.internal_data.column_name + "_column_width) {\n";
-					if(col.internal_data.has_dy_header_tooltip || col.display_data.header_tooltip_key.length() > 0) {
-						result += "\t" "\t" "ident = " + std::to_string(ccount) + ";\n";
-						result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
-						result += "\t" "\t" "subrect.top_left.x += int16_t(" + col.internal_data.column_name + "_column_start);\n";
-						result += "\t" "\t" "subrect.size = base_data.size;\n";
-						result += "\t" "\t" "subrect.size.x += int16_t(" + col.internal_data.column_name + "_column_width);\n";
-						result += "\t" "\t" "return;\n";
-					}
-					result += "\t" "}\n";
-					++ccount;
-				}
-				result += "\t" "\t" "ident = -1;\n";
-				result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
-				result += "\t" "\t" "subrect.size = base_data.size;\n";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::on_create(sys::state& state) noexcept {\n";
-				result += "\t" "on_reset_text(state);\n";
-				result += "}\n";
-
-
-				//
-				// ROW
-				//
-				std::string hprefix = project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::";
-				result += "void  " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
-
-				result += "\t" "auto fh = text::make_font_id(state, false, 1.0f * " + std::to_string(proj.grid_size * 2) + ");\n";
-				result += "\t"  "auto linesz = state.font_collection.line_height(state, fh); \n";
-				result += "\t" "auto ycentered = (base_data.size.y - linesz) / 2;\n";
-				result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - ui::get_absolute_location(state, *this).x;\n";
-
-				result += "\t" "if(alternate_row) {\n";
-				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, alt_row_background_texture, alt_row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
-				result += "\t" "} else {\n";
-				result += "\t" "\t" "ogl::render_textured_rect(state, ui::get_color_modification(false, false,  false), float(x), float(y), float(base_data.size.x), float(base_data.size.y), ogl::get_late_load_texture_handle(state, row_background_texture, row_texture_key), ui::rotation::upright, false, " + std::string(c.ignore_rtl ? "false" : "state_is_rtl(state)") + ");\n";
-				result += "\t" "}\n";
-
-				if(c.has_table_highlight_color) {
-					result += "\t" "if(this == state.ui_state.under_mouse) {\n";
-					result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x ), float(y), float(base_data.size.x), float(base_data.size.y), " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
-					result += "\t" "}\n";
-				}
-
-				for(auto& col : c.table_columns) {
-					result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= " + hprefix + col.internal_data.column_name + "_column_start && rel_mouse_x < (" + hprefix + col.internal_data.column_name + "_column_start + " + hprefix + col.internal_data.column_name + "_column_width);\n";
-					if(col.internal_data.cell_type == table_cell_type::text) {
-						if(c.has_table_highlight_color) {
-							result += "\t" "if(col_um_" + col.internal_data.column_name + " && this != state.ui_state.under_mouse) {\n";
-							result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + " + hprefix + col.internal_data.column_name + "_column_start), float(y), float(" + hprefix + col.internal_data.column_name + "_column_width), float(base_data.size.y), " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.r, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.g, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.b, " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::table_highlight_color.a);\n";
-							result += "\t" "}\n";
-						}
-
-						result += "\t"  "if(!" + col.internal_data.column_name + "_internal_layout.contents.empty() && linesz > 0.0f) {\n";
-						result += "\t"  "\t" "auto cmod = ui::get_color_modification(this == state.ui_state.under_mouse && col_um_" + col.internal_data.column_name + " , false, false); \n";
-						result += "\t" "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) {\n";
-						if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
-							result += "\t" "\t"  "\t" "ui::render_text_chunk(state, t, float(x) + t.x + " + hprefix + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + " + ((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos - " + col.internal_data.column_name + "_decimal_pos, float(y + int32_t(ycentered)),  fh, ui::get_text_color(state, " + col.internal_data.column_name + "_text_color), cmod);\n";
-						} else {
-							result += "\t" "\t"  "\t" "ui::render_text_chunk(state, t, float(x) + t.x + " + hprefix + col.internal_data.column_name + "_column_start + " + std::to_string(proj.grid_size) + ", float(y + int32_t(ycentered)),  fh, ui::get_text_color(state, " + col.internal_data.column_name + "_text_color), cmod);\n";
-						}
-						result += "\t"  "}\n";
-
-						result += "\t"  "}\n";
-					}
-				}
-				result += "}\n";
-
-				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
-				result += "\t" "return ui::message_result::consumed;";
-				result += "}\n";
-
-				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
-				result += "\t" "return ui::message_result::consumed;";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
-				for(auto& col : c.table_columns) {
-					result += "\t" "if(x >= " + hprefix + col.internal_data.column_name + "_column_start && x < " + hprefix + col.internal_data.column_name + "_column_start + " + hprefix + col.internal_data.column_name + "_column_width) {\n";
-
-					if(col.internal_data.has_dy_header_tooltip) {
-						make_sub_obj_parent_var_text(c);
-						result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::row_tooltip\n";
-						if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::row_tooltip"); it != old_code.found_code.end()) {
-							it->second.used = true;
-							result += it->second.text;
-						}
-						result += "// END\n";
-					} else if(col.display_data.header_tooltip_key.length() > 0) {
-						result += "\t" "text::add_line(state, contents, " + col.internal_data.column_name + "_tooltip_key);\n";
-					}
-					result += "\t" "}\n";
-				}
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::tooltip_position(sys::state& state, int32_t x, int32_t y, int32_t& ident, ui::urect& subrect) noexcept {\n";
-
-				int32_t ccountb = 0;
-				for(auto& col : c.table_columns) {
-					result += "\t" "if(x >= " + hprefix + col.internal_data.column_name + "_column_start && x < " + hprefix + col.internal_data.column_name + "_column_start + " + hprefix + col.internal_data.column_name + "_column_width) {\n";
-					if(col.internal_data.has_dy_header_tooltip || col.display_data.header_tooltip_key.length() > 0) {
-						result += "\t" "\t" "ident = " + std::to_string(ccountb) + ";\n";
-						result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
-						result += "\t" "\t" "subrect.top_left.x += int16_t(" + hprefix + col.internal_data.column_name + "_column_start);\n";
-						result += "\t" "\t" "subrect.size = base_data.size;\n";
-						result += "\t" "\t" "subrect.size.x += int16_t(" + hprefix + col.internal_data.column_name + "_column_width);\n";
-						result += "\t" "\t" "return;\n";
-					}
-					result += "\t" "}\n";
-					++ccountb;
-				}
-				result += "\t" "\t" "ident = -1;\n";
-				result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
-				result += "\t" "\t" "subrect.size = base_data.size;\n";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::on_create(sys::state& state) noexcept {\n";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::on_update(sys::state& state) noexcept {\n";
-				make_sub_obj_parent_var_text(c);
-				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::row_update\n";
-				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::row_update"); it != old_code.found_code.end()) {
-					it->second.used = true;
-					result += it->second.text;
-				}
-				result += "// END\n";
-				result += "}\n";
-
-				for(auto& col : c.table_columns) {
-					if(col.internal_data.cell_type == table_cell_type::text) {
-						result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t::set_" + col.internal_data.column_name + "_text(sys::state & state, std::string const& new_text) {\n";
-						result += "\t" "if(new_text !=  " + col.internal_data.column_name + "_cached_text) {\n";
-						result += "\t" "\t" + col.internal_data.column_name + "_cached_text = new_text;\n";
-						result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.contents.clear();\n";
-						result += "\t" "\t" + col.internal_data.column_name + "_internal_layout.number_of_lines = 0;\n";
-						result += "\t" "\t" "{\n";
-						result += "\t" "\t" "text::single_line_layout sl{ " + col.internal_data.column_name + "_internal_layout, text::layout_parameters{ 0, 0, int16_t(" + hprefix + col.internal_data.column_name + "_column_width - " + std::to_string(2 * proj.grid_size) + "), static_cast<int16_t>(base_data.size.y), text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "), 0, " + col.internal_data.column_name + "_text_alignment, text::text_color::black, true, true }, state_is_rtl(state) ? text::layout_base::rtl_status::rtl : text::layout_base::rtl_status::ltr }; \n";
-						result += "\t" "\t" "sl.add_text(state, " + col.internal_data.column_name + "_cached_text);\n";
-						result += "\t" "\t" "}\n";
-
-						if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
-							result += "\t" "auto font_size_factor = float(text::size_from_font_id(text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "))) / (float((1 << 6) * 64.0f * text::magnification_factor));\n";
-							result += "\t" "float temp_decimal_pos = -1.0f;\n";
-							result += "\t" "float running_total = 0.0f;\n";
-							result += "\t" "auto best_cluster = std::string::npos;\n";
-							result += "\t" "auto found_decimal_pos =  " + col.internal_data.column_name + "_cached_text.find_last_of('.');";
-							result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
-							result += "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) { \n";
-							result += "\t" "\t" "running_total = float(t.x);\n";
-							result += "\t" "\t" "for(auto& ch : t.unicodechars.glyph_info) {\n";
-							result += "\t" "\t" "\t" "if(found_decimal_pos <= size_t(ch.cluster) && size_t(ch.cluster) < best_cluster) {\n";
-							result += "\t" "\t" "\t" "\t" "temp_decimal_pos = running_total ;\n";
-							result += "\t" "\t" "\t" "\t" "best_cluster = size_t(ch.cluster);\n";
-							result += "\t" "\t" "\t" "}\n";
-							result += "\t" "\t" "\t" "running_total += ch.x_advance * font_size_factor;\n";
-							result += "\t" "\t" "}\n";
-							result += "\t" "} \n";
-							result += "\t" "if(best_cluster == std::string::npos) {\n";
-							result += "\t" "\t" "running_total = 0.0f;\n";
-							result += "\t" "\t" "temp_decimal_pos = -1000000.0f;\n";
-							result += "\t" "\t" "for(auto& t : " + col.internal_data.column_name + "_internal_layout.contents) {\n";
-							result += "\t" "\t" "\t" "running_total = float(t.x);\n";
-							result += "\t" "\t" "\t" "for(auto& ch : t.unicodechars.glyph_info) {\n";
-							result += "\t" "\t" "\t" "\t" "temp_decimal_pos = std::max(temp_decimal_pos, running_total);\n";
-							result += "\t" "\t" "\t" "\t" "running_total += ch.x_advance * font_size_factor;\n";
-							result += "\t" "\t" "\t" "}\n";
-							result += "\t" "\t" "}\n";
-							result += "\t" "}\n";
-							result += "\t" + col.internal_data.column_name + "_decimal_pos = temp_decimal_pos;\n";
-							result += "\t" "if(left_align)\n";
-							result += "\t" "\t" "((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos = std::min(" + col.internal_data.column_name + "_decimal_pos, ((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos);\n";
-							result += "\t" "else\n";
-							result += "\t" "\t" "((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos = std::max(" + col.internal_data.column_name + "_decimal_pos, ((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos);\n";
-
-
-						}
-						result += "\t" "} else {\n";
-						if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
-							result += "\t" "bool left_align = " + std::string(col.internal_data.decimal_alignment == aui_text_alignment::right ? "true" : "false") + " == (state_is_rtl(state)); \n";
-							result += "\t" "if(left_align)\n";
-							result += "\t" "\t" "((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos = std::min(" + col.internal_data.column_name + "_decimal_pos, ((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos);\n";
-							result += "\t" "else\n";
-							result += "\t" "\t" "((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos = std::max(" + col.internal_data.column_name + "_decimal_pos, ((" + project_name + "_" + win.wrapped.name + "_" + c.name + "_t*)parent)->" + col.internal_data.column_name + "_decimal_pos);\n";
-						}
-						result += "\t" "}\n";
-
-						result += "}\n";
-					}
-				}
-
-				//
-				// TABLE ITSELF
-				//
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::impl_change_page(sys::state & state, int32_t new_page){\n";
-				for(auto& insert : c.table_inserts) {
-					result += "\t" "size_t " + insert + "_pool_used = 0;\n";
-				}
-				result += "\t" "size_t row_pool_used = 0;\n";
-				result += "\t" "size_t header_pool_used = 0;\n";
-				result += "\t" "int16_t vert_used = 0;\n";
-				result += "\t" "bool alt_bg  = true;\n";
-				result += "\t" "page = std::clamp(new_page, 0, max_page());\n";
-				result += "\t" "children.clear();\n";
-				result += "\t" "if(page_starts.empty()) return;\n";
-				result += "\t" "if(open_page) { page_starts.push_back(int32_t(values.size())); open_page = false; }\n";
-				result += "\t" "for(int32_t i = page_starts[page]; i < page_starts[page + 1]; ++i) {\n";
-				for(auto& insert : c.table_inserts) {
-					result += "\t" "\t" "if(std::holds_alternative<" + insert + "_option>(values[i])) {\n";
-					result += "\t" "\t" "\t" "if(" + insert + "_pool_used >= " + insert + "_pool.size()) " + insert + "_pool.emplace_back(make_" + project_name + "_" + insert + "(state));\n";
-					result += "\t" "\t" "\t" "children.push_back(" + insert + "_pool[" + insert + "_pool_used].get());\n";
-					result += "\t" "\t" "\t" "children.back()->parent = this;\n";
-					for(auto& window : proj.windows) {
-						if(window.wrapped.name == insert) {
-							for(auto& dm : window.wrapped.members) {
-								result += "\t" "\t" "\t" "((" + project_name + "_" + insert + "_t*)(" + insert + "_pool[" + insert + "_pool_used].get()))->" + dm.name + " = std::get<" + insert + "_option>(values[i])." + dm.name + ";\n";
-							}
-						}
-					}
-					result += "\t" "\t" "\t" + insert + "_pool[" + insert + "_pool_used]->base_data.position.y = vert_used;\n";
-					result += "\t" "\t" "\t" "vert_used += " + insert + "_pool[" + insert + "_pool_used]->base_data.size.y;\n";
-					for(auto& window : proj.windows) {
-						if(window.wrapped.name == insert) {
-							if(window.wrapped.has_alternate_bg) {
-								result += "\t" "\t" "\t" "((" + project_name + "_" + insert + "_t*)(" + insert + "_pool[" + insert + "_pool_used].get()))->is_active = alt_bg;\n";
-								result += "\t" "\t" "\t" "alt_bg  = !alt_bg;\n";
-							} else {
-								result += "\t" "\t" "\t" "alt_bg  = false;\n";
-							}
-							break;
-						}
-					}
-					result += "\t" "\t" "\t" "++" + insert + "_pool_used;\n";
-					result += "\t" "\t" "}\n";
-				}
-				result += "\t" "\t" "if(std::holds_alternative<value_option>(values[i])) {\n";
-				result += "\t" "\t" "\t" "if(row_pool_used >= row_pool.size())row_pool.emplace_back(make_row(state));\n";
-				result += "\t" "\t" "\t" "children.push_back(row_pool[row_pool_used].get());\n";
-				result += "\t" "\t" "\t" "children.back()->parent = this;\n";
-				result += "\t" "\t" "\t" "row_pool[row_pool_used]->value = std::get<value_option>(values[i]).value;\n";
-				result += "\t" "\t" "\t" "row_pool[row_pool_used]->alternate_row = alt_bg;\n";
-				result += "\t" "\t" "\t" "row_pool[row_pool_used]->base_data.position.y = vert_used;\n";
-				result += "\t" "\t" "\t" "vert_used += row_pool[row_pool_used]->base_data.size.y;\n";
-				result += "\t" "\t" "\t" "++row_pool_used;\n";
-				result += "\t" "\t" "\t" "alt_bg  = !alt_bg;\n";
-				result += "\t" "\t" "}\n";
-
-				result += "\t" "\t" "if(std::holds_alternative<std::monostate>(values[i])) {\n";
-				result += "\t" "\t" "\t" "if(header_pool_used >= header_pool.size()) header_pool.emplace_back(make_headers(state));\n";
-				result += "\t" "\t" "\t" "children.push_back(header_pool[header_pool_used].get());\n";
-				result += "\t" "\t" "\t" "children.back()->parent = this;\n";
-				result += "\t" "\t" "\t" "header_pool[header_pool_used]->base_data.position.y = vert_used;\n";
-				result += "\t" "\t" "\t" "vert_used += header_pool[header_pool_used]->base_data.size.y;\n";
-				result += "\t" "\t" "\t" "++header_pool_used;\n";
-				result += "\t" "\t" "\t" "alt_bg  = true;\n";
-				result += "\t" "\t" "}\n";
-
-				result += "\t" "}\n";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::change_page(sys::state & state, int32_t new_page){\n";
-				if(c.animation_type != animation_type::none) {
-					std::string aninam;
-					switch(c.animation_type) {
-						case animation_type::page_left: aninam = "page_flip_left"; break;
-						case animation_type::page_right: aninam = "page_flip_right"; break;
-						case animation_type::page_up: aninam = "page_flip_up"; break;
-						case animation_type::page_middle: aninam = "page_flip_mid"; break;
-						default: break;
-					}
-
-					result += "\t""bool lflip = new_page < page && page > 0;\n";
-					result += "\t""bool rflip = new_page > page && page < max_page();\n";
-					result += "\t""if(rflip) {\n";
-					result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
-					result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + ", 200); \n";
-					result += "\t" "} else if(lflip) {\n";
-					result += "\t" "\t" "auto pos = ui::get_absolute_location(state, *this);\n";
-					result += "\t" "\t" "state.ui_animation.start_animation(state, pos.x, pos.y, base_data.size.x, base_data.size.y, ogl::animation::type::" + aninam + "_rev, 200);\n";
-					result += "\t" "}\n";
-				}
-				result += "\t" "impl_change_page(state, new_page);";
-				result += "\t" "for(auto c : children) c->impl_on_update(state);\n";
-				result += "\t" "state.game_state_updated.store(true, std::memory_order::release);\n";
-
-				if(c.animation_type != animation_type::none) {
-					result += "\t""if(rflip || lflip) {\n";
-					result += "\t" "\t" "state.ui_animation.post_update_frame(state);\n";
-					result += "\t" "}\n";
-				}
-				result += "}\n";
-
-				result += "int32_t " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::max_page(){\n";
-				result += "\t" "return open_page ? std::max(int32_t(page_starts.size()) - 1, 0) : std::max(int32_t(page_starts.size()) - 2, 0);\n";
-				result += "}\n";
-
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::clear_table() {\n";
-				result += "\t" "children.clear();\n";
-				result += "\t" "page_starts.clear();\n";
-				result += "\t" "values.clear();\n";
-				result += "\t" "open_page = false;\n";
-				result += "\t" "layout_space = 0;\n";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::add_value(" + c.list_content + " const& v) {\n";
-				result += "\t" "if(!open_page) {\n";
-				result += "\t" "\t" "page_starts.push_back(0);\n";
-				result += "\t" "\t" "open_page = true;\n";
-				result += "\t" "}\n";
-
-				if(c.table_has_per_section_headers) {
-					result += "\t" "if(values.empty() || !std::holds_alternative<value_option>(values.back())) {\n";
-					result += "\t" "\t" "if(base_data.size.y - layout_space <= 2 * int32_t(row_height * " + std::to_string(proj.grid_size) + ")) {\n"; // new page
-					result += "\t" "\t" "\t" "page_starts.push_back(int32_t(values.size()));\n";
-					result += "\t" "\t" "\t" "layout_space = 0;\n";
-					result += "\t" "\t" "}\n";
-					result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
-					result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-					result += "\t" "}\n";
-				} else {
-					result += "\t" "if(values.empty()) {\n";
-					result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
-					result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-					result += "\t" "}\n";
-				}
-
-				result += "\t"  "if(base_data.size.y - layout_space <= int32_t(row_height * " + std::to_string(proj.grid_size) + ")) {\n"; // new page
-				result += "\t" "\t" "page_starts.push_back(int32_t(values.size()));\n";
-				result += "\t" "\t" "layout_space = 0;\n";
-				result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
-				result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-				result += "\t" "}\n";
-
-				result += "\t" "values.emplace_back(value_option{v});\n";
-				result += "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-				result += "}\n";
-
-				for(auto& inserts : c.table_inserts) {
-					std::string insert_types;
-					std::string insert_values;
-					for(auto& window : proj.windows) {
-						if(window.wrapped.name == inserts) {
-							for(auto& dm : window.wrapped.members) {
-								insert_types += ", " + dm.type + " const& " + dm.name;
-								insert_values += (insert_values.empty() ? "" : ", ") + dm.name;
-							}
-						}
-					}
-					result +="void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::add_insert_" + inserts + "(sys::state& state" + insert_types + ") {\n";
-					result += "\t" "if(" + inserts + "_pool.empty()) " + inserts + "_pool.emplace_back(make_" + project_name + "_" + inserts + "(state));\n";
-					result += "\t" "if(!open_page) {\n";
-					result += "\t" "\t" "page_starts.push_back(0);\n";
-					result += "\t" "\t" "open_page = true;\n";
-					result += "\t" "}\n";
-
-					if(!c.table_has_per_section_headers) {
-						result += "\t" "if(values.empty()) {\n";
-						result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
-						result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-						result += "\t" "}\n";
-					}
-
-					result += "\t"  "if(base_data.size.y - layout_space <=  " + inserts + "_pool[0]->base_data.size.y) {\n"; // new page
-					result += "\t" "\t" "page_starts.push_back(int32_t(values.size()));\n";
-					result += "\t" "\t" "layout_space = 0;\n";
-					if(!c.table_has_per_section_headers) {
-						result += "\t" "\t" "values.emplace_back(std::monostate{});\n";
-						result += "\t" "\t" "layout_space += int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-					}
-					result += "\t" "}\n";
-
-					result += "\t" "values.emplace_back(" + inserts +"_option{" + insert_values + "});\n";
-					result += "\t" "layout_space += int16_t(" + inserts + "_pool[0]->base_data.size.y);\n";
-					result += "}\n";
-				}
-
-				result += "std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t> " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::make_row(sys::state& state) {\n";
-				result += "\t" "auto cptr = std::make_unique<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_row_t>();\n";
-				result += "\t"  "cptr->parent = this;\n";
-				result += "\t" "cptr->base_data.position.x = 0;\n";
-				result += "\t" "cptr->base_data.position.y = 0;\n";
-				result += "\t" "cptr->base_data.size.y = int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-				result += "\t" "cptr->base_data.size.x = this->base_data.size.x;\n";
-				result += "\t" "cptr->on_create(state);\n";
-				result += "\t" "return cptr;\n";
-				result += "}\n";
-
-				result += "std::unique_ptr<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t> " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::make_headers(sys::state& state){\n";
-				result += "\t" "auto cptr = std::make_unique<" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t>();\n";
-				result += "\t"  "cptr->parent = this;\n";
-				result += "\t" "cptr->base_data.position.x = 0;\n";
-				result += "\t" "cptr->base_data.position.y = 0;\n";
-				result += "\t" "cptr->base_data.size.y = int16_t(row_height * " + std::to_string(proj.grid_size) + ");\n";
-				result += "\t" "cptr->base_data.size.x = this->base_data.size.x;\n";
-				result += "\t" "cptr->on_create(state);\n";
-				result += "\t" "return cptr;\n";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::impl_apply_sort(sys::state& state) {\n";
-				result += "\t" "bool work_to_do = false;\n";
-				for(auto& col : c.table_columns) {
-					if(col.internal_data.sortable)
-						result += "\t" "if(" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_sort_direction != 0) work_to_do = true;\n";
-				}
-				result += "\t" "if(!work_to_do) return;\n";
-				make_parent_var_text();
-				result += "\t" "std::vector<" + c.list_content + "> val_temp;\n";
-				result += "\t" "size_t i = 0;\n";
-				result += "\t" "while(i < values.size()) {\n";
-				// get section
-				std::string additional_sortables;
-				for(auto& ins : c.table_inserts) {
-					for(auto& window : proj.windows) {
-						if(window.wrapped.name == ins) {
-							for(auto& dm : window.wrapped.members) {
-								if(dm.name == "value" && dm.type == c.list_content) {
-									additional_sortables += " || std::holds_alternative<" + ins + "_option>(values[i])";
-									break;
-								}
-							}
-						}
-					}
-				}
-
-				result += "\t" "\t" "if(std::holds_alternative<value_option>(values[i])" + additional_sortables +") {\n";
-				result += "\t" "\t" "\t" "auto start_pos = i;\n";
-				result += "\t" "\t" "\t" "do {\n";
-				result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<value_option>(values[i])) val_temp.push_back(std::get<value_option>(values[i]).value);\n";
-				for(auto& ins : c.table_inserts) {
-					for(auto& window : proj.windows) {
-						if(window.wrapped.name == ins) {
-							for(auto& dm : window.wrapped.members) {
-								if(dm.name == "value" && dm.type == c.list_content) {
-									result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<" + ins + "_option>(values[i])) val_temp.push_back(std::get<" + ins + "_option>(values[i]).value);\n";
-									break;
-								}
-							}
-						}
-					}
-				}
-				result += "\t" "\t" "\t" "\t" "++i;\n";
-				result += "\t" "\t" "\t" "} while(i < values.size() && (std::holds_alternative<value_option>(values[i])" + additional_sortables + " || std::holds_alternative<std::monostate>(values[i])));\n";
-				// do sort
-				for(auto& col : c.table_columns) {
-					if(col.internal_data.sortable) {
-						result += "\t" "\t" "\t" "if(" + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_sort_direction != 0) {\n";
-						result += "\t" "\t" "\t" "\t" "sys::merge_sort(val_temp.begin(), val_temp.end(), [&](const " + c.list_content + "& a, const " + c.list_content + "& b){\n";
-						result += "\t" "\t" "\t" "\t" "\t" "int8_t result = 0;\n";
-						result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::sort::" + col.internal_data.column_name + "\n";
-						if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::sort::" + col.internal_data.column_name); it != old_code.found_code.end()) {
-							it->second.used = true;
-							result += it->second.text;
-						}
-						result += "// END\n";
-						result += "\t" "\t" "\t" "\t" "\t" "return result == " + project_name + "_" + win.wrapped.name + "_" + c.name + "_header_t::" + col.internal_data.column_name + "_sort_direction;\n";
-						result += "\t" "\t" "\t" "\t" "});\n";
-						result += "\t" "\t" "\t" "}\n";
-					}
-				}
-				// put back
-				result += "\t" "\t" "\t" "while(start_pos < i) {\n";
-				result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<value_option>(values[start_pos])) {\n";
-				result += "\t" "\t" "\t" "\t" "\t" "std::get<value_option>(values[start_pos]).value = val_temp.back();\n";
-				result += "\t" "\t" "\t" "\t" "\t" "val_temp.pop_back();\n";
-				result += "\t" "\t" "\t" "\t" "}\n";
-				for(auto& ins : c.table_inserts) {
-					for(auto& window : proj.windows) {
-						if(window.wrapped.name == ins) {
-							for(auto& dm : window.wrapped.members) {
-								if(dm.name == "value" && dm.type == c.list_content) {
-									result += "\t" "\t" "\t" "\t" "if(std::holds_alternative<" + ins + "_option>(values[start_pos])) {\n";
-									result += "\t" "\t" "\t" "\t" "\t" "std::get<" + ins + "_option>(values[start_pos]).value = val_temp.back();\n";
-									result += "\t" "\t" "\t" "\t" "\t" "val_temp.pop_back();\n";
-									result += "\t" "\t" "\t" "\t" "}\n";
-									break;
-								}
-							}
-						}
-					}
-				}
-				result += "\t" "\t" "\t" "\t" "++start_pos;\n";
-				result += "\t" "\t" "\t" "}\n";
-				result += "\t" "\t" "\t" "val_temp.clear();\n";
-				result += "\t" "\t" "} else {\n";
-				result += "\t" "\t" "\t" "++i;\n";
-				result += "\t" "\t" "}" "\n";
-				result += "\t" "}\n";
-				result += "}\n";
-
-				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::apply_sort(sys::state& state) {\n";
-				result += "\t" "impl_apply_sort(state);\n";
-				result += "\t" "impl_change_page(state, page);";
-				result += "\t" "for(auto c : children) c->impl_on_update(state);\n";
-				result += "}\n";
-			} // END TABLE
-
 			result += element_member_functions(project_name, win, c, old_code, proj);
 		}
 
@@ -3615,7 +3155,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				result += "\t" "\t" "\t" + t->name + "_descending_icon_key = main_section.read<std::string_view>();\n";
 			else
 				result += "\t" "\t" "\t" "main_section.read<std::string_view>(); // discard\n";
-			result += "\t" "\t" "\t" "main_section.read(" + t->name + "_divider_color);\n";
+			if(t->template_id != -1) {
+				result += "\t" "\t" "\t" "main_section.read<ogl::color3f>();\n";
+				// result += "\t" "\t" "\t" + t->name + "_template_id = main_section.read<int32_t>();\n";
+				// result += "\t" "\t" "\t" + t->name + "_ink_color = state.ui_templates.tables_t[" + t->name + "_template_id].table_color;\n";
+			} else {
+				result += "\t" "\t" "\t" "main_section.read(" + t->name + "_divider_color);\n";
+			}
 			result += "\t" "\t" "\t" "auto col_section = tbuffer.read_section();\n";
 			for(auto& col : t->table_columns) {
 				if(col.internal_data.cell_type == table_cell_type::text) {
@@ -3641,7 +3187,11 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "\t" "col_section.read<std::string_view>(); // discard\n";
 					result += "\t" "\t" "\t" "col_section.read<std::string_view>(); // discard\n";
 					result += "\t" "\t" "\t" "col_section.read<std::string_view>(); // discard\n";
-					result += "\t" "\t" "\t" "running_w_total += col_section.read<int16_t>();\n";
+
+					result += "\t" "\t" "\t" + t->name + "_" + col.internal_data.column_name + "_column_start = running_w_total;\n";
+					result += "\t" "\t" "\t" "col_section.read(" + t->name + "_" + col.internal_data.column_name + "_column_width);\n";
+					result += "\t" "\t" "\t" "running_w_total += " + t->name + "_" + col.internal_data.column_name + "_column_width;\n";
+
 					result += "\t" "\t" "\t" "col_section.read<text::text_color>(); // discard\n";
 					result += "\t" "\t" "\t" "col_section.read<text::text_color>(); // discard\n";
 					result += "\t" "\t" "\t" "col_section.read<text::alignment>(); // discard\n";

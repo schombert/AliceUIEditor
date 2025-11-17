@@ -189,6 +189,17 @@ struct toggle_button_template {
 	bool animate_active_transition = false;
 };
 
+struct table_template {
+	std::string display_name;
+	std::string temp_display_name;
+
+	int32_t arrow_increasing = -1;
+	int32_t arrow_decreasing = -1;
+	int32_t table_color = 0;
+	int32_t interactable_header_bg = -1;
+	int32_t active_header_bg = -1;
+};
+
 struct project {
 	std::wstring project_name;
 	std::wstring project_directory;
@@ -203,6 +214,7 @@ struct project {
 	std::vector< background_definition> backgrounds;
 	std::vector<mixed_template> mixed_button_t;
 	std::vector<toggle_button_template> toggle_button_t;
+	std::vector<table_template> table_t;
 	std::vector< icon_definition> icons;
 	std::vector<color_definition> colors;
 };

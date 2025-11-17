@@ -475,6 +475,21 @@ project bytes_to_project(serialization::in_buffer& buffer) {
 			indv_tb.read(i.animate_active_transition);
 		}
 
+
+		auto tables_section = buffer.read_section();
+		while(tables_section) {
+			result.table_t.emplace_back();
+			auto indv_tb = tables_section.read_section();
+			auto& i = result.table_t.back();
+
+			indv_tb.read(i.display_name);
+			indv_tb.read(i.arrow_increasing);
+			indv_tb.read(i.arrow_decreasing);
+			indv_tb.read(i.table_color);
+			indv_tb.read(i.interactable_header_bg);
+			indv_tb.read(i.active_header_bg);
+		}
+
 	return result;
 }
 
