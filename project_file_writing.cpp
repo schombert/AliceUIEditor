@@ -493,6 +493,7 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 			buffer.write(t->ascending_sort_icon);
 			buffer.write(t->descending_sort_icon);
 			buffer.write(t->divider_color);
+			buffer.write(t->template_id);
 			buffer.finish_section();
 			buffer.start_section(); // col section
 			for(auto& tc : t->table_columns) {
@@ -520,6 +521,7 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 		buffer.write(tab.highlight_color);
 		buffer.write(tab.divider_color);
 		buffer.write(tab.has_highlight_color);
+		buffer.write(tab.template_id);
 		buffer.finish_section();
 
 		buffer.start_section();
@@ -595,6 +597,8 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 			essential_window_section.read(tab.highlight_color);
 			essential_window_section.read(tab.divider_color);
 			essential_window_section.read(tab.has_highlight_color);
+			if(essential_window_section)
+				essential_window_section.read(tab.template_id);
 
 			auto optional_section = window_section.read_section();
 			while(optional_section) {

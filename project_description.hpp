@@ -9,7 +9,7 @@
 namespace template_project {
 
 enum class template_type : uint8_t {
-	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button
+	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button, toggle_button, table, table_header, table_row, mixed_button_ci, stacked_bar_chart
 };
 
 }
@@ -271,6 +271,7 @@ struct table_definition {
 	color4f highlight_color{ 0.0f, 0.0f, 0.0f, 0.0f };
 	color3f divider_color{ 0.0f, 0.0f, 0.0f };
 	bool has_highlight_color = false;
+	int32_t template_id = -1;
 };
 struct ui_element_t {
 	std::vector< data_member> members;

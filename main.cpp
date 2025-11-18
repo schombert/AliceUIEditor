@@ -616,6 +616,23 @@ void update_cached_window(std::string_view name, int16_t& index) {
 	}
 }
 
+void make_color_combo_box(int32_t& color_choice, char const* label, template_project::project const& current_theme) {
+	ImGui::PushID((void*)&color_choice);
+
+	int32_t combo_selection = color_choice + 1;
+	std::vector<char const*> options;
+	options.push_back("--None--");
+
+	for(auto& c : current_theme.colors) {
+		options.push_back(c.display_name.c_str());
+	}
+
+	if(ImGui::Combo(label, &combo_selection, options.data(), int32_t(options.size()))) {
+		color_choice = combo_selection - 1;
+	}
+	ImGui::PopID();
+}
+
 void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int layer, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale);
 
 void render_window(window_element_wrapper_t& win, float x, float y, bool highlightwin, float ui_scale) {
@@ -781,6 +798,16 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 		return;
 	}
+	if(c.ttype == template_project::template_type::stacked_bar_chart) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.stacked_bar_t[c.template_id].overlay_bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	}
 	if(c.ttype == template_project::template_type::iconic_button) {
 		if(c.template_id != -1) {
 			auto bg = open_templates.iconic_button_t[c.template_id].primary.bg;
@@ -831,6 +858,56 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
 					open_templates.colors[open_templates.mixed_button_t[c.template_id].primary.shared_color]);
 
+			}
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::mixed_button_ci) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.mixed_button_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+
+			auto vcursor = y * ui_scale;
+			auto hcursor = x * ui_scale;
+			if(c.icon_id != -1) {
+				auto l = open_templates.mixed_button_t[c.template_id].primary.icon_left.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto t = open_templates.mixed_button_t[c.template_id].primary.icon_top.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+				auto r = open_templates.mixed_button_t[c.template_id].primary.icon_right.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto b = open_templates.mixed_button_t[c.template_id].primary.icon_bottom.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+
+				hcursor = l;
+				vcursor = t;
+
+				render_svg_rect(open_templates.icons[c.icon_id].renders,
+					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
+					c.table_divider_color);
+
+			}
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::toggle_button) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.toggle_button_t[c.template_id].on_region.primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::table_header || c.ttype == template_project::template_type::table_row) {
+		auto t = table_from_name(open_project, c.table_connection);
+		if(t) {
+			if(!t->table_columns.empty()) {
+				int16_t sum = 0;
+				for(auto& col : t->table_columns) {
+					render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), ((x + sum) * ui_scale), (y * ui_scale), std::max(1, int32_t(col.display_data.width * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+					sum += col.display_data.width;
+				}
 			}
 		}
 		return;
@@ -1801,6 +1878,11 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Text button");
 	opts.push_back("Icon button");
 	opts.push_back("Text & icon button");
+	opts.push_back("Toggle button");
+	opts.push_back("Table header");
+	opts.push_back("Table row");
+	opts.push_back("Text & icon button (color icon)");
+	opts.push_back("Stacked bar chart");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -1814,6 +1896,16 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 3; break;
 		case template_project::template_type::mixed_button:
 			current = 4; break;
+		case template_project::template_type::toggle_button:
+			current = 5; break;
+		case template_project::template_type::table_header:
+			current = 6; break;
+		case template_project::template_type::table_row:
+			current = 7; break;
+		case template_project::template_type::mixed_button_ci:
+			current = 8; break;
+		case template_project::template_type::stacked_bar_chart:
+			current = 9; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -1828,6 +1920,16 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::iconic_button; break;
 			case 4:
 				ttype = template_project::template_type::mixed_button; break;
+			case 5:
+				ttype = template_project::template_type::toggle_button; break;
+			case 6:
+				ttype = template_project::template_type::table_header; break;
+			case 7:
+				ttype = template_project::template_type::table_row; break;
+			case 8:
+				ttype = template_project::template_type::mixed_button_ci; break;
+			case 9:
+				ttype = template_project::template_type::stacked_bar_chart; break;
 			default:
 				break;
 		}
@@ -1884,11 +1986,47 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				template_id = int16_t(chosen - 1);
 			}
 		} break;
+		case template_project::template_type::mixed_button_ci:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.mixed_button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::toggle_button:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.toggle_button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
 		case template_project::template_type::progress_bar:
 		{
 			std::vector<char const*> inner_opts;
 			inner_opts.push_back("None");
 			for(auto& i : open_templates.progress_bar_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::stacked_bar_chart:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.stacked_bar_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
 			int32_t chosen = template_id + 1;
@@ -1994,6 +2132,26 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
+		case template_project::template_type::toggle_button:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+
+			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+			if(!c.dynamic_text)
+				ImGui::InputText("Text key", &(c.text_key));
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
 		case template_project::template_type::iconic_button:
 		{
 			ImGui::Checkbox("Left-click action", &(c.left_click_action));
@@ -2051,6 +2209,109 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::mixed_button_ci:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+
+			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+			if(!c.dynamic_text)
+				ImGui::InputText("Text key", &(c.text_key));
+			{
+				{
+					float ccolor[3] = { c.table_divider_color.r, c.table_divider_color.g, c.table_divider_color.b };
+					ImGui::ColorEdit3("Default icon color", ccolor);
+					c.table_divider_color.r = ccolor[0];
+					c.table_divider_color.g = ccolor[1];
+					c.table_divider_color.b = ccolor[2];
+				}
+			}
+			{
+				std::vector<char const*> inner_opts;
+				inner_opts.push_back("None");
+				for(auto& i : open_templates.icons) {
+					inner_opts.push_back(i.file_name.c_str());
+				}
+				int32_t chosen = c.icon_id + 1;
+				if(ImGui::Combo("Default icon", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+					c.icon_id = int16_t(chosen - 1);
+				}
+			}
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::table_row:
+		{
+			std::vector<char const*> table_names;
+			table_names.push_back("--None--");
+			int32_t selection = (c.table_connection == "" ? 0 : -1);
+			for(auto& tc : open_project.tables) {
+				if(tc.template_id != -1) {
+					table_names.push_back(tc.name.c_str());
+					if(tc.name == c.table_connection) {
+						selection = int32_t(table_names.size() - 1);
+					}
+				}
+			}
+
+			temp = selection;
+			ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
+			if(temp != selection) {
+				if(selection == 0) {
+					c.table_connection = "";
+					c.template_id = -1;
+				} else {
+					c.table_connection = std::string(table_names[selection]);
+					c.template_id = table_from_name(open_project, c.table_connection)->template_id;
+				}
+			}
+		} break;
+		case template_project::template_type::table_header:
+		{
+			std::vector<char const*> table_names;
+			table_names.push_back("--None--");
+			int32_t selection = (c.table_connection == "" ? 0 : -1);
+			for(auto& tc : open_project.tables) {
+				if(tc.template_id != -1) {
+					table_names.push_back(tc.name.c_str());
+					if(tc.name == c.table_connection) {
+						selection = int32_t(table_names.size() - 1);
+					}
+				}
+			}
+
+			temp = selection;
+			ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
+			if(temp != selection) {
+				if(selection == 0) {
+					c.table_connection = "";
+					c.template_id = -1;
+				} else {
+					c.table_connection = std::string(table_names[selection]);
+					c.template_id = table_from_name(open_project, c.table_connection)->template_id;
+				}
+			}
+		} break;
+		case template_project::template_type::stacked_bar_chart:
+		{
+			int32_t dptemp = c.datapoints;
+			ImGui::InputInt("Data points", &dptemp);
+			c.datapoints = int16_t(dptemp);
+
+			ImGui::InputText("Data key", &c.list_content);
+			ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
@@ -2247,201 +2508,6 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 					ImGui::InputText("Hotkey", &(c.hotkey));
 				}
 				ImGui::Checkbox("Hover activation", &(c.hover_activation));
-			} else { // container only
-				{
-					const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)" };
-					temp = int32_t(c.animation_type);
-					ImGui::Combo("Animation", &temp, items, 4);
-					c.animation_type = animation_type(temp);
-				}
-
-				if(c.container_type == container_type::list || c.container_type == container_type::grid) {
-					ImGui::InputText("Child window", &(c.child_window));
-					ImGui::InputText("List content", &(c.list_content));
-				} else if(c.container_type == container_type::table) {
-					ImGui::InputText("Table content", &(c.list_content));
-
-					ImGui::Checkbox("Highlight contents following mouse", &(c.has_table_highlight_color));
-					if(c.has_table_highlight_color) {
-						ImVec4 ccolor{ c.table_highlight_color.r, c.table_highlight_color.g, c.table_highlight_color.b, c.table_highlight_color.a };
-						ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
-						c.table_highlight_color.r = ccolor.x;
-						c.table_highlight_color.g = ccolor.y;
-						c.table_highlight_color.b = ccolor.z;
-						c.table_highlight_color.a = ccolor.w;
-					}
-
-					std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change asc icon")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-					}
-
-					tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change des icon")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-					}
-
-					{
-						ImVec4 ccolor{ c.table_divider_color.r, c.table_divider_color.b, c.table_divider_color.g, 0.0f };
-						ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
-						c.table_divider_color.r = ccolor.x;
-						c.table_divider_color.g = ccolor.z;
-						c.table_divider_color.b = ccolor.y;
-					}
-
-					ImGui::InputFloat("Row height (in grid cells)", &(c.row_height));
-					c.row_height = std::max(0.1f, c.row_height);
-
-					tex = "Row default background: " + (c.row_background_a.size() > 0 ? c.row_background_a : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change row bg")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//c.row_background_a = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						c.row_background_a = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-					}
-
-					tex = "Row alternate background: " + (c.row_background_b.size() > 0 ? c.row_background_b : std::string("[none]"));
-					ImGui::Text(tex.c_str());
-					ImGui::SameLine();
-					if(ImGui::Button("Change row alt")) {
-						auto new_file = fs::pick_existing_file(L"");
-						//auto breakpt = new_file.find_last_of(L'\\');
-						//c.row_background_b = fs::native_to_utf8(new_file.substr(breakpt + 1));
-						c.row_background_b = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-					}
-
-					ImGui::Checkbox("Per-section table headers", &(c.table_has_per_section_headers));
-
-					ImGui::Text("Inserts");
-					for(uint32_t k = 0; k < c.table_inserts.size(); ++k) {
-						ImGui::PushID(int32_t(k));
-						ImGui::Indent();
-						ImGui::InputText("Container name", &(c.table_inserts[k]));
-						ImGui::SameLine();
-						if(ImGui::Button("Delete insert")) {
-							c.members.erase(c.members.begin() + k);
-						}
-						ImGui::Unindent();
-						ImGui::PopID();
-					}
-					if(ImGui::Button("Add insert")) {
-						c.table_inserts.emplace_back();
-					}
-
-					ImGui::Text("Columns");
-					for(uint32_t k = 0; k < c.table_columns.size(); ++k) {
-						ImGui::PushID(int32_t(k));
-						ImGui::Indent();
-						if(k > 0) {
-							ImGui::Text("-------");
-						}
-						ImGui::InputText("Column name", &(c.table_columns[k].internal_data.column_name));
-
-						if(ImGui::Button("Delete")) {
-							c.table_columns.erase(c.table_columns.begin() + k);
-							ImGui::Unindent();
-							ImGui::PopID();
-							break;
-						}
-						if(k > 0) {
-							ImGui::SameLine();
-							if(ImGui::Button("Move left")) {
-								std::swap(c.table_columns[k - 1], c.table_columns[k]);
-							}
-						}
-						if(k + 1 < c.table_columns.size()) {
-							ImGui::SameLine();
-							if(ImGui::Button("Move right")) {
-								std::swap(c.table_columns[k + 1], c.table_columns[k]);
-							}
-						}
-
-						temp = c.table_columns[k].display_data.width;
-						ImGui::InputInt("Column width", &temp);
-						c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
-
-						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-						ImGui::Checkbox("Spacer column", &is_spacer);
-						c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
-
-
-						if(is_spacer == false) {
-							{
-								const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-								temp = int32_t(c.table_columns[k].display_data.cell_text_color);
-								ImGui::Combo("Cell text color", &temp, items, 16);
-								c.table_columns[k].display_data.cell_text_color = text_color(temp);
-							}
-
-							{
-								const char* items[] = { "left (leading)", "right (trailing)", "center" };
-								temp = int32_t(c.table_columns[k].display_data.text_alignment);
-								ImGui::Combo("Cell text alignment", &temp, items, 3);
-								c.table_columns[k].display_data.text_alignment = aui_text_alignment(temp);
-							}
-
-							{
-								const char* items[] = { "left (leading)", "right (trailing)", "none" };
-								temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
-								ImGui::Combo("Decimal alignment", &temp, items, 3);
-								c.table_columns[k].internal_data.decimal_alignment = aui_text_alignment(temp);
-							}
-
-							ImGui::Checkbox("Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
-							if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
-								ImGui::InputText("Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
-							}
-
-							ImGui::Checkbox("Column is sortable", &(c.table_columns[k].internal_data.sortable));
-
-							ImGui::InputText("Header key", &(c.table_columns[k].display_data.header_key));
-
-							ImGui::Checkbox("Header has background", &(c.table_columns[k].internal_data.header_background));
-							if(c.table_columns[k].internal_data.header_background) {
-								std::string tex = "Header background: " + (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
-								ImGui::Text(tex.c_str());
-								ImGui::SameLine();
-								if(ImGui::Button("Change row alt")) {
-									auto new_file = fs::pick_existing_file(L"");
-									//auto breakpt = new_file.find_last_of(L'\\');
-									//c.table_columns[k].display_data.header_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-									c.table_columns[k].display_data.header_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-								}
-							}
-
-							{
-								const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-								temp = int32_t(c.table_columns[k].display_data.header_text_color);
-								ImGui::Combo("Header text color", &temp, items, 16);
-								c.table_columns[k].display_data.header_text_color = text_color(temp);
-							}
-
-							ImGui::Checkbox("Dynamic header tooltip", &(c.table_columns[k].internal_data.has_dy_header_tooltip));
-							if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
-								ImGui::InputText("Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
-							}
-						}
-
-						ImGui::Unindent();
-						ImGui::PopID();
-					}
-
-					if(ImGui::Button("Add column")) {
-						c.table_columns.emplace_back();
-					}
-				}
 			}
 
 			ImGui::Checkbox("Ignore rtl flip", &(c.ignore_rtl));
@@ -3485,6 +3551,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 											set_alt_id(c.name, chosen - 1);
 										}
 									} break;
+									case template_project::template_type::toggle_button:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.toggle_button_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
 									case template_project::template_type::iconic_button:
 									{
 										std::vector<char const*> inner_opts;
@@ -3499,6 +3578,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 										}
 									} break;
 									case template_project::template_type::mixed_button:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.mixed_button_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::mixed_button_ci:
 									{
 										std::vector<char const*> inner_opts;
 										inner_opts.push_back("--Don't change--");
@@ -4057,42 +4149,57 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					}
 				}
 
-				ImGui::Checkbox("Highlight contents following mouse", &(c.has_highlight_color));
-				if(c.has_highlight_color) {
-					ImVec4 ccolor{ c.highlight_color.r, c.highlight_color.g, c.highlight_color.b, c.highlight_color.a };
-					ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
-					c.highlight_color.r = ccolor.x;
-					c.highlight_color.g = ccolor.y;
-					c.highlight_color.b = ccolor.z;
-					c.highlight_color.a = ccolor.w;
-				}
-
-				std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
-				ImGui::Text(tex.c_str());
-				ImGui::SameLine();
-				if(ImGui::Button("Change asc icon")) {
-					auto new_file = fs::pick_existing_file(L"");
-					//auto breakpt = new_file.find_last_of(L'\\');
-					//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-					c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-				}
-
-				tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
-				ImGui::Text(tex.c_str());
-				ImGui::SameLine();
-				if(ImGui::Button("Change des icon")) {
-					auto new_file = fs::pick_existing_file(L"");
-					//auto breakpt = new_file.find_last_of(L'\\');
-					//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
-					c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-				}
-
 				{
-					ImVec4 ccolor{ c.divider_color.r, c.divider_color.b, c.divider_color.g, 0.0f };
-					ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
-					c.divider_color.r = ccolor.x;
-					c.divider_color.g = ccolor.z;
-					c.divider_color.b = ccolor.y;
+					std::vector<char const*> inner_opts;
+					inner_opts.push_back("None");
+					for(auto& i : open_templates.table_t) {
+						inner_opts.push_back(i.display_name.c_str());
+					}
+					int32_t chosen = c.template_id + 1;
+					std::string label = "Template " + c.name;
+					if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+						c.template_id =  chosen - 1;
+					}
+				}
+
+				if(c.template_id == -1) {
+					ImGui::Checkbox("Highlight contents following mouse", &(c.has_highlight_color));
+					if(c.has_highlight_color) {
+						ImVec4 ccolor{ c.highlight_color.r, c.highlight_color.g, c.highlight_color.b, c.highlight_color.a };
+						ImGui::ColorEdit4("Highlight color", (float*)&ccolor);
+						c.highlight_color.r = ccolor.x;
+						c.highlight_color.g = ccolor.y;
+						c.highlight_color.b = ccolor.z;
+						c.highlight_color.a = ccolor.w;
+					}
+
+					std::string tex = "Ascending sort icon: " + (c.ascending_sort_icon.size() > 0 ? c.ascending_sort_icon : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change asc icon")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.ascending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.ascending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+
+					tex = "Descending sort icon: " + (c.descending_sort_icon.size() > 0 ? c.descending_sort_icon : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change des icon")) {
+						auto new_file = fs::pick_existing_file(L"");
+						//auto breakpt = new_file.find_last_of(L'\\');
+						//c.descending_sort_icon = fs::native_to_utf8(new_file.substr(breakpt + 1));
+						c.descending_sort_icon = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+
+					{
+						ImVec4 ccolor{ c.divider_color.r, c.divider_color.b, c.divider_color.g, 0.0f };
+						ImGui::ColorEdit3("Labels divider color", (float*)&ccolor);
+						c.divider_color.r = ccolor.x;
+						c.divider_color.g = ccolor.z;
+						c.divider_color.b = ccolor.y;
+					}
 				}
 
 				size_t amount_of_columns = c.table_columns.size();
@@ -4204,12 +4311,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::BeginDisabled();
 						}
 
-						ImGui::PushID(k);
-						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-						temp = int32_t(c.table_columns[k].display_data.cell_text_color);
-						ImGui::SetNextItemWidth(100.f);
-						ImGui::Combo("##Cell text color", &temp, items, 16);
-						c.table_columns[k].display_data.cell_text_color = text_color(temp);
+						ImGui::PushID(k); 
+
+						if(c.template_id == -1) {
+							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+							temp = int32_t(c.table_columns[k].display_data.cell_text_color);
+							ImGui::SetNextItemWidth(100.f);
+							ImGui::Combo("##Cell text color", &temp, items, 16);
+							c.table_columns[k].display_data.cell_text_color = text_color(temp);
+						} else {
+							int32_t color_choice = int32_t(c.table_columns[k].display_data.cell_text_color);
+							make_color_combo_box(color_choice, "##Cell text color", open_templates);
+							c.table_columns[k].display_data.cell_text_color = text_color(color_choice);
+						}
 						ImGui::PopID();
 
 						if (is_spacer) {
@@ -4360,7 +4474,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					for (int k = 0; k < amount_of_columns; k++) {
 						ImGui::TableSetColumnIndex(k + 1);
 						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-						if (is_spacer) {
+						if (is_spacer || c.template_id != -1) {
 							ImGui::BeginDisabled();
 						}
 
@@ -4368,7 +4482,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::SetNextItemWidth(100.f);
 						ImGui::Checkbox("##Header has background", &(c.table_columns[k].internal_data.header_background));
 						ImGui::PopID();
-						if (is_spacer) {
+						if (is_spacer || c.template_id != -1) {
 							ImGui::EndDisabled();
 						}
 					}
@@ -4380,7 +4494,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					for (int k = 0; k < amount_of_columns; k++) {
 						ImGui::TableSetColumnIndex(k + 1);
 						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-						if (is_spacer) {
+						if (is_spacer || c.template_id != -1) {
 							ImGui::BeginDisabled();
 						}
 
@@ -4400,7 +4514,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::Text("Off");
 						}
 						ImGui::PopID();
-						if (is_spacer) {
+						if (is_spacer || c.template_id != -1) {
 							ImGui::EndDisabled();
 						}
 					}
@@ -4419,10 +4533,16 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::PushID(k);
 						ImGui::SetNextItemWidth(100.f);
 
-						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-						temp = int32_t(c.table_columns[k].display_data.header_text_color);
-						ImGui::Combo("##Header text color", &temp, items, 16);
-						c.table_columns[k].display_data.header_text_color = text_color(temp);
+						if(c.template_id == -1) {
+							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+							temp = int32_t(c.table_columns[k].display_data.header_text_color);
+							ImGui::Combo("##Header text color", &temp, items, 16);
+							c.table_columns[k].display_data.header_text_color = text_color(temp);
+						} else {
+							int32_t color_choice = int32_t(c.table_columns[k].display_data.header_text_color);
+							make_color_combo_box(color_choice, "##Cell text color", open_templates);
+							c.table_columns[k].display_data.header_text_color = text_color(color_choice);
+						}
 
 						ImGui::PopID();
 						if (is_spacer) {

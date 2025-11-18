@@ -4,232 +4,6 @@
 
 namespace template_project {
 
-void project_to_bytes(project const& p, serialization::out_buffer& buffer) {
-	// header info
-	buffer.start_section();
-	buffer.write(p.svg_directory);
-	buffer.finish_section();
-
-	auto& t = p;
-
-	//colors
-	buffer.start_section();
-	for(auto& c : t.colors) {
-		buffer.start_section();
-		buffer.write(c.display_name);
-		buffer.write(c.r);
-		buffer.write(c.g);
-		buffer.write(c.b);
-		buffer.write(c.a);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//icons
-	buffer.start_section();
-	for(auto& i : t.icons) {
-		buffer.start_section();
-		buffer.write(i.file_name);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//backgrounds
-	buffer.start_section();
-	for(auto& i : t.backgrounds) {
-		buffer.start_section();
-		buffer.write(i.file_name);
-		buffer.write(i.base_x);
-		buffer.write(i.base_y);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//labels
-	buffer.start_section();
-	for(auto& i : t.label_t) {
-		buffer.start_section();
-		buffer.write(i.display_name);
-		buffer.write(i.primary.bg);
-		buffer.write(i.primary.text_color);
-		buffer.write(i.primary.font_choice);
-		buffer.write(i.primary.font_scale);
-		buffer.write(i.primary.h_text_margins);
-		buffer.write(i.primary.v_text_margins);
-		buffer.write(i.primary.h_text_alignment);
-		buffer.write(i.primary.v_text_alignment);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//buttons
-	buffer.start_section();
-	for(auto& i : t.button_t) {
-		buffer.start_section();
-		buffer.write(i.display_name);
-		buffer.write(i.animate_active_transition);
-		buffer.write(i.primary.bg);
-		buffer.write(i.primary.text_color);
-		buffer.write(i.primary.font_choice);
-		buffer.write(i.primary.font_scale);
-		buffer.write(i.primary.h_text_margins);
-		buffer.write(i.primary.v_text_margins);
-		buffer.write(i.primary.h_text_alignment);
-		buffer.write(i.primary.v_text_alignment);
-		buffer.write(i.active.bg);
-		buffer.write(i.active.text_color);
-		buffer.write(i.active.font_choice);
-		buffer.write(i.active.font_scale);
-		buffer.write(i.active.h_text_margins);
-		buffer.write(i.active.v_text_margins);
-		buffer.write(i.active.h_text_alignment);
-		buffer.write(i.active.v_text_alignment);
-		buffer.write(i.disabled.bg);
-		buffer.write(i.disabled.text_color);
-		buffer.write(i.disabled.font_choice);
-		buffer.write(i.disabled.font_scale);
-		buffer.write(i.disabled.h_text_margins);
-		buffer.write(i.disabled.v_text_margins);
-		buffer.write(i.disabled.h_text_alignment);
-		buffer.write(i.disabled.v_text_alignment);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//progress bars
-	buffer.start_section();
-	for(auto& i : t.progress_bar_t) {
-		buffer.start_section();
-		buffer.write(i.display_name);
-		buffer.write(i.bg_a);
-		buffer.write(i.bg_b);
-		buffer.write(i.text_color);
-		buffer.write(i.font_choice);
-		buffer.write(i.h_text_margins);
-		buffer.write(i.v_text_margins);
-		buffer.write(i.h_text_alignment);
-		buffer.write(i.v_text_alignment);
-		buffer.write(i.display_percentage_text);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//windows
-	buffer.start_section();
-	for(auto& i : t.window_t) {
-		buffer.start_section();
-		buffer.write(i.display_name);
-		buffer.write(i.bg);
-		buffer.write(i.layout_region_definition);
-		buffer.write(i.close_button_definition);
-		buffer.write(i.close_button_icon);
-		buffer.write(i.h_close_button_margin);
-		buffer.write(i.v_close_button_margin);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//iconic buttons
-	buffer.start_section();
-	for(auto& i : t.iconic_button_t) {
-		buffer.start_section();
-		buffer.write(i.display_name);
-		buffer.write(i.animate_active_transition);
-		buffer.write(i.primary.bg);
-		buffer.write(i.primary.icon_color);
-		buffer.write(i.primary.icon_top);
-		buffer.write(i.primary.icon_left);
-		buffer.write(i.primary.icon_bottom);
-		buffer.write(i.primary.icon_right);
-		buffer.write(i.active.bg);
-		buffer.write(i.active.icon_color);
-		buffer.write(i.active.icon_top);
-		buffer.write(i.active.icon_left);
-		buffer.write(i.active.icon_bottom);
-		buffer.write(i.active.icon_right);
-		buffer.write(i.disabled.bg);
-		buffer.write(i.disabled.icon_color);
-		buffer.write(i.disabled.icon_top);
-		buffer.write(i.disabled.icon_left);
-		buffer.write(i.disabled.icon_bottom);
-		buffer.write(i.disabled.icon_right);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//layout regions
-	buffer.start_section();
-	for(auto& i : t.layout_region_t) {
-		buffer.start_section();
-		buffer.write(i.display_name);
-		buffer.write(i.page_number_text.bg);
-		buffer.write(i.page_number_text.text_color);
-		buffer.write(i.page_number_text.font_choice);
-		buffer.write(i.page_number_text.font_scale);
-		buffer.write(i.page_number_text.h_text_margins);
-		buffer.write(i.page_number_text.v_text_margins);
-		buffer.write(i.page_number_text.h_text_alignment);
-		buffer.write(i.page_number_text.v_text_alignment);
-		buffer.write(i.bg);
-		buffer.write(i.left_button);
-		buffer.write(i.left_button_icon);
-		buffer.write(i.right_button);
-		buffer.write(i.right_button_icon);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-	//mixed buttons
-	buffer.start_section();
-	for(auto& i : t.mixed_button_t) {
-		buffer.start_section();
-		buffer.write(i.display_name);
-		buffer.write(i.primary.bg);
-		buffer.write(i.primary.shared_color);
-		buffer.write(i.primary.font_choice);
-		buffer.write(i.primary.font_scale);
-		buffer.write(i.primary.h_text_margins);
-		buffer.write(i.primary.v_text_margins);
-		buffer.write(i.primary.h_text_alignment);
-		buffer.write(i.primary.v_text_alignment);
-		buffer.write(i.primary.icon_top);
-		buffer.write(i.primary.icon_left);
-		buffer.write(i.primary.icon_bottom);
-		buffer.write(i.primary.icon_right);
-
-		buffer.write(i.active.bg);
-		buffer.write(i.active.shared_color);
-		buffer.write(i.active.font_choice);
-		buffer.write(i.active.font_scale);
-		buffer.write(i.active.h_text_margins);
-		buffer.write(i.active.v_text_margins);
-		buffer.write(i.active.h_text_alignment);
-		buffer.write(i.active.v_text_alignment);
-		buffer.write(i.active.icon_top);
-		buffer.write(i.active.icon_left);
-		buffer.write(i.active.icon_bottom);
-		buffer.write(i.active.icon_right);
-
-		buffer.write(i.disabled.bg);
-		buffer.write(i.disabled.shared_color);
-		buffer.write(i.disabled.font_choice);
-		buffer.write(i.disabled.font_scale);
-		buffer.write(i.disabled.h_text_margins);
-		buffer.write(i.disabled.v_text_margins);
-		buffer.write(i.disabled.h_text_alignment);
-		buffer.write(i.disabled.v_text_alignment);
-		buffer.write(i.disabled.icon_top);
-		buffer.write(i.disabled.icon_left);
-		buffer.write(i.disabled.icon_bottom);
-		buffer.write(i.disabled.icon_right);
-
-		buffer.write(i.animate_active_transition);
-		buffer.finish_section();
-	}
-	buffer.finish_section();
-
-}
-
 project bytes_to_project(serialization::in_buffer& buffer) {
 	project result;
 	auto header_section = buffer.read_section();
@@ -435,6 +209,75 @@ project bytes_to_project(serialization::in_buffer& buffer) {
 			indv_mb.read(i.animate_active_transition);
 		}
 	
+		auto tb_section = buffer.read_section();
+		while(tb_section) {
+			result.toggle_button_t.emplace_back();
+			auto indv_tb = tb_section.read_section();
+			auto& i = result.toggle_button_t.back();
+
+			indv_tb.read(i.display_name);
+			indv_tb.read(i.on_region.primary.bg);
+			indv_tb.read(i.on_region.primary.color);
+			indv_tb.read(i.on_region.active.bg);
+			indv_tb.read(i.on_region.active.color);
+			indv_tb.read(i.on_region.disabled.bg);
+			indv_tb.read(i.on_region.disabled.color);
+			indv_tb.read(i.on_region.font_choice);
+			indv_tb.read(i.on_region.font_scale);
+			indv_tb.read(i.on_region.h_text_alignment);
+			indv_tb.read(i.on_region.v_text_alignment);
+			indv_tb.read(i.on_region.text_margin_left);
+			indv_tb.read(i.on_region.text_margin_right);
+			indv_tb.read(i.on_region.text_margin_top);
+			indv_tb.read(i.on_region.text_margin_bottom);
+
+			indv_tb.read(i.off_region.primary.bg);
+			indv_tb.read(i.off_region.primary.color);
+			indv_tb.read(i.off_region.active.bg);
+			indv_tb.read(i.off_region.active.color);
+			indv_tb.read(i.off_region.disabled.bg);
+			indv_tb.read(i.off_region.disabled.color);
+			indv_tb.read(i.off_region.font_choice);
+			indv_tb.read(i.off_region.font_scale);
+			indv_tb.read(i.off_region.h_text_alignment);
+			indv_tb.read(i.off_region.v_text_alignment);
+			indv_tb.read(i.off_region.text_margin_left);
+			indv_tb.read(i.off_region.text_margin_right);
+			indv_tb.read(i.off_region.text_margin_top);
+			indv_tb.read(i.off_region.text_margin_bottom);
+
+			indv_tb.read(i.animate_active_transition);
+		}
+
+
+		auto tables_section = buffer.read_section();
+		while(tables_section) {
+			result.table_t.emplace_back();
+			auto indv_tb = tables_section.read_section();
+			auto& i = result.table_t.back();
+
+			indv_tb.read(i.display_name);
+			indv_tb.read(i.arrow_increasing);
+			indv_tb.read(i.arrow_decreasing);
+			indv_tb.read(i.table_color);
+			indv_tb.read(i.interactable_header_bg);
+			indv_tb.read(i.active_header_bg);
+		}
+
+		auto stacked_bar_section = buffer.read_section();
+		while(stacked_bar_section) {
+			result.stacked_bar_t.emplace_back();
+			auto indv_tb = stacked_bar_section.read_section();
+			auto& i = result.stacked_bar_t.back();
+
+			indv_tb.read(i.display_name);
+			indv_tb.read(i.overlay_bg);
+			indv_tb.read(i.l_margin);
+			indv_tb.read(i.t_margin);
+			indv_tb.read(i.r_margin);
+			indv_tb.read(i.b_margin);
+		}
+
 	return result;
 }
 
