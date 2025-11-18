@@ -798,6 +798,16 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 		return;
 	}
+	if(c.ttype == template_project::template_type::stacked_bar_chart) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.stacked_bar_t[c.template_id].overlay_bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	}
 	if(c.ttype == template_project::template_type::iconic_button) {
 		if(c.template_id != -1) {
 			auto bg = open_templates.iconic_button_t[c.template_id].primary.bg;
@@ -847,6 +857,33 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				render_svg_rect(open_templates.icons[c.icon_id].renders,
 					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
 					open_templates.colors[open_templates.mixed_button_t[c.template_id].primary.shared_color]);
+
+			}
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::mixed_button_ci) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.mixed_button_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+
+			auto vcursor = y * ui_scale;
+			auto hcursor = x * ui_scale;
+			if(c.icon_id != -1) {
+				auto l = open_templates.mixed_button_t[c.template_id].primary.icon_left.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto t = open_templates.mixed_button_t[c.template_id].primary.icon_top.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+				auto r = open_templates.mixed_button_t[c.template_id].primary.icon_right.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto b = open_templates.mixed_button_t[c.template_id].primary.icon_bottom.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+
+				hcursor = l;
+				vcursor = t;
+
+				render_svg_rect(open_templates.icons[c.icon_id].renders,
+					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
+					c.table_divider_color);
 
 			}
 		}
@@ -1844,6 +1881,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Toggle button");
 	opts.push_back("Table header");
 	opts.push_back("Table row");
+	opts.push_back("Text & icon button (color icon)");
+	opts.push_back("Stacked bar chart");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -1863,6 +1902,10 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 6; break;
 		case template_project::template_type::table_row:
 			current = 7; break;
+		case template_project::template_type::mixed_button_ci:
+			current = 8; break;
+		case template_project::template_type::stacked_bar_chart:
+			current = 9; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -1883,6 +1926,10 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::table_header; break;
 			case 7:
 				ttype = template_project::template_type::table_row; break;
+			case 8:
+				ttype = template_project::template_type::mixed_button_ci; break;
+			case 9:
+				ttype = template_project::template_type::stacked_bar_chart; break;
 			default:
 				break;
 		}
@@ -1939,6 +1986,18 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				template_id = int16_t(chosen - 1);
 			}
 		} break;
+		case template_project::template_type::mixed_button_ci:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.mixed_button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
 		case template_project::template_type::toggle_button:
 		{
 			std::vector<char const*> inner_opts;
@@ -1956,6 +2015,18 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			std::vector<char const*> inner_opts;
 			inner_opts.push_back("None");
 			for(auto& i : open_templates.progress_bar_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::stacked_bar_chart:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.stacked_bar_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
 			int32_t chosen = template_id + 1;
@@ -2141,6 +2212,46 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
+		case template_project::template_type::mixed_button_ci:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+
+			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
+			if(!c.dynamic_text)
+				ImGui::InputText("Text key", &(c.text_key));
+			{
+				{
+					float ccolor[3] = { c.table_divider_color.r, c.table_divider_color.g, c.table_divider_color.b };
+					ImGui::ColorEdit3("Default icon color", ccolor);
+					c.table_divider_color.r = ccolor[0];
+					c.table_divider_color.g = ccolor[1];
+					c.table_divider_color.b = ccolor[2];
+				}
+			}
+			{
+				std::vector<char const*> inner_opts;
+				inner_opts.push_back("None");
+				for(auto& i : open_templates.icons) {
+					inner_opts.push_back(i.file_name.c_str());
+				}
+				int32_t chosen = c.icon_id + 1;
+				if(ImGui::Combo("Default icon", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+					c.icon_id = int16_t(chosen - 1);
+				}
+			}
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
 		case template_project::template_type::table_row:
 		{
 			std::vector<char const*> table_names;
@@ -2192,6 +2303,17 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 					c.template_id = table_from_name(open_project, c.table_connection)->template_id;
 				}
 			}
+		} break;
+		case template_project::template_type::stacked_bar_chart:
+		{
+			int32_t dptemp = c.datapoints;
+			ImGui::InputInt("Data points", &dptemp);
+			c.datapoints = int16_t(dptemp);
+
+			ImGui::InputText("Data key", &c.list_content);
+			ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
 		default:
 		{
@@ -3456,6 +3578,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 										}
 									} break;
 									case template_project::template_type::mixed_button:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.mixed_button_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::mixed_button_ci:
 									{
 										std::vector<char const*> inner_opts;
 										inner_opts.push_back("--Don't change--");

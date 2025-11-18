@@ -191,13 +191,21 @@ struct toggle_button_template {
 
 struct table_template {
 	std::string display_name;
-	std::string temp_display_name;
-
 	int32_t arrow_increasing = -1;
 	int32_t arrow_decreasing = -1;
 	int32_t table_color = 0;
 	int32_t interactable_header_bg = -1;
 	int32_t active_header_bg = -1;
+};
+
+
+struct stacked_bar_template {
+	std::string display_name;
+	int32_t overlay_bg = -1;
+	float l_margin = 0.0f;
+	float t_margin = 0.0f;
+	float r_margin = 0.0f;
+	float b_margin = 0.0f;
 };
 
 struct project {
@@ -215,6 +223,7 @@ struct project {
 	std::vector<mixed_template> mixed_button_t;
 	std::vector<toggle_button_template> toggle_button_t;
 	std::vector<table_template> table_t;
+	std::vector< stacked_bar_template> stacked_bar_t;
 	std::vector< icon_definition> icons;
 	std::vector<color_definition> colors;
 };

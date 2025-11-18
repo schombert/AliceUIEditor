@@ -196,11 +196,15 @@ bool element_needs_class(ui_element_t const& c) {
 			return true;
 		case template_project::template_type::mixed_button:
 			return true;
+		case template_project::template_type::mixed_button_ci:
+			return true;
 		case template_project::template_type::toggle_button:
 			return true;
 		case template_project::template_type::table_header:
 			return true;
 		case template_project::template_type::table_row:
+			return true;
+		case template_project::template_type::stacked_bar_chart:
 			return true;
 		default:
 			return true;
@@ -287,11 +291,25 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			result += "\t" "\t" "\t"  "if(child_data.text_key.length() > 0)\n";
 			result += "\t" "\t" "\t" "\t" "cptr->default_text = state.lookup_key(child_data.text_key);\n";
 		} break;
+		case template_project::template_type::mixed_button_ci:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+			result += "\t" "\t" "\t"  "cptr->icon_id = child_data.icon_id;\n";
+			result += "\t" "\t" "\t"  "cptr->icon_color = child_data.table_divider_color;\n";
+			result += "\t" "\t" "\t"  "if(child_data.tooltip_text_key.length() > 0)\n";
+			result += "\t" "\t" "\t" "\t" "cptr->default_tooltip = state.lookup_key(child_data.tooltip_text_key);\n";
+			result += "\t" "\t" "\t"  "if(child_data.text_key.length() > 0)\n";
+			result += "\t" "\t" "\t" "\t" "cptr->default_text = state.lookup_key(child_data.text_key);\n";
+		} break;
 		case template_project::template_type::table_header:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 		} break;
 		case template_project::template_type::table_row:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+		} break;
+		case template_project::template_type::stacked_bar_chart:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 		} break;
@@ -357,6 +375,9 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				break;
 			case template_project::template_type::mixed_button:
 				base_type = "alice_ui::template_mixed_button";
+				break;
+			case template_project::template_type::mixed_button_ci:
+				base_type = "alice_ui::template_mixed_button_ci";
 				break;
 			case template_project::template_type::toggle_button:
 				base_type = "alice_ui::template_toggle_button";
@@ -497,6 +518,32 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				}
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
+			case template_project::template_type::mixed_button_ci:
+			{
+				if(c.dynamic_tooltip) {
+					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+					result += "\t" "}\n";
+					result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				}
+				if(c.left_click_action) {
+					result += "\t"  "bool button_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.right_click_action) {
+					result += "\t"  "bool button_right_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.shift_click_action) {
+					result += "\t"  "bool button_shift_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.hotkey.size() > 0) {
+					result += "\t" "ui::message_result on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept override;\n";
+				}
+				if(c.hover_activation) {
+					result += "\t"  "void button_on_hover(sys::state& state) noexcept override;\n";
+					result += "\t"  "void button_on_hover_end(sys::state& state) noexcept override;\n";
+				}
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
 			case template_project::template_type::table_row: 
 			{
 				result += "\t" "int32_t template_id = -1;\n";
@@ -570,6 +617,34 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				result += "\t"  "void on_reset_text(sys::state & state) noexcept override;\n";
 				result += "\t"  "ui::message_result on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
+				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::stacked_bar_chart:
+			{
+				result += "\t" "int32_t template_id = -1;\n";
+				result += "\t" "ogl::data_texture data_texture{ " + std::to_string(c.datapoints) + ", 3 };\n";
+				result += "\t" "struct graph_entry {" + c.list_content + " key; ogl::color3f color; float amount; };\n";
+				result += "\t" "std::vector<graph_entry> graph_content;\n";
+				result += "\t" "void update_chart(sys::state& state);\n";
+				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
+				result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
+
+				result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+				result += "\t" "\t" "return ui::tooltip_behavior::position_sensitive_tooltip;\n";
+				result += "\t" "}\n";
+
+				result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
+				result += "\t" "\t" "if(type == ui::mouse_probe_type::click) {\n";
+				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
+				result += "\t" "\t" "} else if(type == ui::mouse_probe_type::tooltip) {\n";
+				result += "\t" "\t" "\t" "return ui::message_result::consumed;\n";
+				result += "\t" "\t" "} else {\n";
+				result += "\t" "\t" "\t" "return ui::message_result::unseen;\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "}\n";
+
+
 				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
@@ -1192,6 +1267,98 @@ std::string element_member_functions(std::string const& project_name, window_ele
 				}
 
 			} break;
+			case template_project::template_type::mixed_button_ci:
+			{
+				if(c.dynamic_tooltip) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+				if(c.left_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::lbutton_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::lbutton_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.right_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_right_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::rbutton_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::rbutton_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.shift_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_shift_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::lbutton_shift_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::lbutton_shift_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.hotkey.size() > 0) {
+					result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept {\n";
+					result += "\t" "if(key == sys::virtual_key::" + c.hotkey + " && !disabled) {\n";
+					result += "\t" "\t" "on_lbutton_down(state, 0, 0, mods);\n";
+					result += "\t" "\t" "return ui::message_result::consumed;\n";
+					result += "\t" "}\n";
+					result += "\t" "return ui::message_result::unseen;\n";
+					result += "}\n";
+				}
+				if(c.hover_activation) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_on_hover(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_on_hover_end(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover_end\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover_end"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+
+			} break;
 			case template_project::template_type::table_row:
 			{
 				result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_lbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept {\n";
@@ -1585,6 +1752,95 @@ std::string element_member_functions(std::string const& project_name, window_ele
 				}
 				result += "// END\n";
 				result += "}\n";
+			} break;
+			case template_project::template_type::stacked_bar_chart:
+			{
+				//ON CREATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_create(sys::state& state) noexcept {\n";
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::create\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::create"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_chart(sys::state& state) {\n";
+				if(c.has_alternate_bg == false)
+					result += "\t" "std::sort(graph_content.begin(), graph_content.end(), [](auto const& a, auto const& b) { return a.amount > b.amount; });\n";
+				result += "\t" "float total = 0.0f;\n";
+				result += "\t" "for(auto& e : graph_content) { total += e.amount; }\n";
+				result += "\t" "if(total <= 0.0f) {\n";
+				result += "\t" "\t" "for(int32_t k = 0; k < " + std::to_string(c.datapoints) + "; k++) {\n";
+				result += "\t" "\t" "\t" "data_texture.data[k * 3] = uint8_t(0);\n";
+				result += "\t" "\t" "\t""data_texture.data[k * 3 + 1] = uint8_t(0);\n";
+				result += "\t" "\t" "\t" "data_texture.data[k * 3 + 2] = uint8_t(0);\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "\t" "data_texture.data_updated = true;\n";
+				result += "\t" "\t" "return;\n";
+				result += "\t" "}\n";
+				result += "\t" "int32_t index = 0;\n";
+				result += "\t" "float offset = 0.0f;\n";
+				result += "\t" "for(int32_t k = 0; k < " + std::to_string(c.datapoints) + "; k++) {\n";
+				result += "\t" "\t" "while(graph_content[index].amount + offset < (float(k) + 0.5f) * total /  float(" + std::to_string(c.datapoints) + ")) {\n";
+				result += "\t" "\t" "\t" "offset += graph_content[index].amount;\n";
+				result += "\t" "\t" "\t" "++index;\n";
+				result += "\t" "\t" "}\n";
+				result += "\t" "\t" "data_texture.data[k * 3] = uint8_t(graph_content[index].color.r * 255.0f);\n";
+				result += "\t" "\t" "data_texture.data[k * 3 + 1] = uint8_t(graph_content[index].color.g * 255.0f);\n";
+				result += "\t" "\t""data_texture.data[k * 3 + 2] = uint8_t(graph_content[index].color.b * 255.0f);\n";
+				result += "\t" "}\n";
+				result += "\t" "data_texture.data_updated = true;\n";
+				result += "}\n";
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+				make_parent_var_text();
+
+				result += "\t" "if(template_id == -1) return;\n";
+				result += "\t" "alice_ui::layout_window_element* par = static_cast<alice_ui::layout_window_element*>(parent);\n";
+				result += "\t" "float temp_total = 0.0f;\n";
+				result += "\t" "for(auto& p : graph_content) { temp_total += p.amount; }\n";
+				result += "\t" "float temp_offset = temp_total * float(x - par->grid_size * state.ui_templates.stacked_bar_t[template_id].l_margin ) / float(base_data.size.x - par->grid_size *(state.ui_templates.stacked_bar_t[template_id].l_margin +state.ui_templates.stacked_bar_t[template_id].r_margin));\n";
+				result += "\t" "int32_t temp_index = 0;\n";
+				result += "\t" "if(temp_offset < 0.0f || temp_offset > temp_total) return;\n";
+				result += "\t" "for(auto& p : graph_content) { if(temp_offset <= p.amount) break; temp_offset -= p.amount; ++temp_index; }\n";
+				result += "\t" "if(temp_index < int32_t(graph_content.size())) {\n";
+				result += "\t" "\t" "auto& selected_key = graph_content[temp_index].key;\n";
+				
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				if(c.background == background_type::stackedbarchart || c.background == background_type::doughnut) {
+					result += "\t" "}\n";
+				}
+				result += "}\n";
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
+				result += "\t" "if(template_id == -1) return;\n";
+				result += "\t" "alice_ui::layout_window_element* par = static_cast<alice_ui::layout_window_element*>(parent);\n";
+				result += "\t" "ogl::render_stripchart(state, ogl::color_modification::none, float(x + par->grid_size * state.ui_templates.stacked_bar_t[template_id].l_margin), float(y + par->grid_size * state.ui_templates.stacked_bar_t[template_id].t_margin), float(base_data.size.x - par->grid_size *(state.ui_templates.stacked_bar_t[template_id].l_margin +state.ui_templates.stacked_bar_t[template_id].r_margin)), float(base_data.size.y - par->grid_size *(state.ui_templates.stacked_bar_t[template_id].t_margin +state.ui_templates.stacked_bar_t[template_id].b_margin)), data_texture);\n";
+
+				result += "\t" "auto bg_id = state.ui_templates.stacked_bar_t[template_id].overlay_bg;\n";
+				result += "\t" "if(bg_id != -1)\n";
+				result += "\t" "\t" "ogl::render_textured_rect_direct(state, float(x), float(y), float(base_data.size.x), float(base_data.size.y), state.ui_templates.backgrounds[bg_id].renders.get_render(state, float(base_data.size.x) / float(par->grid_size), float(base_data.size.y) / float(par->grid_size), int32_t(par->grid_size), state.user_settings.ui_scale));\n";
+				
+				result += "}\n";
+
+
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
 			} break;
 			default: break;
 		}
