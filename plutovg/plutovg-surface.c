@@ -15,7 +15,7 @@ static plutovg_surface_t* plutovg_surface_create_uninitialized(int width, int he
     if(width <= 0 || height <= 0 || width >= kMaxSize || height >= kMaxSize)
         return NULL;
     const size_t size = width * height * 4;
-    plutovg_surface_t* surface = malloc(size + sizeof(plutovg_surface_t));
+    plutovg_surface_t* surface = (plutovg_surface_t*)malloc(size + sizeof(plutovg_surface_t));
     if(surface == NULL)
         return NULL;
     plutovg_init_reference(surface);
@@ -28,7 +28,7 @@ static plutovg_surface_t* plutovg_surface_create_uninitialized(int width, int he
 
 plutovg_surface_t* plutovg_surface_create(int width, int height)
 {
-    plutovg_surface_t* surface = plutovg_surface_create_uninitialized(width, height);
+    plutovg_surface_t* surface = (plutovg_surface_t*)plutovg_surface_create_uninitialized(width, height);
     if(surface)
         memset(surface->data, 0, surface->height * surface->stride);
     return surface;
@@ -36,7 +36,7 @@ plutovg_surface_t* plutovg_surface_create(int width, int height)
 
 plutovg_surface_t* plutovg_surface_create_for_data(unsigned char* data, int width, int height, int stride)
 {
-    plutovg_surface_t* surface = malloc(sizeof(plutovg_surface_t));
+    plutovg_surface_t* surface = (plutovg_surface_t*)malloc(sizeof(plutovg_surface_t));
     plutovg_init_reference(surface);
     surface->width = width;
     surface->height = height;
@@ -66,7 +66,7 @@ plutovg_surface_t* plutovg_surface_load_from_image_file(const char* filename) //
 plutovg_surface_t* plutovg_surface_load_from_image_data(const void* data, int length)
 {
     int width, height, channels;
-    stbi_uc* image = stbi_load_from_memory(data, length, &width, &height, &channels, STBI_rgb_alpha);
+    stbi_uc* image = stbi_load_from_memory((const stbi_uc *)data, length, &width, &height, &channels, STBI_rgb_alpha);
     if(image == NULL)
         return NULL;
     return plutovg_surface_load_from_image(image, width, height);
@@ -103,7 +103,7 @@ plutovg_surface_t* plutovg_surface_load_from_image_base64(const char* data, int 
 
     if(length == -1)
         length = (int)(strlen(data));
-    output_data = malloc(length);
+    output_data = (uint8_t*)malloc(length);
     if(output_data == NULL)
         return NULL;
     for(int i = 0; i < length; ++i) {

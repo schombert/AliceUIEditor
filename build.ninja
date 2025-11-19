@@ -1,4 +1,4 @@
-cflags = -std=c++20 -O0 -DWIN32 -D_AMD64_ -I./GLFW -I./imgui -I./imgui/misc/cpp -I./imgui/backends -I.
+cflags = -std=c++20 -O0 -DWIN32 -D_AMD64_ -I./GLFW -I./imgui -I./imgui/misc/cpp -I./imgui/backends -I. -I./lunasvg -I./plutovg
 debug_flags = -g -gdwarf-3 -gcodeview
 debug_flags_link = -g -gdwarf-3
 
@@ -21,6 +21,8 @@ rule link_cpp
 build out/imgui_cloned : clone_imgui
 
 build out/cache/main.o : compile_cpp main.cpp | out/imgui_cloned
+build out/cache/project_serialization.o : compile_cpp project_serialization.cpp
+build out/cache/asvg.o : compile_cpp asvg.cpp
 build out/cache/filesystem.o : compile_cpp filesystem.cpp
 build out/cache/glew.o : compile_cpp glew.c
 build out/cache/code_generator.o : compile_cpp code_generator.cpp
@@ -35,4 +37,27 @@ build out/cache/imgui_impl_glfw.o : compile_cpp imgui/backends/imgui_impl_glfw.c
 build out/cache/imgui_draw.o : compile_cpp imgui/imgui_draw.cpp | out/imgui_cloned
 build out/cache/imgui_demo.o : compile_cpp imgui/imgui_demo.cpp | out/imgui_cloned
 
-build out/editor.exe : link_cpp out/cache/main.o out/cache/filesystem.o out/cache/glew.o out/cache/code_generator.o out/cache/imgui_demo.o out/cache/imgui_draw.o out/cache/imgui_impl_glfw.o out/cache/imgui_impl_opengl3.o out/cache/imgui_stdlib.o out/cache/imgui_tables.o out/cache/imgui.o out/cache/project_file_writing.o out/cache/texture.o out/cache/imgui_widgets.o
+build out/cache/graphics.o : compile_cpp lunasvg/graphics.cpp
+build out/cache/lunasvg.o : compile_cpp lunasvg/lunasvg.cpp
+build out/cache/svgelement.o : compile_cpp lunasvg/svgelement.cpp
+build out/cache/svggeometryelement.o : compile_cpp lunasvg/svggeometryelement.cpp
+build out/cache/svglayoutstate.o : compile_cpp lunasvg/svglayoutstate.cpp
+build out/cache/svgpaintelement.o : compile_cpp lunasvg/svgpaintelement.cpp
+build out/cache/svgparser.o : compile_cpp lunasvg/svgparser.cpp
+build out/cache/svgproperty.o : compile_cpp lunasvg/svgproperty.cpp
+build out/cache/svgrenderstate.o : compile_cpp lunasvg/svgrenderstate.cpp
+build out/cache/svgtextelement.o : compile_cpp lunasvg/svgtextelement.cpp
+
+build out/cache/pluto-blend.o : compile_cpp plutovg/plutovg-blend.c
+build out/cache/pluto-canvas.o : compile_cpp plutovg/plutovg-canvas.c
+build out/cache/pluto-font.o : compile_cpp plutovg/plutovg-font.c
+build out/cache/pluto-ft-math.o : compile_cpp plutovg/plutovg-ft-math.c
+build out/cache/pluto-ft-raster.o : compile_cpp plutovg/plutovg-ft-raster.c
+build out/cache/pluto-ft-stroker.o : compile_cpp plutovg/plutovg-ft-stroker.c
+build out/cache/pluto-matrix.o : compile_cpp plutovg/plutovg-matrix.c
+build out/cache/pluto-paint.o : compile_cpp plutovg/plutovg-paint.c
+build out/cache/pluto-path.o : compile_cpp plutovg/plutovg-path.c
+build out/cache/pluto-rasterize.o : compile_cpp plutovg/plutovg-rasterize.c
+build out/cache/pluto-surface.o : compile_cpp plutovg/plutovg-surface.c
+
+build out/editor.exe : link_cpp out/cache/main.o out/cache/filesystem.o out/cache/glew.o out/cache/code_generator.o out/cache/imgui_demo.o out/cache/imgui_draw.o out/cache/imgui_impl_glfw.o out/cache/imgui_impl_opengl3.o out/cache/imgui_stdlib.o out/cache/imgui_tables.o out/cache/imgui.o out/cache/project_file_writing.o out/cache/texture.o out/cache/imgui_widgets.o out/cache/graphics.o out/cache/lunasvg.o out/cache/svgelement.o out/cache/svggeometryelement.o out/cache/svglayoutstate.o  out/cache/svgpaintelement.o out/cache/svgparser.o out/cache/svgproperty.o out/cache/svgrenderstate.o out/cache/svgtextelement.o out/cache/pluto-blend.o out/cache/pluto-canvas.o out/cache/pluto-font.o out/cache/pluto-ft-math.o out/cache/pluto-ft-raster.o out/cache/pluto-ft-stroker.o out/cache/pluto-matrix.o out/cache/pluto-paint.o out/cache/pluto-path.o out/cache/pluto-rasterize.o out/cache/pluto-surface.o out/cache/asvg.o out/cache/project_serialization.o
