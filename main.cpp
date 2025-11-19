@@ -798,6 +798,25 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 		return;
 	}
+	if(c.ttype == template_project::template_type::free_background) {
+		if(c.template_id != -1) 
+			render_asvg_rect(open_templates.backgrounds[c.template_id].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+		else
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		return;
+	}
+	if(c.ttype == template_project::template_type::free_icon) {
+		if(c.template_id != -1) {
+
+			auto vcursor = y * ui_scale;
+			auto hcursor = x * ui_scale;
+
+			render_svg_rect(open_templates.icons[c.template_id].renders,
+				hcursor, vcursor, int32_t((c.x_size)), int32_t((c.y_size)),
+				c.table_divider_color);
+		}
+		return;
+	}
 	if(c.ttype == template_project::template_type::stacked_bar_chart) {
 		if(c.template_id != -1) {
 			auto bg = open_templates.stacked_bar_t[c.template_id].overlay_bg;
@@ -1884,6 +1903,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Text & icon button (color icon)");
 	opts.push_back("Stacked bar chart");
 	opts.push_back("Table highlights");
+	opts.push_back("Icon");
+	opts.push_back("Background image");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -1909,6 +1930,10 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 9; break;
 		case template_project::template_type::table_highlights:
 			current = 10; break;
+		case template_project::template_type::free_icon:
+			current = 11; break;
+		case template_project::template_type::free_background:
+			current = 12; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -1935,6 +1960,10 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::stacked_bar_chart; break;
 			case 10:
 				ttype = template_project::template_type::table_highlights; break;
+			case 11:
+				ttype = template_project::template_type::free_icon; break;
+			case 12:
+				ttype = template_project::template_type::free_background; break;
 			default:
 				break;
 		}
@@ -2033,6 +2062,30 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			inner_opts.push_back("None");
 			for(auto& i : open_templates.stacked_bar_t) {
 				inner_opts.push_back(i.display_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::free_icon:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.icons) {
+				inner_opts.push_back(i.file_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::free_background:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.backgrounds) {
+				inner_opts.push_back(i.file_name.c_str());
 			}
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
@@ -2254,6 +2307,34 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::free_icon:
+		{
+			{
+				{
+					float ccolor[3] = { c.table_divider_color.r, c.table_divider_color.g, c.table_divider_color.b };
+					ImGui::ColorEdit3("Default icon color", ccolor);
+					c.table_divider_color.r = ccolor[0];
+					c.table_divider_color.g = ccolor[1];
+					c.table_divider_color.b = ccolor[2];
+				}
+			}
+			
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			ImGui::Checkbox("Other dynamic behavior", &(c.dynamic_text));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::free_background:
+		{
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			ImGui::Checkbox("Other dynamic behavior", &(c.dynamic_text));
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
@@ -3631,6 +3712,32 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 										inner_opts.push_back("--Don't change--");
 										for(auto& i : open_templates.mixed_button_t) {
 											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::free_icon:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.icons) {
+											inner_opts.push_back(i.file_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::free_background:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.backgrounds) {
+											inner_opts.push_back(i.file_name.c_str());
 										}
 										int32_t chosen = get_alt_id(c.name) + 1;
 										std::string label = "Alternate template for " + c.name;

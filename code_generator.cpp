@@ -190,6 +190,10 @@ bool element_needs_class(ui_element_t const& c) {
 	switch(c.ttype) {
 		case template_project::template_type::label:
 			return c.dynamic_text || c.dynamic_tooltip;
+		case template_project::template_type::free_icon:
+			return c.dynamic_text || c.dynamic_tooltip;
+		case template_project::template_type::free_background:
+			return c.dynamic_text || c.dynamic_tooltip;
 		case template_project::template_type::button:
 			return true;
 		case template_project::template_type::iconic_button:
@@ -229,6 +233,14 @@ std::string element_class_name(std::string const& project_name, window_element_w
 		case template_project::template_type::label:
 			if(!c.dynamic_text && !c.dynamic_tooltip)
 				return "template_label";
+			break;
+		case template_project::template_type::free_background:
+			if(!c.dynamic_text && !c.dynamic_tooltip)
+				return "template_bg_graphic";
+			break;
+		case template_project::template_type::free_icon:
+			if(!c.dynamic_text && !c.dynamic_tooltip)
+				return "template_icon_graphic";
 			break;
 		default:
 			break;
@@ -303,6 +315,19 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			result += "\t" "\t" "\t"  "if(child_data.text_key.length() > 0)\n";
 			result += "\t" "\t" "\t" "\t" "cptr->default_text = state.lookup_key(child_data.text_key);\n";
 		} break;
+		case template_project::template_type::free_icon:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+			result += "\t" "\t" "\t"  "cptr->color = child_data.table_divider_color;\n";
+			result += "\t" "\t" "\t"  "if(child_data.tooltip_text_key.length() > 0)\n";
+			result += "\t" "\t" "\t" "\t" "cptr->default_tooltip = state.lookup_key(child_data.tooltip_text_key);\n";
+		} break;
+		case template_project::template_type::free_background:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+			result += "\t" "\t" "\t"  "if(child_data.tooltip_text_key.length() > 0)\n";
+			result += "\t" "\t" "\t" "\t" "cptr->default_tooltip = state.lookup_key(child_data.tooltip_text_key);\n";
+		} break;
 		case template_project::template_type::table_header:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
@@ -373,6 +398,12 @@ std::string element_type_declarations(std::string const& project_name, window_el
 			case template_project::template_type::label:
 				base_type = "alice_ui::template_label";
 				break;
+			case template_project::template_type::free_icon:
+				base_type = "alice_ui::template_icon_graphic";
+				break;
+			case template_project::template_type::free_background:
+				base_type = "alice_ui::template_bg_graphic";
+				break;
 			case template_project::template_type::iconic_button:
 				base_type = "alice_ui::template_icon_button";
 				break;
@@ -409,6 +440,30 @@ std::string element_type_declarations(std::string const& project_name, window_el
 	if(c.ttype != template_project::template_type::none) {
 		switch(c.ttype) {
 			case template_project::template_type::label:
+			{
+				if(c.dynamic_tooltip) {
+					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+					result += "\t" "}\n";
+					result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				}
+				if(c.dynamic_text || c.dynamic_tooltip) {
+					result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+				}
+			} break;
+			case template_project::template_type::free_background:
+			{
+				if(c.dynamic_tooltip) {
+					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+					result += "\t" "}\n";
+					result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				}
+				if(c.dynamic_text || c.dynamic_tooltip) {
+					result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+				}
+			} break;
+			case template_project::template_type::free_icon:
 			{
 				if(c.dynamic_tooltip) {
 					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
@@ -891,6 +946,58 @@ std::string element_member_functions(std::string const& project_name, window_ele
 	if(c.ttype != template_project::template_type::none) {
 		switch(c.ttype) {
 			case template_project::template_type::label:
+			{
+				if(c.dynamic_tooltip) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+				if(c.dynamic_text || c.dynamic_tooltip) {
+					//UPDATE
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+			} break;
+			case template_project::template_type::free_background:
+			{
+				if(c.dynamic_tooltip) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+				if(c.dynamic_text || c.dynamic_tooltip) {
+					//UPDATE
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+			} break;
+			case template_project::template_type::free_icon:
 			{
 				if(c.dynamic_tooltip) {
 					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
