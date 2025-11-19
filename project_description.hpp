@@ -9,7 +9,7 @@
 namespace template_project {
 
 enum class template_type : uint8_t {
-	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button, toggle_button, table, table_header, table_row, mixed_button_ci, stacked_bar_chart
+	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button, toggle_button, table, table_header, table_row, mixed_button_ci, stacked_bar_chart, table_highlights
 };
 
 }

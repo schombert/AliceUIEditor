@@ -899,7 +899,7 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 		return;
 	}
-	if(c.ttype == template_project::template_type::table_header || c.ttype == template_project::template_type::table_row) {
+	if(c.ttype == template_project::template_type::table_header || c.ttype == template_project::template_type::table_row || c.ttype == template_project::template_type::table_highlights) {
 		auto t = table_from_name(open_project, c.table_connection);
 		if(t) {
 			if(!t->table_columns.empty()) {
@@ -1883,6 +1883,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Table row");
 	opts.push_back("Text & icon button (color icon)");
 	opts.push_back("Stacked bar chart");
+	opts.push_back("Table highlights");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -1906,6 +1907,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 8; break;
 		case template_project::template_type::stacked_bar_chart:
 			current = 9; break;
+		case template_project::template_type::table_highlights:
+			current = 10; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -1930,6 +1933,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::mixed_button_ci; break;
 			case 9:
 				ttype = template_project::template_type::stacked_bar_chart; break;
+			case 10:
+				ttype = template_project::template_type::table_highlights; break;
 			default:
 				break;
 		}
@@ -2253,6 +2258,32 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
 		case template_project::template_type::table_row:
+		{
+			std::vector<char const*> table_names;
+			table_names.push_back("--None--");
+			int32_t selection = (c.table_connection == "" ? 0 : -1);
+			for(auto& tc : open_project.tables) {
+				if(tc.template_id != -1) {
+					table_names.push_back(tc.name.c_str());
+					if(tc.name == c.table_connection) {
+						selection = int32_t(table_names.size() - 1);
+					}
+				}
+			}
+
+			temp = selection;
+			ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
+			if(temp != selection) {
+				if(selection == 0) {
+					c.table_connection = "";
+					c.template_id = -1;
+				} else {
+					c.table_connection = std::string(table_names[selection]);
+					c.template_id = table_from_name(open_project, c.table_connection)->template_id;
+				}
+			}
+		} break;
+		case template_project::template_type::table_highlights:
 		{
 			std::vector<char const*> table_names;
 			table_names.push_back("--None--");
@@ -2640,6 +2671,8 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 			path_to_selected_layout.clear();
 			current_edit_target = edit_targets::layout_sublayout;
 			result = true;
+			ImGui::EndPopup();
+			return true;
 		}
 		auto& win = open_project.windows[selected_window];
 		auto& buffer = win.buffer;
@@ -2657,6 +2690,8 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 			path_to_selected_layout.clear();
 			current_edit_target = edit_targets::layout_sublayout;
 			result = true;
+			ImGui::EndPopup();
+			return true;
 		}
 		if(std::holds_alternative<sub_layout_t>(layout.contents[current_location.index])) {
 			auto& i = std::get<sub_layout_t>(layout.contents[current_location.index]);

@@ -206,6 +206,8 @@ bool element_needs_class(ui_element_t const& c) {
 			return true;
 		case template_project::template_type::stacked_bar_chart:
 			return true;
+		case template_project::template_type::table_highlights:
+			return true;
 		default:
 			return true;
 	}
@@ -306,6 +308,10 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 		} break;
 		case template_project::template_type::table_row:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+		} break;
+		case template_project::template_type::table_highlights:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 		} break;
@@ -584,6 +590,17 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				result += "\t"  "ui::message_result on_rbutton_down(sys::state& state, int32_t x, int32_t y, sys::key_modifiers mods) noexcept override;\n";
 				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::table_highlights:
+			{
+				result += "\t" "int32_t template_id = -1;\n";
+				result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
+
+				result += "\t" "ui::message_result test_mouse(sys::state& state, int32_t x, int32_t y, ui::mouse_probe_type type) noexcept override {\n";
+				result += "\t" "\t" "return ui::message_result::unseen;\n";
+				result += "\t" "}\n";
+
+				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
 			} break;
 			case template_project::template_type::table_header:
 			{
@@ -1552,6 +1569,44 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += it->second.text;
 				}
 				result += "// END\n";
+				result += "}\n";
+
+			} break;
+			case template_project::template_type::table_highlights:
+			{
+				auto t = table_from_name(proj, c.table_connection);
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
+				if(t) {					result += "\t" "auto table_source = (" + project_name + "_" + win.wrapped.parent + "_t*)(parent->parent);\n";
+					result += "\t" "auto abs_location = ui::get_absolute_location(state, *this);\n";
+					result += "\t" "int32_t rel_mouse_x = int32_t(state.mouse_x_position / state.user_settings.ui_scale) - abs_location.x;\n";
+					result += "\t" "int32_t rel_mouse_y = int32_t(state.mouse_y_position / state.user_settings.ui_scale) - abs_location.y;\n";
+					result += "\t" "auto ink_color =template_id != -1 ? ogl::color3f(state.ui_templates.colors[state.ui_templates.table_t[template_id].table_color]) : ogl::color3f{}; ";
+
+					for(auto& col : t->table_columns) {
+						result += "\t" "bool col_um_" + col.internal_data.column_name + " = rel_mouse_x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && rel_mouse_x < (table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width);\n";
+
+						result += "\t" "if(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y && col_um_" + col.internal_data.column_name + "){\n"; // case over this cell
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y + base_data.size.y - 2), float(2), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(1), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y), float(2), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y + base_data.size.y - 2), float(1), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width * 0.25f), float(y + base_data.size.y - 1), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width * 0.5f), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+
+						result += "\t" "} else if(!(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y) && col_um_" + col.internal_data.column_name + "){\n"; // case over this cell above/below
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(1), float(base_data.size.y), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width - 2), float(y), float(2), float(base_data.size.y), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+
+						result += "\t" "} else if(0 <= rel_mouse_y && rel_mouse_y < base_data.size.y && !col_um_" + col.internal_data.column_name + "){\n"; // case over another cell in line
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(1), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t" "\t" "ogl::render_alpha_colored_rect(state, float(x + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start), float(y + base_data.size.y - 2), float(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width), float(2), ink_color.r, ink_color.g, ink_color.b, 1.0f);\n";
+						result += "\t}\n";
+					}
+				}
+				result += "}\n";
+
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_create(sys::state& state) noexcept {\n";
 				result += "}\n";
 
 			} break;
