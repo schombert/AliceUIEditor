@@ -1900,6 +1900,177 @@ void apply_layout_style(layout_level_t& layout, int16_t margins, int16_t header_
 	}
 }
 
+struct found_vs_window {
+	HWND handle = nullptr;
+	std::wstring exe_name;
+};
+std::vector< found_vs_window> open_vs_windows;
+HWND chosen_attachement_vs_window = nullptr;
+
+
+void open_file_and_line(int32_t line) {
+	if(!chosen_attachement_vs_window)
+		return;
+
+	SetForegroundWindow(chosen_attachement_vs_window);
+	Sleep(1);
+
+	auto resolved_file_name = open_project.project_name + L".cpp";
+
+	auto tempkeyname = VkKeyScanW(L'm');
+
+	std::vector< INPUT> file_goto;
+	file_goto.resize(resolved_file_name.length() * 2 + 6);
+	memset(file_goto.data(), 0, sizeof(INPUT) * file_goto.size());
+
+	file_goto[0].type = INPUT_KEYBOARD;
+	file_goto[0].ki.wVk = VK_CONTROL;
+	file_goto[1].type = INPUT_KEYBOARD;
+	file_goto[1].ki.wVk = VK_SHIFT;
+	file_goto[2].type = INPUT_KEYBOARD;
+	file_goto[2].ki.wVk = 'T';
+	file_goto[3].type = INPUT_KEYBOARD;
+	file_goto[3].ki.wVk = VK_CONTROL;
+	file_goto[3].ki.dwFlags = KEYEVENTF_KEYUP;
+	file_goto[4].type = INPUT_KEYBOARD;
+	file_goto[4].ki.wVk = VK_SHIFT;
+	file_goto[4].ki.dwFlags = KEYEVENTF_KEYUP;
+	file_goto[5].type = INPUT_KEYBOARD;
+	file_goto[5].ki.wVk = 'T';
+	file_goto[5].ki.dwFlags = KEYEVENTF_KEYUP;
+
+	auto new_fg = GetForegroundWindow();
+
+	for(size_t i = 0; i < resolved_file_name.length(); ++i) {
+		file_goto[6 + i * 2].type = INPUT_KEYBOARD;
+		file_goto[6 + i * 2].ki.wVk = WORD(0xFF & VkKeyScanW(resolved_file_name[i]));
+		file_goto[7 + i * 2].type = INPUT_KEYBOARD;
+		file_goto[7 + i * 2].ki.wVk = WORD(0xFF & VkKeyScanW(resolved_file_name[i]));
+		file_goto[7 + i * 2].ki.dwFlags = KEYEVENTF_KEYUP;
+	}
+
+	SendInput(file_goto.size(), file_goto.data(), sizeof(INPUT));
+	Sleep(1000);
+
+	std::vector< INPUT> send_return;
+	send_return.resize(2);
+	memset(send_return.data(), 0, sizeof(INPUT) * send_return.size());
+	send_return[0].type = INPUT_KEYBOARD;
+	send_return[0].ki.wVk = VK_RETURN;
+	send_return[1].type = INPUT_KEYBOARD;
+	send_return[1].ki.wVk = VK_RETURN;
+	send_return[1].ki.dwFlags = KEYEVENTF_KEYUP;
+	SendInput(2, send_return.data(), sizeof(INPUT));
+
+	Sleep(1000);
+
+	auto line_number = std::to_wstring(line);
+	std::vector< INPUT> line_goto;
+	line_goto.resize(line_number.length() * 2 + 6);
+	memset(line_goto.data(), 0, sizeof(INPUT) * line_goto.size());
+
+	line_goto[0].type = INPUT_KEYBOARD;
+	line_goto[0].ki.wVk = VK_CONTROL;
+	line_goto[1].type = INPUT_KEYBOARD;
+	line_goto[1].ki.wVk = 'G';
+	line_goto[2].type = INPUT_KEYBOARD;
+	line_goto[2].ki.wVk = VK_CONTROL;
+	line_goto[2].ki.dwFlags = KEYEVENTF_KEYUP;
+	line_goto[3].type = INPUT_KEYBOARD;
+	line_goto[3].ki.wVk = 'G';
+	line_goto[3].ki.dwFlags = KEYEVENTF_KEYUP;
+	for(size_t i = 0; i < line_number.length(); ++i) {
+		line_goto[4 + i * 2].type = INPUT_KEYBOARD;
+		line_goto[4 + i * 2].ki.wVk = WORD(line_number[i]);
+		line_goto[5 + i * 2].type = INPUT_KEYBOARD;
+		line_goto[5 + i * 2].ki.wVk = WORD(line_number[i]);
+		line_goto[5 + i * 2].ki.dwFlags = KEYEVENTF_KEYUP;
+	}
+	line_goto[line_goto.size() - 2].type = INPUT_KEYBOARD;
+	line_goto[line_goto.size() - 2].ki.wVk = VK_RETURN;
+	line_goto[line_goto.size() - 1].type = INPUT_KEYBOARD;
+	line_goto[line_goto.size() - 1].ki.wVk = VK_RETURN;
+	line_goto[line_goto.size() - 1].ki.dwFlags = KEYEVENTF_KEYUP;
+
+
+	SendInput(line_goto.size(), line_goto.data(), sizeof(INPUT));
+}
+
+void update_file_contents_and_open_to(std::string const& target_name) {
+	auto full_target_string = "// BEGIN " + target_name;
+
+	generator::code_snippets old_code;
+	{
+		fs::file loaded_file{ open_project.project_directory + open_project.source_path + open_project.project_name + L".cpp" };
+		old_code = generator::extract_snippets(loaded_file.content().data, loaded_file.content().file_size);
+	}
+	auto text = generator::generate_project_code(open_project, old_code);
+	fs::write_file(open_project.project_directory + open_project.source_path + open_project.project_name + L".cpp", text.c_str(), uint32_t(text.size()));
+	std::string_view text_view = text;
+
+	Sleep(1);
+	int32_t line_count = 1;
+	bool found = false;
+	for(size_t i = 0; i < text_view.length(); ++i) {
+		if(text_view[i] == '\n' || text_view[i] == '\r') {
+			while(i < text_view.length() && (text_view[i] == '\n' || text_view[i] == '\r')) {
+				++i;
+			}
+			line_count++;
+			if(text_view.substr(i).starts_with(full_target_string)) {
+				found = true;
+				break;
+			}
+		}
+	}
+	if(found) {
+		open_file_and_line(line_count + 1);
+	} else {
+		MessageBoxW(nullptr, L"Text not found in generated file", L"Not found", MB_OK);
+	}
+}
+
+void make_goto_button(window_element_wrapper_t& for_window, ui_element_t& for_element, std::string const& function, int32_t extra_id = 0) {
+	if(chosen_attachement_vs_window) {
+		ImGui::SameLine();
+		ImGui::PushID(&for_element);
+		ImGui::PushID(extra_id);
+		if(ImGui::Button(">>")) {
+			auto find_string = for_window.wrapped.name + "::" + for_element.name + "::" + function;
+			update_file_contents_and_open_to(find_string);
+		}
+		ImGui::PopID();
+		ImGui::PopID();
+	}
+}
+BOOL CALLBACK desktop_window_callback(_In_ HWND   hwnd,_In_ LPARAM lParam) {
+	TCHAR buffer[MAX_PATH] = { 0 };
+	DWORD lpdwSize = MAX_PATH;
+	DWORD dwProcId = 0;
+
+	GetWindowThreadProcessId(hwnd, &dwProcId);
+	if(dwProcId) {
+		HANDLE hProc = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, dwProcId);
+		if(hProc) {
+			QueryFullProcessImageName(hProc, 0, buffer, &lpdwSize);
+			std::wstring lazy(buffer);
+			if(lazy.length() != 0) {
+				int t = 0;
+			}
+			if(lazy.find(L"devenv.exe") != std::wstring::npos) {
+				open_vs_windows.push_back(found_vs_window{ hwnd , lazy });
+			}
+			CloseHandle(hProc);
+		}
+	}
+	return TRUE;
+}
+
+void populate_vs_windows_list() {
+	open_vs_windows.clear();
+	EnumDesktopWindows(nullptr, desktop_window_callback, 0);
+}
+
 void template_type_options(template_project::template_type& ttype, int16_t& template_id) {
 	std::vector<char const*> opts;
 	opts.push_back("None");
@@ -2188,64 +2359,103 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 		case template_project::template_type::label:
 		{
 			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
-			if(!c.dynamic_text) 
+			if(!c.dynamic_text) {
 				ImGui::InputText("Text key", &(c.text_key));
-			
+			} else {
+				make_goto_button(win, c, "update", 0);
+			}
+
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip) 
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
-			
+			else
+				make_goto_button(win, c, "update_tooltip", 1);
+
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
 		case template_project::template_type::button:
 		{
-			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			ImGui::Checkbox("Left-click action", &(c.left_click_action)); 
+			if(c.left_click_action)
+				make_goto_button(win, c, "lbutton_action", 0);
 			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			if(c.right_click_action)
+				make_goto_button(win, c, "rbutton_action", 1);
 			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.shift_click_action)
+				make_goto_button(win, c, "lbutton_shift_action", 2);
 			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
 				ImGui::InputText("Hotkey", &(c.hotkey));
 			}
 			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+			if(c.hover_activation)
+				make_goto_button(win, c, "on_hover", 3);
 
 			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
 			if(!c.dynamic_text)
 				ImGui::InputText("Text key", &(c.text_key));
+			else
+				make_goto_button(win, c, "update", 4);
 
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 5);
 		} break;
 		case template_project::template_type::toggle_button:
 		{
 			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			if(c.left_click_action)
+				make_goto_button(win, c, "lbutton_action", 0);
 			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			if(c.right_click_action)
+				make_goto_button(win, c, "rbutton_action", 1);
 			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.shift_click_action)
+				make_goto_button(win, c, "lbutton_shift_action", 2);
 			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
 				ImGui::InputText("Hotkey", &(c.hotkey));
 			}
 			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+			if(c.hover_activation)
+				make_goto_button(win, c, "on_hover", 3);
 
 			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
 			if(!c.dynamic_text)
 				ImGui::InputText("Text key", &(c.text_key));
+			else
+				make_goto_button(win, c, "update", 4);
 
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 5);
 		} break;
 		case template_project::template_type::iconic_button:
 		{
 			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			if(c.left_click_action)
+				make_goto_button(win, c, "lbutton_action", 0);
 			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			if(c.right_click_action)
+				make_goto_button(win, c, "rbutton_action", 1);
 			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.shift_click_action)
+				make_goto_button(win, c, "lbutton_shift_action", 2);
 			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
 				ImGui::InputText("Hotkey", &(c.hotkey));
 			}
 			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+			if(c.hover_activation)
+				make_goto_button(win, c, "on_hover", 3);
 
 			{
 				std::vector<char const*> inner_opts;
@@ -2262,22 +2472,35 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 5);
 		} break;
 		case template_project::template_type::mixed_button:
 		{
 			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			if(c.left_click_action)
+				make_goto_button(win, c, "lbutton_action", 0);
 			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			if(c.right_click_action)
+				make_goto_button(win, c, "rbutton_action", 1);
 			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.shift_click_action)
+				make_goto_button(win, c, "lbutton_shift_action", 2);
 			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
 				ImGui::InputText("Hotkey", &(c.hotkey));
 			}
 			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+			if(c.hover_activation)
+				make_goto_button(win, c, "on_hover", 3);
 
 			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
 			if(!c.dynamic_text)
 				ImGui::InputText("Text key", &(c.text_key));
+			else
+				make_goto_button(win, c, "update", 4);
 
 			{
 				std::vector<char const*> inner_opts;
@@ -2294,22 +2517,36 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 5);
 		} break;
 		case template_project::template_type::mixed_button_ci:
 		{
 			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			if(c.left_click_action)
+				make_goto_button(win, c, "lbutton_action", 0);
 			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			if(c.right_click_action)
+				make_goto_button(win, c, "rbutton_action", 1);
 			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.shift_click_action)
+				make_goto_button(win, c, "lbutton_shift_action", 2);
 			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
 				ImGui::InputText("Hotkey", &(c.hotkey));
 			}
 			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+			if(c.hover_activation)
+				make_goto_button(win, c, "on_hover", 3);
 
 			ImGui::Checkbox("Dynamic text", &(c.dynamic_text));
 			if(!c.dynamic_text)
 				ImGui::InputText("Text key", &(c.text_key));
+			else
+				make_goto_button(win, c, "update", 4);
+
 			{
 				{
 					float ccolor[3] = { c.table_divider_color.r, c.table_divider_color.g, c.table_divider_color.b };
@@ -2334,8 +2571,11 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 5);
 		} break;
 		case template_project::template_type::free_icon:
 		{
@@ -2352,18 +2592,26 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
 			ImGui::Checkbox("Other dynamic behavior", &(c.dynamic_text));
+			make_goto_button(win, c, "update", 5);
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 6);
 		} break;
 		case template_project::template_type::free_background:
 		{
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
 			ImGui::Checkbox("Other dynamic behavior", &(c.dynamic_text));
+			make_goto_button(win, c, "update", 5);
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 6);
 		} break;
 		case template_project::template_type::table_row:
 		{
@@ -2453,6 +2701,7 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 6);
 		} break;
 		case template_project::template_type::drop_down_control:
 		{
@@ -2486,6 +2735,10 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			c.text_type = double_col ? text_type::header : text_type::body;
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 6);
+
+			ImGui::Text("on select action");
+			make_goto_button(win, c, "on_selection", 7);
 		} break;
 		default:
 		{
@@ -3393,7 +3646,50 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						} while(true);
 					}
 				}
+				ImGui::EndMenu();
+			}
 
+			if(ImGui::BeginMenu("Visual Studio Integration")) {
+				if(open_vs_windows.empty())
+					populate_vs_windows_list();
+				if(open_vs_windows.empty()) {
+					if(ImGui::MenuItem("--None found--")) {
+					}
+				} else {
+					for(auto& w : open_vs_windows) {
+						char ascii_name[300] = { 0 };
+						auto numchars = GetWindowTextA(w.handle, ascii_name, 300);
+						int style = GetWindowLong(w.handle, -16);
+						bool has_a_caption = ( (style & 0x10C00000) == 0x10C00000);
+
+						if(numchars > 0 && has_a_caption) {
+							if(ImGui::MenuItem(ascii_name)) {
+								chosen_attachement_vs_window = w.handle;
+							}
+						}
+					}
+				}
+				if(ImGui::MenuItem("--Refresh--")) {
+					populate_vs_windows_list();
+				}
+				if(chosen_attachement_vs_window && ImGui::MenuItem("TestCommand")) {
+					SetForegroundWindow(chosen_attachement_vs_window);
+
+					INPUT input[4]; // ctrl + g sequence
+					memset(input, 0, sizeof(INPUT) * 4);
+					input[0].type = INPUT_KEYBOARD;
+					input[0].ki.wVk = VK_CONTROL;
+					input[1].type = INPUT_KEYBOARD;
+					input[1].ki.wVk = 'G';
+					input[2].type = INPUT_KEYBOARD;
+					input[2].ki.wVk = VK_CONTROL;
+					input[2].ki.dwFlags = KEYEVENTF_KEYUP;
+					input[3].type = INPUT_KEYBOARD;
+					input[3].ki.wVk = 'G';
+					input[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+					SendInput(4, input, sizeof(INPUT));
+				}
 				ImGui::EndMenu();
 			}
 
