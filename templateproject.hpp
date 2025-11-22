@@ -208,6 +208,26 @@ struct stacked_bar_template {
 	float b_margin = 0.0f;
 };
 
+
+struct drop_down_template {
+	std::string display_name;
+
+	int32_t primary_bg = -1;
+	int32_t active_bg = -1;
+	int32_t disabled_bg = -1;
+
+	int32_t list_button = -1;
+	int32_t list_button_alt = -1;
+	int32_t selection_icon = -1;
+
+	int32_t layout_region_base = -1;
+
+	int32_t dropdown_window_bg = -1;
+	float dropdown_window_margin = 0.5;
+
+	bool animate_active_transition = false;
+};
+
 struct project {
 	std::wstring project_name;
 	std::wstring project_directory;
@@ -224,6 +244,7 @@ struct project {
 	std::vector<toggle_button_template> toggle_button_t;
 	std::vector<table_template> table_t;
 	std::vector< stacked_bar_template> stacked_bar_t;
+	std::vector< drop_down_template> drop_down_t;
 	std::vector< icon_definition> icons;
 	std::vector<color_definition> colors;
 };

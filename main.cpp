@@ -805,6 +805,16 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		return;
 	}
+	if(c.ttype == template_project::template_type::drop_down_control) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.drop_down_t[c.template_id].primary_bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	}
 	if(c.ttype == template_project::template_type::free_icon) {
 		if(c.template_id != -1) {
 
@@ -1905,6 +1915,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Table highlights");
 	opts.push_back("Icon");
 	opts.push_back("Background image");
+	opts.push_back("Drop down control");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -1934,6 +1945,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 11; break;
 		case template_project::template_type::free_background:
 			current = 12; break;
+		case template_project::template_type::drop_down_control:
+			current = 13; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -1964,6 +1977,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::free_icon; break;
 			case 12:
 				ttype = template_project::template_type::free_background; break;
+			case 13:
+				ttype = template_project::template_type::drop_down_control; break;
 			default:
 				break;
 		}
@@ -2086,6 +2101,18 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			inner_opts.push_back("None");
 			for(auto& i : open_templates.backgrounds) {
 				inner_opts.push_back(i.file_name.c_str());
+			}
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::drop_down_control:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.drop_down_t) {
+				inner_opts.push_back(i.display_name.c_str());
 			}
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
@@ -2424,6 +2451,39 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 
 			ImGui::InputText("Data key", &c.list_content);
 			ImGui::Checkbox("Don't sort", &(c.has_alternate_bg));
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+		} break;
+		case template_project::template_type::drop_down_control:
+		{
+			{
+				std::vector<char const*> window_names;
+				window_names.push_back("--Not set--");
+				int32_t selection = (c.child_window == "" ? 0 : -1);
+				for(auto& tc : open_project.windows) {
+					window_names.push_back(tc.wrapped.name.c_str());
+					if(tc.wrapped.name == c.child_window) {
+						selection = int32_t(window_names.size() - 1);
+					}
+				}
+
+				temp = selection;
+				ImGui::Combo("Item window", &selection, window_names.data(), int32_t(window_names.size()));
+				if(temp != selection) {
+					if(selection == 0)
+						c.child_window = "";
+					else
+						c.child_window = window_names[selection];
+				}
+			}
+
+			temp = c.border_size;
+			ImGui::InputInt("List size in items (0 to use all available space)", &temp);
+			c.border_size = int16_t(temp);
+
+			bool double_col = c.text_type != text_type::body;
+			ImGui::Checkbox("Double column list", &double_col);
+			c.text_type = double_col ? text_type::header : text_type::body;
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 		} break;
@@ -3750,6 +3810,19 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 										std::vector<char const*> inner_opts;
 										inner_opts.push_back("--Don't change--");
 										for(auto& i : open_templates.progress_bar_t) {
+											inner_opts.push_back(i.display_name.c_str());
+										}
+										int32_t chosen = get_alt_id(c.name) + 1;
+										std::string label = "Alternate template for " + c.name;
+										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+											set_alt_id(c.name, chosen - 1);
+										}
+									} break;
+									case template_project::template_type::drop_down_control:
+									{
+										std::vector<char const*> inner_opts;
+										inner_opts.push_back("--Don't change--");
+										for(auto& i : open_templates.drop_down_t) {
 											inner_opts.push_back(i.display_name.c_str());
 										}
 										int32_t chosen = get_alt_id(c.name) + 1;

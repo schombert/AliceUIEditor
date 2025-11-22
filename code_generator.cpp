@@ -212,6 +212,8 @@ bool element_needs_class(ui_element_t const& c) {
 			return true;
 		case template_project::template_type::table_highlights:
 			return true;
+		case template_project::template_type::drop_down_control:
+			return true;
 		default:
 			return true;
 	}
@@ -248,7 +250,7 @@ std::string element_class_name(std::string const& project_name, window_element_w
 	return project_name + "_" + win.wrapped.name + "_" + c.name + "_t";
 }
 
-std::string element_initialize_child(std::string const& project_name, window_element_wrapper_t const& win, ui_element_t const& c) {
+std::string element_initialize_child(std::string const& project_name, window_element_wrapper_t const& win, ui_element_t const& c, open_project_t const& proj) {
 	std::string result;
 
 	result += "\t" "\t" "\t" + c.name + " = std::make_unique<" + element_class_name(project_name, win, c) + ">();\n";
@@ -344,6 +346,19 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 		} break;
+		case template_project::template_type::drop_down_control:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+			result += "\t" "\t" "\t"  "cptr->two_columns = (child_data.text_type != aui_text_type::body);\n";
+			result += "\t" "\t" "\t"  "cptr->target_page_height = child_data.border_size;\n";
+			auto cwindow_type = window_from_name(proj, c.child_window);
+			if(cwindow_type) {
+				result += "\t" "\t" "\t"  "cptr->label_window_internal = std::unique_ptr<" + project_name + "_" + c.child_window + "_t>(static_cast<" + project_name + "_" + c.child_window + "_t*>(make_" + project_name + "_" + cwindow_type->wrapped.name + "(state).release()));\n";
+				result += "\t" "\t" "\t"  "cptr->element_x_size = cptr->label_window_internal->base_data.size.x;\n";
+				result += "\t" "\t" "\t"  "cptr->element_y_size = cptr->label_window_internal->base_data.size.y;\n";
+				result += "\t" "\t" "\t"  "cptr->label_window = cptr->label_window_internal.get();\n";
+			}
+		} break;
 		default:
 		{
 			if(c.background == background_type::existing_gfx) {
@@ -418,6 +433,9 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				break;
 			case template_project::template_type::toggle_button:
 				base_type = "alice_ui::template_toggle_button";
+				break;
+			case template_project::template_type::drop_down_control:
+				base_type = "alice_ui::template_drop_down_control";
 				break;
 			default:
 				break;
@@ -718,6 +736,38 @@ std::string element_type_declarations(std::string const& project_name, window_el
 
 
 				result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::drop_down_control:
+			{
+
+				auto cwindow_type = window_from_name(proj, c.child_window);
+				std::string insert_params;
+				if(cwindow_type) {
+					result += "\t" "struct " + c.child_window + "_option { ";
+					for(auto& dm : cwindow_type->wrapped.members) {
+						insert_params += " " + dm.type + " " + dm.name + ", ";
+						result += dm.type + " " + dm.name + "; ";
+					}
+					result += "};\n";
+				}
+				if(insert_params.size() >= 2) {
+					insert_params.pop_back();
+					insert_params.pop_back();
+				}
+
+				result += "\t" "std::vector<" + c.child_window + "_option> list_contents;\n";
+				result += "\t" "std::vector<std::unique_ptr<" + project_name + "_" + c.child_window + "_t >> list_pool;\n";
+				result += "\t" "std::unique_ptr<" + project_name + "_" + c.child_window + "_t> label_window_internal;\n";
+
+				result += "\t" "void add_item(" + insert_params + ");\n";
+				
+				result += "\t" "ui::element_base* get_nth_item(sys::state& state, int32_t id, int32_t pool_id) override;\n";
+				result += "\t" "void quiet_on_selection(sys::state& state, int32_t id);\n";
+				result += "\t" "void on_selection(sys::state& state, int32_t id) override;\n";
+				result += "\t" "void clear_list();\n";
+				
+				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
 			default: break;
@@ -1482,6 +1532,92 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "}\n";
 				}
 
+			} break;
+			case template_project::template_type::drop_down_control:
+			{
+				auto cwindow_type = window_from_name(proj, c.child_window);
+				std::string insert_params;
+				std::string insert_vals;
+				if(cwindow_type) {
+					for(auto& dm : cwindow_type->wrapped.members) {
+						insert_params += " " + dm.type + " " + dm.name + ", ";
+						insert_vals += dm.name + ", ";
+					}
+				}
+				if(insert_params.size() >= 2) {
+					insert_params.pop_back();
+					insert_params.pop_back();
+				}
+				if(insert_vals.size() >= 2) {
+					insert_vals.pop_back();
+					insert_vals.pop_back();
+				}
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::add_item(" + insert_params + ") {\n";
+				result += "\t" "list_contents.emplace_back(" + c.child_window + "_option{" + insert_vals + "});\n";
+				result += "\t" "++total_items;\n";
+				result += "}\n";
+
+				result += "ui::element_base* " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::get_nth_item(sys::state& state, int32_t id, int32_t pool_id) {\n";
+				result += "\t" "while(pool_id >= int32_t(list_pool.size())) {\n";
+				result += "\t" "\t" "list_pool.emplace_back(static_cast<" + project_name + "_" + c.child_window + "_t*>(make_" + project_name + "_" + cwindow_type->wrapped.name + "(state).release()));\n";
+				result += "\t" "}\n";
+				if(cwindow_type) {
+					for(auto& dm : cwindow_type->wrapped.members) {
+						result += "\t" "list_pool[pool_id]->" + dm.name + " = list_contents[id]." + dm.name + "; \n";
+					}
+				}
+				result += "\t" "return list_pool[pool_id].get();\n";
+				result += "}\n";
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::quiet_on_selection(sys::state& state, int32_t id) {\n";
+				result += "\t" "if(id < 0 || id >= int32_t(list_contents.size())) return;\n";
+				result += "\t" "selected_item = id;\n";
+				if(cwindow_type) {
+					for(auto& dm : cwindow_type->wrapped.members) {
+						result += "\t" "label_window_internal->" + dm.name + " = list_contents[id]." + dm.name + "; \n";
+					}
+				}
+				result += "\t" "label_window_internal->impl_on_update(state); \n";
+				result += "}\n";
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_selection(sys::state& state, int32_t id) {\n";
+				result += "\t" "quiet_on_selection(state, id);\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_selection\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_selection"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::clear_list() {";
+				result += "\t" "list_contents.clear();\n";
+				result += "\t" "total_items = 0;\n";
+				result += "}\n";
+
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+
+				//ON CREATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_create(sys::state& state) noexcept {\n";
+				result += "\t" "template_drop_down_control::on_create(state);\n";
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::create\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::create"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
 			} break;
 			case template_project::template_type::table_row:
 			{
@@ -2640,7 +2776,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 	// fix parents
 	for(auto& win : proj.windows) {
 		for(auto& c : win.children) {
-			if(c.container_type != container_type::none && c.child_window.size() > 0) {
+			if(c.container_type != container_type::none && c.ttype != template_project::template_type::drop_down_control && c.child_window.size() > 0) {
 				for(auto& winb : proj.windows) {
 					if(winb.wrapped.name == c.child_window) {
 						winb.wrapped.parent = win.wrapped.name;
@@ -3568,7 +3704,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 				continue;
 			}
 			result += "\t" "\t" "if(child_data.name == \"" + c.name + "\") {\n";
-			result += element_initialize_child(project_name, win, c);
+			result += element_initialize_child(project_name, win, c, proj);
 			result += "\t" "\t" "} else \n";
 		}
 		auto tabs = tables_in_window(proj, win);
