@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <variant>
 #include <vector>
+#include <string>
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
@@ -28,6 +29,15 @@
 #include "stools.hpp"
 #include "code_generator.hpp"
 #include "templateproject.hpp"
+#include <uiautomation.h>
+#include <atlbase.h>
+
+// import EnvDTE
+#pragma warning(disable : 4278)
+#pragma warning(disable : 4146)
+#import "libid:80cc9f66-e7d8-4ddd-85b6-d9e6cd0e93e2" version("8.0") lcid("0") raw_interfaces_only named_guids
+#pragma warning(default : 4146)
+#pragma warning(default : 4278)
 
 namespace edit_targets {
 	inline constexpr int window = 0;
@@ -1908,16 +1918,189 @@ std::vector< found_vs_window> open_vs_windows;
 HWND chosen_attachement_vs_window = nullptr;
 
 
+
+struct uiautomation_wrapper {
+	IUIAutomation* main_cui_automation = nullptr;
+	IUIAutomationElement* main_window = nullptr;
+
+	void init() {
+		auto result = CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_IUIAutomation, reinterpret_cast<void**>(&main_cui_automation));
+		if(FAILED(result)) {
+			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		}
+
+	}
+	void attach_to_window(HWND win) {
+		if(!main_cui_automation)
+			return;
+
+		if(main_window) {
+			main_window->Release();
+			main_window = nullptr;
+		}
+		auto result = main_cui_automation->ElementFromHandle(win, &main_window);
+		if(FAILED(result)) {
+			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		}
+	}
+
+	IUIAutomationElement* find_by_name(std::wstring const& name) {
+		if(!main_window)
+			return nullptr;
+
+		IUIAutomationElement* result = nullptr;
+
+		VARIANT varProp;
+		varProp.vt = VT_BSTR;
+		varProp.bstrVal = SysAllocString(name.c_str());
+		if(varProp.bstrVal == NULL) {
+			return nullptr;
+		}
+
+		// Get a top-level element by name, such as "Program Manager"
+		IUIAutomationCondition* pCondition;
+		auto hr = main_cui_automation->CreatePropertyCondition(UIA_NamePropertyId, varProp, &pCondition);
+		if(FAILED(hr)) {
+			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+			VariantClear(&varProp);
+			return nullptr;
+		}
+
+		main_window->FindFirst(TreeScope_Descendants, pCondition, &result);
+
+		VariantClear(&varProp);
+		return result;
+	}
+
+	void go_to_file_sequence() {
+		auto edit_menu = find_by_name(L"Edit");
+		if(edit_menu) {
+			IUIAutomationInvokePattern* edit_invoke = nullptr;
+			auto result = edit_menu->GetCurrentPattern(UIA_InvokePatternId, (IUnknown**) &edit_invoke);
+
+			if(edit_invoke) {
+				edit_invoke->Invoke();
+				edit_invoke->Release();
+			}
+			edit_menu->Release();
+			if(FAILED(result))
+				MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		} else {
+			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		}
+
+		auto gt_menu = find_by_name(L"Go To");
+		if(gt_menu) {
+			IUIAutomationInvokePattern* iinvoke = nullptr;
+			auto result = gt_menu->GetCurrentPattern(UIA_InvokePatternId, (IUnknown**)&iinvoke);
+
+			if(iinvoke) {
+				iinvoke->Invoke();
+				iinvoke->Release();
+			}
+			gt_menu->Release();
+			if(FAILED(result))
+				MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		} else {
+			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		}
+
+		auto gtf_menu = find_by_name(L"Go To File...");
+		if(gtf_menu) {
+			IUIAutomationInvokePattern* iinvoke = nullptr;
+			auto result = gtf_menu->GetCurrentPattern(UIA_InvokePatternId, (IUnknown**)&iinvoke);
+
+			if(iinvoke) {
+				iinvoke->Invoke();
+				iinvoke->Release();
+			}
+			gtf_menu->Release();
+			if(FAILED(result))
+				MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		} else {
+			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
+		}
+	}
+
+	void cleanup() {
+		if(main_window) {
+			main_window->Release();
+		}
+		if(main_cui_automation) {
+			main_cui_automation->Release();
+		}
+	}
+} ui_automation_instance;
+
+static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) {
+	HRESULT result;
+	CLSID clsid;
+	result = ::CLSIDFromProgID(L"VisualStudio.DTE", &clsid);
+	if(FAILED(result))
+		return false;
+
+	CComPtr<IUnknown> punk;
+	result = ::GetActiveObject(clsid, NULL, &punk);
+	if(FAILED(result))
+		return false;
+
+	CComPtr<EnvDTE::_DTE> DTE;
+	DTE = punk;
+
+	CComPtr<EnvDTE::ItemOperations> item_ops;
+	result = DTE->get_ItemOperations(&item_ops);
+	if(FAILED(result))
+		return false;
+
+	CComBSTR bstrFileName(filename);
+	CComBSTR bstrKind(EnvDTE::vsViewKindTextView);
+	CComPtr<EnvDTE::Window> window;
+	result = item_ops->OpenFile(bstrFileName, bstrKind, &window);
+	if(FAILED(result))
+		return false;
+
+	CComPtr<EnvDTE::Document> doc;
+	result = DTE->get_ActiveDocument(&doc);
+	if(FAILED(result))
+		return false;
+
+	CComPtr<IDispatch> selection_dispatch;
+	result = doc->get_Selection(&selection_dispatch);
+	if(FAILED(result))
+		return false;
+
+	CComPtr<EnvDTE::TextSelection> selection;
+	result = selection_dispatch->QueryInterface(&selection);
+	if(FAILED(result))
+		return false;
+
+	result = selection->GotoLine(line, TRUE);
+	if(FAILED(result))
+		return false;
+
+	return true;
+}
+
+
 void open_file_and_line(int32_t line) {
 	if(!chosen_attachement_vs_window)
 		return;
 
+
+	auto full_fn = open_project.project_directory + open_project.source_path + open_project.project_name + L".cpp";
+	visual_studio_open_file(full_fn.c_str(), uint32_t(line));
 	SetForegroundWindow(chosen_attachement_vs_window);
+
+	return;
+
+	
+	/*
 	Sleep(1);
 
 	auto resolved_file_name = open_project.project_name + L".cpp";
 
-	auto tempkeyname = VkKeyScanW(L'm');
+	ui_automation_instance.go_to_file_sequence();
+	return;
 
 	std::vector< INPUT> file_goto;
 	file_goto.resize(resolved_file_name.length() * 2 + 6);
@@ -1994,6 +2177,7 @@ void open_file_and_line(int32_t line) {
 
 
 	SendInput(line_goto.size(), line_goto.data(), sizeof(INPUT));
+	*/
 }
 
 void update_file_contents_and_open_to(std::string const& target_name) {
@@ -3349,6 +3533,8 @@ layout_control_t* find_control(layout_level_t& lvl, int32_t index) {
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
 	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
+	ui_automation_instance.init();
+
 	glfwSetErrorCallback(glfw_error_callback);
 	if(!glfwInit())
 		return 1;
@@ -3665,6 +3851,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						if(numchars > 0 && has_a_caption) {
 							if(ImGui::MenuItem(ascii_name)) {
 								chosen_attachement_vs_window = w.handle;
+								ui_automation_instance.attach_to_window(chosen_attachement_vs_window);
 							}
 						}
 					}
@@ -5440,6 +5627,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
+
+	ui_automation_instance.cleanup();
 
 	CoUninitialize();
 	return 0;
