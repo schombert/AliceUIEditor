@@ -1946,8 +1946,10 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 					win->get_HWnd((long*)(&comparison_hwnd));
 					if(comparison_hwnd == chosen_attachement_vs_window) {
 						fetched->Release();
+						win->Release();
 						break;
 					} else {
+						win->Release();
 						DTE = nullptr;
 					}
 				}
