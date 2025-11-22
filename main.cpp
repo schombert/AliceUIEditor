@@ -1918,137 +1918,70 @@ std::vector< found_vs_window> open_vs_windows;
 HWND chosen_attachement_vs_window = nullptr;
 
 
-
-struct uiautomation_wrapper {
-	IUIAutomation* main_cui_automation = nullptr;
-	IUIAutomationElement* main_window = nullptr;
-
-	void init() {
-		auto result = CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER, IID_IUIAutomation, reinterpret_cast<void**>(&main_cui_automation));
-		if(FAILED(result)) {
-			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		}
-
-	}
-	void attach_to_window(HWND win) {
-		if(!main_cui_automation)
-			return;
-
-		if(main_window) {
-			main_window->Release();
-			main_window = nullptr;
-		}
-		auto result = main_cui_automation->ElementFromHandle(win, &main_window);
-		if(FAILED(result)) {
-			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		}
-	}
-
-	IUIAutomationElement* find_by_name(std::wstring const& name) {
-		if(!main_window)
-			return nullptr;
-
-		IUIAutomationElement* result = nullptr;
-
-		VARIANT varProp;
-		varProp.vt = VT_BSTR;
-		varProp.bstrVal = SysAllocString(name.c_str());
-		if(varProp.bstrVal == NULL) {
-			return nullptr;
-		}
-
-		// Get a top-level element by name, such as "Program Manager"
-		IUIAutomationCondition* pCondition;
-		auto hr = main_cui_automation->CreatePropertyCondition(UIA_NamePropertyId, varProp, &pCondition);
-		if(FAILED(hr)) {
-			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-			VariantClear(&varProp);
-			return nullptr;
-		}
-
-		main_window->FindFirst(TreeScope_Descendants, pCondition, &result);
-
-		VariantClear(&varProp);
-		return result;
-	}
-
-	void go_to_file_sequence() {
-		auto edit_menu = find_by_name(L"Edit");
-		if(edit_menu) {
-			IUIAutomationInvokePattern* edit_invoke = nullptr;
-			auto result = edit_menu->GetCurrentPattern(UIA_InvokePatternId, (IUnknown**) &edit_invoke);
-
-			if(edit_invoke) {
-				edit_invoke->Invoke();
-				edit_invoke->Release();
-			}
-			edit_menu->Release();
-			if(FAILED(result))
-				MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		} else {
-			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		}
-
-		auto gt_menu = find_by_name(L"Go To");
-		if(gt_menu) {
-			IUIAutomationInvokePattern* iinvoke = nullptr;
-			auto result = gt_menu->GetCurrentPattern(UIA_InvokePatternId, (IUnknown**)&iinvoke);
-
-			if(iinvoke) {
-				iinvoke->Invoke();
-				iinvoke->Release();
-			}
-			gt_menu->Release();
-			if(FAILED(result))
-				MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		} else {
-			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		}
-
-		auto gtf_menu = find_by_name(L"Go To File...");
-		if(gtf_menu) {
-			IUIAutomationInvokePattern* iinvoke = nullptr;
-			auto result = gtf_menu->GetCurrentPattern(UIA_InvokePatternId, (IUnknown**)&iinvoke);
-
-			if(iinvoke) {
-				iinvoke->Invoke();
-				iinvoke->Release();
-			}
-			gtf_menu->Release();
-			if(FAILED(result))
-				MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		} else {
-			MessageBoxW(nullptr, L"something happened", L"COM err", MB_OK);
-		}
-	}
-
-	void cleanup() {
-		if(main_window) {
-			main_window->Release();
-		}
-		if(main_cui_automation) {
-			main_cui_automation->Release();
-		}
-	}
-} ui_automation_instance;
-
 static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) {
-	HRESULT result;
-	CLSID clsid;
-	result = ::CLSIDFromProgID(L"VisualStudio.DTE", &clsid);
-	if(FAILED(result))
-		return false;
+	
+	IRunningObjectTable* rot = nullptr;
+	IEnumMoniker* monikerEnumerator = nullptr;
 
-	CComPtr<IUnknown> punk;
-	result = ::GetActiveObject(clsid, NULL, &punk);
-	if(FAILED(result))
-		return false;
+	GetRunningObjectTable(0, &rot);
+	rot->EnumRunning(&monikerEnumerator);
+	monikerEnumerator->Reset();
+
+	IMoniker* fetched = nullptr;
 
 	CComPtr<EnvDTE::_DTE> DTE;
-	DTE = punk;
+
+	while(monikerEnumerator->Next(1, &fetched, nullptr) == S_OK) {
+		if(fetched) {
+			IUnknown* found_obj = nullptr;
+			rot->GetObjectW(fetched, &found_obj);
+
+			CComPtr<IUnknown> temp = found_obj;
+			DTE = temp;
+			if(DTE) {
+				EnvDTE::Window* win = nullptr;
+				DTE->get_MainWindow(&win);
+				if(win) {
+					HWND comparison_hwnd = nullptr;
+					win->get_HWnd((long*)(&comparison_hwnd));
+					if(comparison_hwnd == chosen_attachement_vs_window) {
+						fetched->Release();
+						break;
+					} else {
+						DTE = nullptr;
+					}
+				}
+			}
+
+			fetched->Release();
+		}
+	}
+
+	if(monikerEnumerator)
+		monikerEnumerator->Release();
+	if(rot)
+		rot->Release();
+	
+	
+	if(!DTE) {
+		CComPtr<IUnknown> punk;
+
+		HRESULT result;
+		CLSID clsid;
+		result = ::CLSIDFromProgID(L"VisualStudio.DTE", &clsid);
+		if(FAILED(result))
+			return false;
+
+		result = ::GetActiveObject(clsid, NULL, &punk);
+		if(FAILED(result))
+			return false;
+
+		DTE = punk;
+	}
+
 
 	CComPtr<EnvDTE::ItemOperations> item_ops;
-	result = DTE->get_ItemOperations(&item_ops);
+	auto result = DTE->get_ItemOperations(&item_ops);
 	if(FAILED(result))
 		return false;
 
@@ -2093,91 +2026,6 @@ void open_file_and_line(int32_t line) {
 
 	return;
 
-	
-	/*
-	Sleep(1);
-
-	auto resolved_file_name = open_project.project_name + L".cpp";
-
-	ui_automation_instance.go_to_file_sequence();
-	return;
-
-	std::vector< INPUT> file_goto;
-	file_goto.resize(resolved_file_name.length() * 2 + 6);
-	memset(file_goto.data(), 0, sizeof(INPUT) * file_goto.size());
-
-	file_goto[0].type = INPUT_KEYBOARD;
-	file_goto[0].ki.wVk = VK_CONTROL;
-	file_goto[1].type = INPUT_KEYBOARD;
-	file_goto[1].ki.wVk = VK_SHIFT;
-	file_goto[2].type = INPUT_KEYBOARD;
-	file_goto[2].ki.wVk = 'T';
-	file_goto[3].type = INPUT_KEYBOARD;
-	file_goto[3].ki.wVk = VK_CONTROL;
-	file_goto[3].ki.dwFlags = KEYEVENTF_KEYUP;
-	file_goto[4].type = INPUT_KEYBOARD;
-	file_goto[4].ki.wVk = VK_SHIFT;
-	file_goto[4].ki.dwFlags = KEYEVENTF_KEYUP;
-	file_goto[5].type = INPUT_KEYBOARD;
-	file_goto[5].ki.wVk = 'T';
-	file_goto[5].ki.dwFlags = KEYEVENTF_KEYUP;
-
-	auto new_fg = GetForegroundWindow();
-
-	for(size_t i = 0; i < resolved_file_name.length(); ++i) {
-		file_goto[6 + i * 2].type = INPUT_KEYBOARD;
-		file_goto[6 + i * 2].ki.wVk = WORD(0xFF & VkKeyScanW(resolved_file_name[i]));
-		file_goto[7 + i * 2].type = INPUT_KEYBOARD;
-		file_goto[7 + i * 2].ki.wVk = WORD(0xFF & VkKeyScanW(resolved_file_name[i]));
-		file_goto[7 + i * 2].ki.dwFlags = KEYEVENTF_KEYUP;
-	}
-
-	SendInput(file_goto.size(), file_goto.data(), sizeof(INPUT));
-	Sleep(1000);
-
-	std::vector< INPUT> send_return;
-	send_return.resize(2);
-	memset(send_return.data(), 0, sizeof(INPUT) * send_return.size());
-	send_return[0].type = INPUT_KEYBOARD;
-	send_return[0].ki.wVk = VK_RETURN;
-	send_return[1].type = INPUT_KEYBOARD;
-	send_return[1].ki.wVk = VK_RETURN;
-	send_return[1].ki.dwFlags = KEYEVENTF_KEYUP;
-	SendInput(2, send_return.data(), sizeof(INPUT));
-
-	Sleep(1000);
-
-	auto line_number = std::to_wstring(line);
-	std::vector< INPUT> line_goto;
-	line_goto.resize(line_number.length() * 2 + 6);
-	memset(line_goto.data(), 0, sizeof(INPUT) * line_goto.size());
-
-	line_goto[0].type = INPUT_KEYBOARD;
-	line_goto[0].ki.wVk = VK_CONTROL;
-	line_goto[1].type = INPUT_KEYBOARD;
-	line_goto[1].ki.wVk = 'G';
-	line_goto[2].type = INPUT_KEYBOARD;
-	line_goto[2].ki.wVk = VK_CONTROL;
-	line_goto[2].ki.dwFlags = KEYEVENTF_KEYUP;
-	line_goto[3].type = INPUT_KEYBOARD;
-	line_goto[3].ki.wVk = 'G';
-	line_goto[3].ki.dwFlags = KEYEVENTF_KEYUP;
-	for(size_t i = 0; i < line_number.length(); ++i) {
-		line_goto[4 + i * 2].type = INPUT_KEYBOARD;
-		line_goto[4 + i * 2].ki.wVk = WORD(line_number[i]);
-		line_goto[5 + i * 2].type = INPUT_KEYBOARD;
-		line_goto[5 + i * 2].ki.wVk = WORD(line_number[i]);
-		line_goto[5 + i * 2].ki.dwFlags = KEYEVENTF_KEYUP;
-	}
-	line_goto[line_goto.size() - 2].type = INPUT_KEYBOARD;
-	line_goto[line_goto.size() - 2].ki.wVk = VK_RETURN;
-	line_goto[line_goto.size() - 1].type = INPUT_KEYBOARD;
-	line_goto[line_goto.size() - 1].ki.wVk = VK_RETURN;
-	line_goto[line_goto.size() - 1].ki.dwFlags = KEYEVENTF_KEYUP;
-
-
-	SendInput(line_goto.size(), line_goto.data(), sizeof(INPUT));
-	*/
 }
 
 void update_file_contents_and_open_to(std::string const& target_name) {
@@ -2196,10 +2044,10 @@ void update_file_contents_and_open_to(std::string const& target_name) {
 	int32_t line_count = 1;
 	bool found = false;
 	for(size_t i = 0; i < text_view.length(); ++i) {
-		if(text_view[i] == '\n' || text_view[i] == '\r') {
-			while(i < text_view.length() && (text_view[i] == '\n' || text_view[i] == '\r')) {
-				++i;
-			}
+		if(text_view[i] == '\r')
+			continue;
+		if(text_view[i] == '\n') {
+			++i;
 			line_count++;
 			if(text_view.substr(i).starts_with(full_target_string)) {
 				found = true;
@@ -3533,8 +3381,6 @@ layout_control_t* find_control(layout_level_t& lvl, int32_t index) {
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
 	CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
-	ui_automation_instance.init();
-
 	glfwSetErrorCallback(glfw_error_callback);
 	if(!glfwInit())
 		return 1;
@@ -3851,7 +3697,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						if(numchars > 0 && has_a_caption) {
 							if(ImGui::MenuItem(ascii_name)) {
 								chosen_attachement_vs_window = w.handle;
-								ui_automation_instance.attach_to_window(chosen_attachement_vs_window);
 							}
 						}
 					}
@@ -5627,8 +5472,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
-
-	ui_automation_instance.cleanup();
 
 	CoUninitialize();
 	return 0;
