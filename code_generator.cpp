@@ -1639,7 +1639,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					for(auto& col : t->table_columns) {
 						if(col.internal_data.cell_type == table_cell_type::text) {
 							result += "\t" "if(x >= table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x < table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start + table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
-							if(col.internal_data.has_dy_header_tooltip || col.display_data.header_tooltip_key.length() > 0) {
+							if(col.internal_data.has_dy_cell_tooltip || col.display_data.cell_tooltip_key.length() > 0) {
 								result += "\t" "\t" "ident = " + std::to_string(ccountb) + ";\n";
 								result += "\t" "\t" "subrect.top_left = ui::get_absolute_location(state, *this);\n";
 								result += "\t" "\t" "subrect.top_left.x += int16_t(table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start);\n";
