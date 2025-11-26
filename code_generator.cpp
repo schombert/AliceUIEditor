@@ -1695,7 +1695,6 @@ std::string element_member_functions(std::string const& project_name, window_ele
 							result += "\t" "\t" "}\n";
 
 							if(col.internal_data.decimal_alignment != aui_text_alignment::center) {
-								result += "\t" "auto font_size_factor = float(text::size_from_font_id(text::make_font_id(state, false, 1.0f * " + std::to_string(2 * proj.grid_size) + "))) / (float((1 << 6) * 64.0f * text::magnification_factor));\n";
 								result += "\t" "float temp_decimal_pos = -1.0f;\n";
 								result += "\t" "float running_total = 0.0f;\n";
 								result += "\t" "auto best_cluster = std::string::npos;\n";
@@ -1708,7 +1707,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 								result += "\t" "\t" "\t" "\t" "temp_decimal_pos = running_total ;\n";
 								result += "\t" "\t" "\t" "\t" "best_cluster = size_t(ch.cluster);\n";
 								result += "\t" "\t" "\t" "}\n";
-								result += "\t" "\t" "\t" "running_total += ch.x_advance * font_size_factor;\n";
+								result += "\t" "\t" "\t" "running_total += ch.x_advance / (state.user_settings.ui_scale * text::fixed_to_fp);\n";
 								result += "\t" "\t" "}\n";
 								result += "\t" "} \n";
 								result += "\t" "if(best_cluster == std::string::npos) {\n";
@@ -1718,7 +1717,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 								result += "\t" "\t" "\t" "running_total = float(t.x);\n";
 								result += "\t" "\t" "\t" "for(auto& ch : t.unicodechars.glyph_info) {\n";
 								result += "\t" "\t" "\t" "\t" "temp_decimal_pos = std::max(temp_decimal_pos, running_total);\n";
-								result += "\t" "\t" "\t" "\t" "running_total += ch.x_advance * font_size_factor;\n";
+								result += "\t" "\t" "\t" "\t" "running_total += ch.x_advance / (state.user_settings.ui_scale * text::fixed_to_fp)\n";
 								result += "\t" "\t" "\t" "}\n";
 								result += "\t" "\t" "}\n";
 								result += "\t" "}\n";
