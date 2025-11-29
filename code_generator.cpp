@@ -214,6 +214,8 @@ bool element_needs_class(ui_element_t const& c) {
 			return true;
 		case template_project::template_type::drop_down_control:
 			return true;
+		case template_project::template_type::edit_control:
+			return true;
 		default:
 			return true;
 	}
@@ -282,6 +284,10 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			result += "\t" "\t" "\t" "\t" "cptr->default_text = state.lookup_key(child_data.text_key);\n";
 			result += "\t" "\t" "\t"  "if(child_data.tooltip_text_key.length() > 0)\n";
 			result += "\t" "\t" "\t" "\t" "cptr->default_tooltip = state.lookup_key(child_data.tooltip_text_key);\n";
+		} break;
+		case template_project::template_type::edit_control:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 		} break;
 		case template_project::template_type::toggle_button:
 		{
@@ -425,6 +431,9 @@ std::string element_type_declarations(std::string const& project_name, window_el
 			case template_project::template_type::button:
 				base_type = "alice_ui::template_text_button";
 				break;
+			case template_project::template_type::edit_control:
+				base_type = "ui::edit_box_element_base";
+				break;
 			case template_project::template_type::mixed_button:
 				base_type = "alice_ui::template_mixed_button";
 				break;
@@ -518,6 +527,17 @@ std::string element_type_declarations(std::string const& project_name, window_el
 					result += "\t"  "void button_on_hover_end(sys::state& state) noexcept override;\n";
 				}
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::edit_control:
+			{
+				if(c.dynamic_tooltip) {
+					result += "\t" "void on_edit_command(sys::state& state, ui::edit_command command, sys::key_modifiers mods) noexcept override;\n";
+				}
+				if(c.dynamic_text) {
+					result += "\t" "void edit_box_update(sys::state& state, std::u16string_view s) noexcept override;\n";
+				}
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
 			} break;
 			case template_project::template_type::toggle_button:
 			{
@@ -1072,6 +1092,54 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "// END\n";
 					result += "}\n";
 				}
+			} break;
+			case template_project::template_type::edit_control:
+			{
+				if(c.dynamic_tooltip) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_edit_command(sys::state& state, ui::edit_command command, sys::key_modifiers mods)  noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::edit_command\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::edit_command"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "ui::edit_box_element_base::on_edit_command(state, command, mods);\n";
+					result += "}\n";
+				}
+				if(c.dynamic_text) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::edit_box_update(sys::state& state, std::u16string_view s) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::edit_update\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::edit_update"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+
+				//ON CREATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_create(sys::state& state) noexcept {\n";
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::create\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::create"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
 			} break;
 			case template_project::template_type::button:
 			{
@@ -3829,7 +3897,10 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			size_t read_position = 0;
 			while(read_position < s.second.text.size()) {
 				auto line = analyze_line(s.second.text.c_str(), read_position, s.second.text.size());
-				result += "//" + std::string(line.line);
+				if(line.line.starts_with("//"))
+					result += std::string(line.line);
+				else
+					result += "//" + std::string(line.line);
 			}
 			result += "// END\n";
 		}

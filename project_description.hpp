@@ -9,7 +9,7 @@
 namespace template_project {
 
 enum class template_type : uint8_t {
-	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button, toggle_button, table, table_header, table_row, mixed_button_ci, stacked_bar_chart, table_highlights, free_icon, free_background, drop_down_control
+	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button, toggle_button, table, table_header, table_row, mixed_button_ci, stacked_bar_chart, table_highlights, free_icon, free_background, drop_down_control, edit_control
 };
 
 }
@@ -275,8 +275,6 @@ struct table_definition {
 };
 struct ui_element_t {
 	std::vector< data_member> members;
-	std::vector< std::string> table_inserts;
-	std::vector< full_col_data> table_columns;
 	std::string name;
 	std::string temp_name;
 	std::string texture;
@@ -441,6 +439,7 @@ struct window_element_wrapper_t {
 	std::vector<ui_element_t> children;
 	layout_level_t layout;
 	std::vector<layout_item> buffer;
+	std::vector<ui_element_t> buffer_children;
 	std::vector<template_alternate> alternates;
 };
 
@@ -485,7 +484,25 @@ inline window_element_wrapper_t* window_from_name(open_project_t& proj, std::str
 	}
 	return nullptr;
 }
-inline std::vector<table_definition const*> tables_in_layout(open_project_t const& proj, layout_level_t const& lvl) {
+inline ui_element_t* control_from_name(window_element_wrapper_t& win, std::string const& name) {
+	for(auto& c : win.children) {
+		if(c.name == name)
+			return &c;
+	}
+	return nullptr;
+}
+inline ui_element_t const* control_from_name(window_element_wrapper_t const& win, std::string const& name) {
+	for(auto& c : win.children) {
+		if(c.name == name)
+			return &c;
+	}
+	return nullptr;
+}
+
+inline std::vector<table_definition const*> tables_in_window(open_project_t const& proj, window_element_wrapper_t const& win);
+inline std::vector<table_definition*> tables_in_window(open_project_t& proj, window_element_wrapper_t& win);
+
+inline std::vector<table_definition const*> tables_in_layout( open_project_t const& proj, window_element_wrapper_t const& win, layout_level_t const& lvl) {
 	std::vector<table_definition const*> result;
 	for(auto& c : lvl.contents) {
 		if(holds_alternative<generator_t>(c)) {
@@ -496,21 +513,35 @@ inline std::vector<table_definition const*> tables_in_layout(open_project_t cons
 						if(std::find(result.begin(), result.end(), t) == result.end())
 							result.push_back(t);
 					}
+					auto and_sub_tables = tables_in_window(proj, *w);
+					for(auto t : and_sub_tables) {
+						if(std::find(result.begin(), result.end(), t) == result.end())
+							result.push_back(t);
+					}
 				}
 			}
 		}
 		if(holds_alternative<sub_layout_t>(c)) {
 			auto& i = get<sub_layout_t>(c);
-			auto sr = tables_in_layout(proj, *i.layout);
+			auto sr = tables_in_layout(proj, win, *i.layout);
 			for(auto t : sr) {
 				if(std::find(result.begin(), result.end(), t) == result.end())
 					result.push_back(t);
 			}
 		}
+		if(holds_alternative<layout_control_t>(c)) {
+			auto& i = get<layout_control_t>(c);
+			if(auto ic = control_from_name(win, i.name); ic) {
+				if(auto t = table_from_name(proj, ic->table_connection); t) {
+					if(std::find(result.begin(), result.end(), t) == result.end())
+						result.push_back(t);
+				}
+			}
+		}
 	}
 	return result;
 }
-inline std::vector<table_definition*> tables_in_layout(open_project_t& proj, layout_level_t& lvl) {
+inline std::vector<table_definition*> tables_in_layout(open_project_t& proj, window_element_wrapper_t& win, layout_level_t& lvl) {
 	std::vector<table_definition*> result;
 	for(auto& c : lvl.contents) {
 		if(holds_alternative<generator_t>(c)) {
@@ -521,25 +552,39 @@ inline std::vector<table_definition*> tables_in_layout(open_project_t& proj, lay
 						if(std::find(result.begin(), result.end(), t) == result.end())
 							result.push_back(t);
 					}
+					auto and_sub_tables = tables_in_window(proj, *w);
+					for(auto t : and_sub_tables) {
+						if(std::find(result.begin(), result.end(), t) == result.end())
+							result.push_back(t);
+					}
 				}
 			}
 		}
 		if(holds_alternative<sub_layout_t>(c)) {
 			auto& i = get<sub_layout_t>(c);
-			auto sr = tables_in_layout(proj, *i.layout);
+			auto sr = tables_in_layout(proj, win, *i.layout);
 			for(auto t : sr) {
 				if(std::find(result.begin(), result.end(), t) == result.end())
 					result.push_back(t);
+			}
+		}
+		if(holds_alternative<layout_control_t>(c)) {
+			auto& i = get<layout_control_t>(c);
+			if(auto ic = control_from_name(win, i.name); ic) {
+				if(auto t = table_from_name(proj, ic->table_connection); t) {
+					if(std::find(result.begin(), result.end(), t) == result.end())
+						result.push_back(t);
+				}
 			}
 		}
 	}
 	return result;
 }
 inline std::vector<table_definition const*> tables_in_window(open_project_t const& proj, window_element_wrapper_t const& win) {
-	return tables_in_layout(proj, win.layout);
+	return tables_in_layout(proj, win, win.layout);
 }
 inline std::vector<table_definition*> tables_in_window(open_project_t& proj, window_element_wrapper_t& win) {
-	return tables_in_layout(proj, win.layout);
+	return tables_in_layout(proj, win, win.layout);
 }
 
 

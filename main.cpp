@@ -9,6 +9,7 @@
 #include <variant>
 #include <vector>
 #include <string>
+#include <algorithm>
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
@@ -40,8 +41,6 @@
 #pragma warning(default : 4278)
 
 namespace edit_targets {
-	inline constexpr int window = 0;
-	inline constexpr int control = 1;
 	inline constexpr int layout_sublayout = 2;
 	inline constexpr int layout_control = 3;
 	inline constexpr int layout_glue = 4;
@@ -536,7 +535,7 @@ int32_t hovered_control = -1;
 int32_t selected_table = -1;
 // layout_level_t* selected_layout = nullptr;
 std::vector<size_t> path_to_selected_layout {};
-int current_edit_target = edit_targets::window;
+int current_edit_target = edit_targets::layout_window;
 
 bool paths_are_the_same(std::vector<size_t>& left, std::vector<size_t>& right) {
 	if (left.size() != right.size()) return false;
@@ -752,17 +751,6 @@ void render_window(window_element_wrapper_t& win, float x, float y, bool highlig
 }
 
 void render_control(ui_element_t& c, float x, float y, bool highlighted, float ui_scale) {
-	if(c.container_type == container_type::table) {
-		if(c.table_columns.empty()) {
-			c.x_size = int16_t(open_project.grid_size);
-		} else {
-			int16_t sum = 0;
-			for(auto& col : c.table_columns) {
-				sum += col.display_data.width;
-			}
-			c.x_size = sum;
-		}
-	}
 
 	auto render_asvg_rect = [&](asvg::svg& s, float hcursor, float vcursor, float x_sz, float y_sz, int32_t gsz) {
 		render_hollow_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f),
@@ -795,6 +783,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale),  c.x_size, c.y_size, open_project.grid_size);
 			else
 				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
 		return;
 	} 
@@ -805,6 +795,20 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
 			else
 				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::edit_control) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.button_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
 		return;
 	}
@@ -822,6 +826,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
 			else
 				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
 		return;
 	}
@@ -834,6 +840,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 			render_svg_rect(open_templates.icons[c.template_id].renders,
 				hcursor, vcursor, int32_t((c.x_size)), int32_t((c.y_size)),
 				c.table_divider_color);
+		} else {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
 		return;
 	}
@@ -844,6 +852,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
 			else
 				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
 		return;
 	}
@@ -871,6 +881,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 					open_templates.colors[open_templates.iconic_button_t[c.template_id].primary.icon_color]);
 				
 			}
+		} else {
+			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
 		}
 		return;
 	}
@@ -898,6 +910,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 					open_templates.colors[open_templates.mixed_button_t[c.template_id].primary.shared_color]);
 
 			}
+		} else {
+			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
 		}
 		return;
 	}
@@ -925,6 +939,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 					c.table_divider_color);
 
 			}
+		} else {
+			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
 		}
 		return;
 	}
@@ -935,6 +951,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
 			else
 				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		} else {
+			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
 		}
 		return;
 	}
@@ -948,6 +966,8 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 					sum += col.display_data.width;
 				}
 			}
+		} else {
+			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
 		}
 		return;
 	}
@@ -961,11 +981,11 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 					sum += col.display_data.width;
 				}
 			}
+		} else {
+			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
 		}
 	} else if(c.background != background_type::texture && c.background != background_type::bordered_texture && c.background != background_type::progress_bar) {
-		if(c.container_type != container_type::table || c.table_columns.empty()) {
-			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
-		}
+		render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 	} else if(c.background == background_type::texture || c.background == background_type::progress_bar) {
 		if(c.ogl_texture.loaded == false) {
 			c.ogl_texture.load(open_project.project_directory + fs::utf8_to_native(c.texture));
@@ -983,14 +1003,6 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		} else {
 			render_stretch_textured_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), ui_scale, std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)), c.border_size, c.ogl_texture.texture_handle);
-		}
-	}
-
-	if(c.container_type == container_type::table) {
-		int16_t sum = 0;
-		for(auto& col : c.table_columns) {
-			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), ((x + sum) * ui_scale), (y * ui_scale), std::max(1, int32_t(col.display_data.width * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
-			sum += col.display_data.width;
 		}
 	}
 }
@@ -1931,6 +1943,12 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 
 	CComPtr<EnvDTE::_DTE> DTE;
 
+	std::string line_str = std::to_string(line) + "\n";
+	OutputDebugStringA("attepting to go to: ");
+	OutputDebugStringW(filename);
+	OutputDebugStringA(" line: ");
+	OutputDebugStringA(line_str.c_str());
+
 	while(monikerEnumerator->Next(1, &fetched, nullptr) == S_OK) {
 		if(fetched) {
 			IUnknown* found_obj = nullptr;
@@ -1966,17 +1984,23 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 	
 	
 	if(!DTE) {
+		OutputDebugStringA("Unable to find DTE in ROT; using fallback\n");
+
 		CComPtr<IUnknown> punk;
 
 		HRESULT result;
 		CLSID clsid;
 		result = ::CLSIDFromProgID(L"VisualStudio.DTE", &clsid);
-		if(FAILED(result))
+		if(FAILED(result)) {
+			OutputDebugStringA("fallback CLSIDFromProgID failed\n");
 			return false;
+		}
 
 		result = ::GetActiveObject(clsid, NULL, &punk);
-		if(FAILED(result))
+		if(FAILED(result)) {
+			OutputDebugStringA("fallback GetActiveObject failed\n");
 			return false;
+		}
 
 		DTE = punk;
 	}
@@ -1984,34 +2008,123 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 
 	CComPtr<EnvDTE::ItemOperations> item_ops;
 	auto result = DTE->get_ItemOperations(&item_ops);
-	if(FAILED(result))
+	if(FAILED(result)) {
+		OutputDebugStringA("get_ItemOperations failed\n");
 		return false;
+	}
 
 	CComBSTR bstrFileName(filename);
 	CComBSTR bstrKind(EnvDTE::vsViewKindTextView);
 	CComPtr<EnvDTE::Window> window;
 	result = item_ops->OpenFile(bstrFileName, bstrKind, &window);
-	if(FAILED(result))
+	if(FAILED(result)) {
+		OutputDebugStringA("OpenFile failed\n");
 		return false;
+	}
 
 	CComPtr<EnvDTE::Document> doc;
 	result = DTE->get_ActiveDocument(&doc);
-	if(FAILED(result))
+	if(FAILED(result)) {
+		OutputDebugStringA("get_ActiveDocument failed\n");
 		return false;
+	}
+
+	BSTR doc_name = nullptr;
+	result = doc->get_Name(&doc_name);
+	if(!FAILED(result)) {
+		OutputDebugStringA("active doc: ");
+		if(doc_name) {
+			OutputDebugStringW(doc_name);
+			::SysFreeString(doc_name);
+		} else {
+			OutputDebugStringA("[null]");
+		}
+		OutputDebugStringA("\n");
+	}
 
 	CComPtr<IDispatch> selection_dispatch;
 	result = doc->get_Selection(&selection_dispatch);
-	if(FAILED(result))
-		return false;
+	if(FAILED(result)) {
+		OutputDebugStringA("get_Selection failed\n");
+	}
 
-	CComPtr<EnvDTE::TextSelection> selection;
-	result = selection_dispatch->QueryInterface(&selection);
-	if(FAILED(result))
-		return false;
+	if(!FAILED(result)) {
+		CComPtr<EnvDTE::TextSelection> selection;
+		result = selection_dispatch->QueryInterface(&selection);
+		if(FAILED(result)) {
+			OutputDebugStringA("TextSelection QueryInterface failed\n");
+		}
+		if(!FAILED(result)) {
+			result = selection->GotoLine(line, false);
+			if(FAILED(result)) {
+				OutputDebugStringA("GotoLine failed\n");
+			}
+		}
+	}
 
-	result = selection->GotoLine(line, TRUE);
-	if(FAILED(result))
-		return false;
+	auto line_number = std::to_wstring(line);
+
+	if(FAILED(result)) {
+		std::vector< INPUT> line_goto;
+		line_goto.resize(line_number.length() * 2 + 6);
+		memset(line_goto.data(), 0, sizeof(INPUT) * line_goto.size());
+
+		line_goto[0].type = INPUT_KEYBOARD;
+		line_goto[0].ki.wVk = VK_CONTROL;
+		line_goto[1].type = INPUT_KEYBOARD;
+		line_goto[1].ki.wVk = 'G';
+		line_goto[2].type = INPUT_KEYBOARD;
+		line_goto[2].ki.wVk = VK_CONTROL;
+		line_goto[2].ki.dwFlags = KEYEVENTF_KEYUP;
+		line_goto[3].type = INPUT_KEYBOARD;
+		line_goto[3].ki.wVk = 'G';
+		line_goto[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+
+		for(size_t i = 0; i < line_number.length(); ++i) {
+			line_goto[4 + i * 2].type = INPUT_KEYBOARD;
+			line_goto[4 + i * 2].ki.wVk = WORD(line_number[i]);
+			line_goto[5 + i * 2].type = INPUT_KEYBOARD;
+			line_goto[5 + i * 2].ki.wVk = WORD(line_number[i]);
+			line_goto[5 + i * 2].ki.dwFlags = KEYEVENTF_KEYUP;
+		}
+
+		line_goto[line_goto.size() - 2].type = INPUT_KEYBOARD;
+		line_goto[line_goto.size() - 2].ki.wVk = VK_RETURN;
+		line_goto[line_goto.size() - 1].type = INPUT_KEYBOARD;
+		line_goto[line_goto.size() - 1].ki.wVk = VK_RETURN;
+		line_goto[line_goto.size() - 1].ki.dwFlags = KEYEVENTF_KEYUP;
+		SendInput(line_goto.size(), line_goto.data(), sizeof(INPUT));
+	}
+
+	if(OpenClipboard(nullptr)) {
+		if(EmptyClipboard()) {
+
+			size_t byteSize = sizeof(char16_t) * (line_number.length() + 1);
+			HGLOBAL hClipboardData = GlobalAlloc(GMEM_DDESHARE | GMEM_MOVEABLE | GMEM_ZEROINIT, byteSize);
+
+			if(hClipboardData != nullptr) {
+				void* memory = GlobalLock(hClipboardData);
+
+				if(memory != nullptr) {
+					memcpy(memory, line_number.data(), sizeof(char16_t) * (line_number.length()));
+					memset((char*)memory + sizeof(char16_t) * (line_number.length()), 0, sizeof(char16_t));
+					GlobalUnlock(hClipboardData);
+
+					if(SetClipboardData(CF_UNICODETEXT, hClipboardData) != nullptr) {
+						hClipboardData = nullptr; // system now owns the clipboard, so don't touch it.
+					}
+				}
+				GlobalFree(hClipboardData); // free if failed
+			}
+		}
+		CloseClipboard();
+	}
+	//result = selection->SelectLine();
+	//if(FAILED(result)) {
+	//	OutputDebugStringA("select line failed\n");
+	//	return false;
+	//}
 
 	return true;
 }
@@ -2023,8 +2136,15 @@ void open_file_and_line(int32_t line) {
 
 
 	auto full_fn = open_project.project_directory + open_project.source_path + open_project.project_name + L".cpp";
-	visual_studio_open_file(full_fn.c_str(), uint32_t(line));
+	if(IsZoomed(chosen_attachement_vs_window)) {
+		//ShowWindow(chosen_attachement_vs_window, SW_HIDE);
+		//ShowWindow(chosen_attachement_vs_window, SW_MAXIMIZE);
+	} else {
+		ShowWindow(chosen_attachement_vs_window, SW_HIDE);
+		ShowWindow(chosen_attachement_vs_window, SW_SHOWNOACTIVATE);
+	}
 	SetForegroundWindow(chosen_attachement_vs_window);
+	visual_studio_open_file(full_fn.c_str(), uint32_t(line));
 
 	return;
 
@@ -2049,9 +2169,8 @@ void update_file_contents_and_open_to(std::string const& target_name) {
 		if(text_view[i] == '\r')
 			continue;
 		if(text_view[i] == '\n') {
-			++i;
 			line_count++;
-			if(text_view.substr(i).starts_with(full_target_string)) {
+			if(text_view.substr(i + 1).starts_with(full_target_string)) {
 				found = true;
 				break;
 			}
@@ -2071,6 +2190,19 @@ void make_goto_button(window_element_wrapper_t& for_window, ui_element_t& for_el
 		ImGui::PushID(extra_id);
 		if(ImGui::Button(">>")) {
 			auto find_string = for_window.wrapped.name + "::" + for_element.name + "::" + function;
+			update_file_contents_and_open_to(find_string);
+		}
+		ImGui::PopID();
+		ImGui::PopID();
+	}
+}
+void make_goto_button(window_element_wrapper_t& for_window, std::string const& function, int32_t extra_id = 0) {
+	if(chosen_attachement_vs_window) {
+		ImGui::SameLine();
+		ImGui::PushID(&for_window);
+		ImGui::PushID(extra_id);
+		if(ImGui::Button(">>")) {
+			auto find_string = for_window.wrapped.name + "::" + function;
 			update_file_contents_and_open_to(find_string);
 		}
 		ImGui::PopID();
@@ -2121,6 +2253,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Icon");
 	opts.push_back("Background image");
 	opts.push_back("Drop down control");
+	opts.push_back("Edit control");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -2152,6 +2285,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 12; break;
 		case template_project::template_type::drop_down_control:
 			current = 13; break;
+		case template_project::template_type::edit_control:
+			current = 14; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -2184,6 +2319,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::free_background; break;
 			case 13:
 				ttype = template_project::template_type::drop_down_control; break;
+			case 14:
+				ttype = template_project::template_type::edit_control; break;
 			default:
 				break;
 		}
@@ -2199,6 +2336,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.label_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.label_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2211,6 +2349,20 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.button_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.button_t.size()) - 1)));
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::edit_control:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.button_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2223,6 +2375,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.iconic_button_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.iconic_button_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2235,6 +2388,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.mixed_button_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.mixed_button_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2247,6 +2401,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.mixed_button_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.mixed_button_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2259,6 +2414,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.toggle_button_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.toggle_button_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2271,6 +2427,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.progress_bar_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.progress_bar_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2283,6 +2440,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.stacked_bar_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.stacked_bar_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2295,6 +2453,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.icons) {
 				inner_opts.push_back(i.file_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.icons.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2307,6 +2466,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.backgrounds) {
 				inner_opts.push_back(i.file_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.backgrounds.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2319,6 +2479,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			for(auto& i : open_templates.drop_down_t) {
 				inner_opts.push_back(i.display_name.c_str());
 			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.drop_down_t.size()) - 1)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
 				template_id = int16_t(chosen - 1);
@@ -2327,25 +2488,498 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	}
 }
 
-void control_options(window_element_wrapper_t& win, ui_element_t& c) {
-
-	if(ImGui::Button("Delete")) {
-		win.children.erase(win.children.begin() + selected_control);
-		selected_control = -1;
+void sub_layout_options(layout_level_t* selected_layout) {
+	if(!selected_layout)
 		return;
+
+	{
+		auto temp = int32_t(selected_layout->type);
+		const char* items[] = { "horizontal", "vertical", "overlapped horizontal", "overlapped vertical", "multiline", "multicolumn" };
+		ImGui::Combo("Layout type", &temp, items, 6);
+		selected_layout->type = layout_type(temp);
 	}
 
-	ImGui::SameLine();
-	if(ImGui::Button("Copy")) {
-		win.children.push_back(win.children[selected_control]);
-		win.children.back().name += "_copy";
+	int32_t temp = selected_layout->size_x;
+	ImGui::InputInt("Width (-1 for maximal)", &temp);
+	selected_layout->size_x = int16_t(temp);
+
+	temp = selected_layout->size_y;
+	ImGui::InputInt("Height (-1 for maximal)", &temp);
+	selected_layout->size_y = int16_t(temp);
+
+	temp = selected_layout->margin_top;
+	ImGui::InputInt("Top margin", &temp);
+	selected_layout->margin_top = int16_t(temp);
+
+	temp = selected_layout->margin_bottom;
+	ImGui::InputInt("Bottom margin", &temp);
+	selected_layout->margin_bottom = int16_t(temp);
+
+	temp = selected_layout->margin_left;
+	ImGui::InputInt("Left margin", &temp);
+	selected_layout->margin_left = int16_t(temp);
+
+	temp = selected_layout->margin_right;
+	ImGui::InputInt("Right margin", &temp);
+	selected_layout->margin_right = int16_t(temp);
+
+	{
+		std::vector<char const*> inner_opts;
+		inner_opts.push_back("Default");
+		for(auto& i : open_templates.layout_region_t) {
+			inner_opts.push_back(i.display_name.c_str());
+		}
+		int32_t chosen = selected_layout->template_id + 1;
+		if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+			selected_layout->template_id = int16_t(chosen - 1);
+		}
 	}
 
+	{
+		const char* items[] = { "leading", "trailing", "centered" };
+		temp = int32_t(selected_layout->line_alignment);
+		ImGui::Combo("Line alignment", &temp, items, 3);
+		selected_layout->line_alignment = layout_line_alignment(temp);
+	}
+	{
+		const char* items[] = { "leading", "trailing", "centered" };
+		temp = int32_t(selected_layout->line_internal_alignment);
+		ImGui::Combo("Internal line alignment", &temp, items, 3);
+		selected_layout->line_internal_alignment = layout_line_alignment(temp);
+	}
+	if(selected_layout->type == layout_type::mulitline_horizontal || selected_layout->type == layout_type::multiline_vertical) {
+		temp = selected_layout->interline_spacing;
+		ImGui::InputInt("Interline spacing", &temp);
+		selected_layout->interline_spacing = uint8_t(temp);
+	}
+
+	ImGui::Checkbox("Paged", &(selected_layout->paged));
+	if(selected_layout->paged) {
+		{
+			const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)", "page turn (middle)" };
+			temp = int32_t(selected_layout->page_animation);
+			ImGui::Combo("Animation", &temp, items, 5);
+			selected_layout->page_animation = animation_type(temp);
+		}
+	}
+}
+
+void window_options(window_element_wrapper_t& win) {
+	if(ImGui::Button("Delete")) {
+		open_project.windows.erase(open_project.windows.begin() + selected_window);
+		path_to_selected_layout.clear();
+		current_edit_target = edit_targets::layout_sublayout;
+		selected_window = -1;
+		selected_control = -1;
+		selected_table = -1;
+	} else {
+		ImGui::SameLine();
+		if(ImGui::Button("Copy container")) {
+			open_project.windows.push_back(win);
+			open_project.windows.back().wrapped.name += "_copy";
+			return;
+		}
+		ImGui::InputText("Name", &(win.wrapped.temp_name));
+		if(!ImGui::IsItemActiveAsInputText()) {
+			if(win.wrapped.temp_name == win.wrapped.name) {
+				// nothing; nothing has changed
+			} else if(win.wrapped.temp_name.empty()) {
+				win.wrapped.temp_name = win.wrapped.name;
+			} else {
+				bool found = false;
+				for(auto& w : open_project.windows) {
+					if(w.wrapped.name == win.wrapped.temp_name) {
+						found = true;
+						break;
+					}
+				}
+				if(found) {
+					MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
+				} else {
+					for(auto& ow : open_project.windows)
+						rename_window(ow.layout, win.wrapped.name, win.wrapped.temp_name);
+
+					win.wrapped.name = win.wrapped.temp_name;
+				}
+			}
+		}
+
+		int32_t temp = win.wrapped.x_pos;
+		ImGui::InputInt("X position", &temp);
+		win.wrapped.x_pos = int16_t(temp);
+
+		temp = win.wrapped.y_pos;
+		ImGui::InputInt("Y position", &temp);
+		win.wrapped.y_pos = int16_t(temp);
+
+		temp = win.wrapped.x_size;
+		ImGui::InputInt("Width", &temp);
+		win.wrapped.x_size = int16_t(std::max(0, temp));
+
+		temp = win.wrapped.y_size;
+		ImGui::InputInt("Height", &temp);
+		win.wrapped.y_size = int16_t(std::max(0, temp));
+
+		ImVec4 ccolor{ win.wrapped.rectangle_color.r, win.wrapped.rectangle_color.b, win.wrapped.rectangle_color.g, 1.0f };
+		ImGui::ColorEdit3("Outline color", (float*)&ccolor);
+		win.wrapped.rectangle_color.r = ccolor.x;
+		win.wrapped.rectangle_color.g = ccolor.z;
+		win.wrapped.rectangle_color.b = ccolor.y;
+
+		ImGui::Checkbox("Ignore grid", &(win.wrapped.no_grid));
+
+		{
+			int32_t combo_selection = win.wrapped.template_id + 1;
+			std::vector<char const*> options;
+			options.push_back("--None--");
+
+			for(auto& c : open_templates.window_t) {
+				options.push_back(c.display_name.c_str());
+			}
+
+			if(ImGui::Combo("Window template", &combo_selection, options.data(), int32_t(options.size()))) {
+				win.wrapped.template_id = combo_selection - 1;
+			}
+		}
+
+		auto i = selected_window;
+
+		if(win.wrapped.template_id != -1) {
+			if(open_templates.window_t[win.wrapped.template_id].close_button_definition != -1)
+				ImGui::Checkbox("Add close button", &(win.wrapped.auto_close_button));
+		}
+
+		if(win.wrapped.template_id == -1) {
+			const char* items[] = { "none", "texture", "bordered texture", "legacy GFX" };
+			temp = int32_t(open_project.windows[i].wrapped.background);
+			ImGui::Combo("Background", &temp, items, 4);
+			open_project.windows[i].wrapped.background = background_type(temp);
+		}
+
+		if(win.wrapped.template_id == -1) {
+			if(win.wrapped.background == background_type::existing_gfx) {
+				ImGui::InputText("Texture", &(win.wrapped.texture));
+			} else if(win.wrapped.background != background_type::none) {
+				std::string tex = "Texture: " + (win.wrapped.texture.size() > 0 ? win.wrapped.texture : std::string("[none]"));
+				ImGui::Text(tex.c_str());
+				ImGui::SameLine();
+				if(ImGui::Button("Change")) {
+					auto new_file = fs::pick_existing_file(L"");
+					win.wrapped.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					win.wrapped.ogl_texture.unload();
+				}
+				ImGui::Checkbox("Has alternate background", &(win.wrapped.has_alternate_bg));
+				if(win.wrapped.has_alternate_bg) {
+					std::string tex = "Alternate texture: " + (win.wrapped.alternate_bg.size() > 0 ? win.wrapped.alternate_bg : std::string("[none]"));
+					ImGui::Text(tex.c_str());
+					ImGui::SameLine();
+					if(ImGui::Button("Change Alternate")) {
+						auto new_file = fs::pick_existing_file(L"");
+						win.wrapped.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+					}
+				}
+			}
+			if(win.wrapped.background == background_type::bordered_texture) {
+				temp = win.wrapped.border_size;
+				ImGui::InputInt("Border size", &temp);
+				win.wrapped.border_size = int16_t(std::max(0, temp));
+			}
+		}
+		ImGui::Checkbox("Share table highlight", &(win.wrapped.share_table_highlight));
+		if(win.wrapped.share_table_highlight) {
+			std::vector<char const*> table_names;
+			table_names.push_back("[none]");
+			int32_t selection = (win.wrapped.table_connection == "" ? 0 : -1);
+			for(auto& c : open_project.tables) {
+				table_names.push_back(c.name.c_str());
+				if(c.name == win.wrapped.table_connection) {
+					selection = int32_t(table_names.size() - 1);
+				}
+			}
+
+			temp = selection;
+			ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
+			if(temp != selection) {
+				if(selection == 0)
+					win.wrapped.table_connection = "";
+				else
+					win.wrapped.table_connection = open_project.tables[selection - 1].name;
+			}
+		}
+		ImGui::Checkbox("Receive updates while hidden", &(win.wrapped.updates_while_hidden));
+		ImGui::Checkbox("On hide/close action", &(win.wrapped.on_hide_action));
+		make_goto_button(win, "on_hide", 10);
+
+		temp = 0;
+		switch(win.wrapped.orientation) {
+			case orientation::upper_left: temp = 0; break;
+			case orientation::upper_right: temp = 1; break;
+			case orientation::lower_left: temp = 2; break;
+			case orientation::lower_right: temp = 3; break;
+			case orientation::upper_center: temp = 4; break;
+			case orientation::lower_center: temp = 5; break;
+			case orientation::center: temp = 6; break;
+		}
+		{
+			const char* items[] = { "upper left", "upper right", "lower left", "lower right", "upper center", "lower center", "center" };
+			ImGui::Combo("Position in parent", &temp, items, 7);
+		}
+		switch(temp) {
+			case 0: win.wrapped.orientation = orientation::upper_left; break;
+			case 1: win.wrapped.orientation = orientation::upper_right; break;
+			case 2: win.wrapped.orientation = orientation::lower_left; break;
+			case 3: win.wrapped.orientation = orientation::lower_right; break;
+			case 4: win.wrapped.orientation = orientation::upper_center; break;
+			case 5: win.wrapped.orientation = orientation::lower_center; break;
+			case 6: win.wrapped.orientation = orientation::center; break;
+		}
+		ImGui::Checkbox("Ignore rtl flip", &(win.wrapped.ignore_rtl));
+		ImGui::Checkbox("Draggable", &(win.wrapped.draggable));
+
+		ImGui::Text("Member Variables");
+		if(win.wrapped.members.empty()) {
+			ImGui::Text("[none]");
+		} else {
+			for(uint32_t k = 0; k < win.wrapped.members.size(); ++k) {
+				ImGui::PushID(int32_t(k));
+				ImGui::Indent();
+				ImGui::InputText("Type", &(win.wrapped.members[k].type));
+				ImGui::InputText("Name", &(win.wrapped.members[k].name));
+				if(ImGui::Button("Delete")) {
+					win.wrapped.members.erase(win.wrapped.members.begin() + k);
+				}
+				ImGui::Unindent();
+				ImGui::PopID();
+			}
+		}
+		if(ImGui::Button("Add Member Variable")) {
+			win.wrapped.members.emplace_back();
+		}
+
+		if(win.wrapped.template_id != -1) {
+			bool has_alt_list = (win.alternates.empty() == false);
+			if(ImGui::Checkbox("Has alternate template set", &has_alt_list)) {
+				if(has_alt_list && win.alternates.empty()) {
+					win.alternates.push_back(template_alternate{ "", -1 });
+				}
+				if(!has_alt_list) {
+					win.alternates.clear();
+				}
+			}
+			if(has_alt_list) {
+				auto get_alt_id = [&](std::string_view s) {
+					for(auto& alt : win.alternates) {
+						if(alt.control_name == s)
+							return alt.tempalte_id;
+					}
+					return -1;
+				};
+				auto set_alt_id = [&](std::string_view s, int32_t id) {
+					for(auto& alt : win.alternates) {
+						if(alt.control_name == s) {
+							alt.tempalte_id = id;
+							return;
+						}
+					}
+					win.alternates.push_back(template_alternate{ std::string(s), id });
+				};
+				{
+					std::vector<char const*> inner_opts;
+					inner_opts.push_back("--Don't change--");
+					for(auto& i : open_templates.window_t) {
+						inner_opts.push_back(i.display_name.c_str());
+					}
+					int32_t chosen = get_alt_id("") + 1;
+					if(ImGui::Combo("Alternate window template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+						set_alt_id("", chosen - 1);
+					}
+				}
+				for(auto& c : win.children) {
+					switch(c.ttype) {
+						case template_project::template_type::none:
+							break;
+						case template_project::template_type::label:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.label_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::button:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.button_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::edit_control:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.button_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::toggle_button:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.toggle_button_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::iconic_button:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.iconic_button_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::mixed_button:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.mixed_button_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::mixed_button_ci:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.mixed_button_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::free_icon:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.icons) {
+								inner_opts.push_back(i.file_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::free_background:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.backgrounds) {
+								inner_opts.push_back(i.file_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::progress_bar:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.progress_bar_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+						case template_project::template_type::drop_down_control:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.drop_down_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
+					}
+				}
+			}
+		}
+
+		if(win.wrapped.template_id == -1) {
+			std::string tex = "Page left: " + (win.wrapped.page_left_texture.size() > 0 ? win.wrapped.page_left_texture : std::string("[none]"));
+			ImGui::Text(tex.c_str());
+			ImGui::SameLine();
+			if(ImGui::Button("Change (pl)")) {
+				auto new_file = fs::pick_existing_file(L"");
+				win.wrapped.page_left_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+			}
+		}
+		if(win.wrapped.template_id == -1) {
+			std::string tex = "Page right: " + (win.wrapped.page_right_texture.size() > 0 ? win.wrapped.page_right_texture : std::string("[none]"));
+			ImGui::Text(tex.c_str());
+			ImGui::SameLine();
+			if(ImGui::Button("Change (pr)")) {
+				auto new_file = fs::pick_existing_file(L"");
+				win.wrapped.page_right_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
+			}
+		}
+		if(win.wrapped.template_id == -1) {
+			const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
+			temp = int32_t(win.wrapped.page_text_color);
+			ImGui::Combo("Page number text color", &temp, items, 16);
+			win.wrapped.page_text_color = text_color(temp);
+		}
+	}
+}
+
+void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 	ImGui::InputText("Name", &(c.temp_name));
-	ImGui::SameLine();
-	if(ImGui::Button("Change Name")) {
-		if(c.temp_name.empty()) {
-			MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
+	if(!ImGui::IsItemActiveAsInputText()) {
+		if(c.temp_name == c.name) {
+			// nothing; nothing has changed
+		} else if(c.temp_name.empty()) {
+			c.temp_name = c.name;
 		} else {
 			bool found = false;
 			for(auto& w : win.children) {
@@ -2356,6 +2990,7 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			}
 			if(found) {
 				MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
+				c.temp_name = c.name;
 			} else {
 				for(auto& alt : win.alternates) {
 					if(alt.control_name == c.name)
@@ -2366,7 +3001,6 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 			}
 		}
 	}
-
 
 
 	int32_t temp = 0;
@@ -2436,6 +3070,16 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
 			else
 				make_goto_button(win, c, "update_tooltip", 5);
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 5);
+		} break;
+		case template_project::template_type::edit_control:
+		{
+			ImGui::Checkbox("Edit on update event", &(c.dynamic_text)); 
+			make_goto_button(win, c, "edit_update");
+			ImGui::Checkbox("Intercept edit commands", &(c.dynamic_tooltip)); 
+			make_goto_button(win, c, "edit_command");
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 			make_goto_button(win, c, "update", 5);
@@ -3049,6 +3693,57 @@ struct tree_location {
 	int index = 0;
 };
 
+bool internal_tree_location_from_control(std::string const& name, layout_level_t& layout, std::vector<size_t>& result) {
+	for(size_t i = 0; i < layout.contents.size(); ++i) {
+		auto& cc = layout.contents[i];
+		if(std::holds_alternative<layout_control_t>(cc)) {
+			auto& item = std::get<layout_control_t>(cc);
+			if(item.name == name) {
+				result.push_back(i);
+				return true;
+			}
+		} else if(std::holds_alternative<sub_layout_t>(cc)) {
+			auto& item = std::get<sub_layout_t>(cc);
+			result.push_back(i);
+			if(internal_tree_location_from_control(name, *(item.layout), result)) {
+				return true;
+			}
+			result.pop_back();
+		}
+	}
+	return false;
+}
+std::vector<size_t> tree_location_from_control(std::string const& name, window_element_wrapper_t& win) {
+	std::vector<size_t> result;
+	internal_tree_location_from_control(name, win.layout, result);
+	return result;
+}
+bool internal_tree_location_from_win(std::string const& name, layout_level_t& layout, std::vector<size_t>& result) {
+	for(size_t i = 0; i < layout.contents.size(); ++i) {
+		auto& cc = layout.contents[i];
+		if(std::holds_alternative<layout_window_t>(cc)) {
+			auto& item = std::get<layout_window_t>(cc);
+			if(item.name == name) {
+				result.push_back(i);
+				return true;
+			}
+		} else if(std::holds_alternative<sub_layout_t>(cc)) {
+			auto& item = std::get<sub_layout_t>(cc);
+			result.push_back(i);
+			if(internal_tree_location_from_win(name, *(item.layout), result)) {
+				return true;
+			}
+			result.pop_back();
+		}
+	}
+	return false;
+}
+std::vector<size_t> tree_location_from_win(std::string const& name, window_element_wrapper_t& win) {
+	std::vector<size_t> result;
+	internal_tree_location_from_win(name, win.layout, result);
+	return result;
+}
+
 bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& label, tree_location& current_location) {
 	if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
 		ImGui::SetDragDropPayload("DND_layout_items", &current_location, sizeof(tree_location));
@@ -3094,17 +3789,44 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 	}
 	if (ImGui::BeginPopupContextItem())
 	{
+		auto& win = open_project.windows[selected_window];
+
 		if (ImGui::Selectable("Delete")) {
+			if(std::holds_alternative<layout_control_t>(layout.contents[current_location.index])) {
+				auto& itm = std::get<layout_control_t>(layout.contents[current_location.index]);
+				auto ctrl = control_from_name(win, itm.name);
+				if(ctrl) {
+					auto id = std::distance(win.children.data(), ctrl);
+					if(id < win.children.size())
+						win.children.erase(win.children.begin() + id);
+				}
+			}
 			layout.contents.erase(layout.contents.begin() + current_location.index);
 			path_to_selected_layout.clear();
 			current_edit_target = edit_targets::layout_sublayout;
 			result = true;
+			
 			ImGui::EndPopup();
 			return true;
 		}
-		auto& win = open_project.windows[selected_window];
+		
 		auto& buffer = win.buffer;
 		if (ImGui::Selectable("Move to buffer")) {
+			if(std::holds_alternative<layout_control_t>(layout.contents[current_location.index])) {
+				auto& itm = std::get<layout_control_t>(layout.contents[current_location.index]);
+				auto ctrl = control_from_name(win, itm.name);
+				if(ctrl) {
+					win.buffer_children.push_back(*ctrl);
+					auto dist = std::distance(win.children.data(), ctrl);
+					if(dist < win.children.size()) {
+						win.children.erase(win.children.begin() + dist);
+					} else {
+						std::abort(); // control-not in window
+					}
+				} else {
+					std::abort(); // control-less control
+				}
+			}
 			buffer.insert(
 				buffer.end(),
 				std::make_move_iterator(
@@ -3135,6 +3857,10 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 					)
 				);
 				buffer.clear();
+				for(auto& bc : win.buffer_children) {
+					win.children.push_back(bc);
+				}
+				win.buffer_children.clear();
 				path_to_selected_layout.clear();
 				current_edit_target = edit_targets::layout_sublayout;
 				result = true;
@@ -3144,6 +3870,30 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 					i.layout->contents.emplace_back(layout_control_t{ });
 					path_to_selected_layout.clear();
 					current_edit_target = edit_targets::layout_sublayout;
+
+					win.children.emplace_back();
+					win.children.back().x_size = int16_t(open_project.grid_size * 8);
+					win.children.back().y_size = int16_t(open_project.grid_size * 2);
+
+					auto j = win.children.size();
+					do {
+						std::string def_name = "Control" + std::to_string(j);
+						bool found = false;
+						for(auto& w : win.children) {
+							if(w.name == def_name) {
+								found = true;
+								break;
+							}
+						}
+						if(!found) {
+							win.children.back().name = def_name;
+							break;
+						}
+						++j;
+					} while(true);
+
+					auto& itm = std::get<layout_control_t>(i.layout->contents.back());
+					itm.name = win.children.back().name;
 					result = true;
 				}
 				if (ImGui::MenuItem("Window")) {
@@ -3209,6 +3959,10 @@ void imgui_layout_contents(layout_level_t& root, layout_level_t& layout, std::ve
 					)
 				);
 				buffer.clear();
+				for(auto& bc : win.buffer_children) {
+					win.children.push_back(bc);
+				}
+				win.buffer_children.clear();
 				path_to_selected_layout.clear();
 				current_edit_target = edit_targets::layout_sublayout;
 			}
@@ -3217,6 +3971,30 @@ void imgui_layout_contents(layout_level_t& root, layout_level_t& layout, std::ve
 					layout.contents.emplace_back(layout_control_t{ });
 					path_to_selected_layout.clear();
 					current_edit_target = edit_targets::layout_sublayout;
+
+					win.children.emplace_back();
+					win.children.back().x_size = int16_t(open_project.grid_size * 8);
+					win.children.back().y_size = int16_t(open_project.grid_size * 2);
+
+					auto i = win.children.size();
+					do {
+						std::string def_name = "Control" + std::to_string(i);
+						bool found = false;
+						for(auto& w : win.children) {
+							if(w.name == def_name) {
+								found = true;
+								break;
+							}
+						}
+						if(!found) {
+							win.children.back().name = def_name;
+							break;
+						}
+						++i;
+					} while(true);
+
+					auto& itm = std::get<layout_control_t>(layout.contents.back());
+					itm.name = win.children.back().name;
 				}
 				if (ImGui::MenuItem("Window")) {
 					layout.contents.emplace_back(layout_window_t{ });
@@ -3548,6 +4326,24 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						open_project.project_name = rem.substr(0, ext_pos);
 						open_project.project_directory = new_file.substr(0, breakpt + 1);
 						switch_to_window(-1);
+
+						{
+							fs::file loaded_file{ open_project.project_directory + L"the.tui" };
+							serialization::in_buffer file_content{ loaded_file.content().data, loaded_file.content().file_size };
+							open_templates = template_project::bytes_to_project(file_content);
+							open_templates.project_name = rem.substr(0, ext_pos);
+							open_templates.project_directory = open_project.project_directory;
+							asvg::common_file_bank::bank.root_directory = open_templates.project_directory + open_templates.svg_directory;
+
+							for(auto& i : open_templates.icons) {
+								fs::file loaded_file{ open_templates.project_directory + open_templates.svg_directory + fs::utf8_to_native(i.file_name) };
+								i.renders = asvg::simple_svg(loaded_file.content().data, size_t(loaded_file.content().file_size));
+							}
+							for(auto& b : open_templates.backgrounds) {
+								fs::file loaded_file{ open_templates.project_directory + open_templates.svg_directory + fs::utf8_to_native(b.file_name) };
+								b.renders = asvg::svg(loaded_file.content().data, size_t(loaded_file.content().file_size), b.base_x, b.base_y);
+							}
+						}
 					}
 				}
 
@@ -3581,6 +4377,16 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							for(auto& b : open_templates.backgrounds) {
 								fs::file loaded_file{ open_templates.project_directory + open_templates.svg_directory + fs::utf8_to_native(b.file_name) };
 								b.renders = asvg::svg(loaded_file.content().data, size_t(loaded_file.content().file_size), b.base_x, b.base_y);
+							}
+						}
+					}
+
+					// rehome orhpaned controls
+					for(auto& win : open_project.windows) {
+						for(size_t c = win.children.size(); c-- > 0;) {
+							auto in_layout = tree_location_from_control(win.children[c].name, win);
+							if(in_layout.empty()) {
+								win.layout.contents.emplace_back(layout_control_t{ win.children[c].name, int16_t(-1), int16_t(win.children[c].x_pos), int16_t(win.children[c].y_pos), true });
 							}
 						}
 					}
@@ -3653,33 +4459,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					} while(true);
 				}
 
-				if(0 <= selected_window && selected_window <= int32_t(open_project.windows.size())) {
-					auto& win = open_project.windows[selected_window];
-					if (ImGui::MenuItem("Control")) {
-						win.children.emplace_back();
-						win.children.back().x_pos = int16_t(open_project.grid_size);
-						win.children.back().y_pos = int16_t(open_project.grid_size);
-						win.children.back().x_size = int16_t(open_project.grid_size * 8);
-						win.children.back().y_size = int16_t(open_project.grid_size * 2);
-
-						auto i = win.children.size();
-						do {
-							std::string def_name = "Control" + std::to_string(i);
-							bool found = false;
-							for(auto& w : win.children) {
-								if(w.name == def_name) {
-									found = true;
-									break;
-								}
-							}
-							if(!found) {
-								win.children.back().name = def_name;
-								break;
-							}
-							++i;
-						} while(true);
-					}
-				}
+			
 				ImGui::EndMenu();
 			}
 
@@ -3800,415 +4580,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 			ImGui::Begin("Edit", NULL, ImGuiWindowFlags_MenuBar);
 
-			if (current_edit_target == edit_targets::window) {
-				if(ImGui::Button("Delete")) {
-					open_project.windows.erase(open_project.windows.begin() + selected_window);
-					switch_to_window(-1);
-				} else {
-					ImGui::SameLine();
-					if(ImGui::Button("Copy container")) {
-						open_project.windows.push_back(open_project.windows[selected_window]);
-						open_project.windows.back().wrapped.name += "_copy";
-					}
-					ImGui::InputText("Name", &(open_project.windows[selected_window].wrapped.temp_name));
-					ImGui::SameLine();
-					if(ImGui::Button("Change Name")) {
-						if(open_project.windows[selected_window].wrapped.temp_name.empty()) {
-							MessageBoxW(nullptr, L"Name cannot be empty", L"Invalid Name", MB_OK);
-						} else {
-							bool found = false;
-							for(auto& w : open_project.windows) {
-								if(w.wrapped.name == open_project.windows[selected_window].wrapped.temp_name) {
-									found = true;
-									break;
-								}
-							}
-							if(found) {
-								MessageBoxW(nullptr, L"Name must be unique", L"Invalid Name", MB_OK);
-							} else {
-								for(auto& ow : open_project.windows)
-									rename_window(ow.layout, open_project.windows[selected_window].wrapped.name, open_project.windows[selected_window].wrapped.temp_name);
-
-								open_project.windows[selected_window].wrapped.name = open_project.windows[selected_window].wrapped.temp_name;
-							}
-						}
-					}
-					ImGui::InputText("Parent", &(open_project.windows[selected_window].wrapped.parent));
-
-					int32_t temp = open_project.windows[selected_window].wrapped.x_pos;
-					ImGui::InputInt("X position", &temp);
-					open_project.windows[selected_window].wrapped.x_pos = int16_t(temp);
-
-					temp = open_project.windows[selected_window].wrapped.y_pos;
-					ImGui::InputInt("Y position", &temp);
-					open_project.windows[selected_window].wrapped.y_pos = int16_t(temp);
-
-					temp = open_project.windows[selected_window].wrapped.x_size;
-					ImGui::InputInt("Width", &temp);
-					open_project.windows[selected_window].wrapped.x_size = int16_t(std::max(0, temp));
-
-					temp = open_project.windows[selected_window].wrapped.y_size;
-					ImGui::InputInt("Height", &temp);
-					open_project.windows[selected_window].wrapped.y_size = int16_t(std::max(0, temp));
-
-					ImVec4 ccolor{ open_project.windows[selected_window].wrapped.rectangle_color.r, open_project.windows[selected_window].wrapped.rectangle_color.b, open_project.windows[selected_window].wrapped.rectangle_color.g, 1.0f };
-					ImGui::ColorEdit3("Outline color", (float*)&ccolor);
-					open_project.windows[selected_window].wrapped.rectangle_color.r = ccolor.x;
-					open_project.windows[selected_window].wrapped.rectangle_color.g = ccolor.z;
-					open_project.windows[selected_window].wrapped.rectangle_color.b = ccolor.y;
-
-					ImGui::Checkbox("Ignore grid", &(open_project.windows[selected_window].wrapped.no_grid));
-
-					{
-						int32_t combo_selection = open_project.windows[selected_window].wrapped.template_id + 1;
-						std::vector<char const*> options;
-						options.push_back("--None--");
-
-						for(auto& c : open_templates.window_t) {
-							options.push_back(c.display_name.c_str());
-						}
-
-						if(ImGui::Combo("Window template", &combo_selection, options.data(), int32_t(options.size()))) {
-							open_project.windows[selected_window].wrapped.template_id = combo_selection - 1;
-						}
-					}
-
-					auto i = selected_window;
-
-					if(open_project.windows[selected_window].wrapped.template_id != -1) {
-						if(open_templates.window_t[open_project.windows[selected_window].wrapped.template_id].close_button_definition != -1)
-							ImGui::Checkbox("Add close button", &(open_project.windows[selected_window].wrapped.auto_close_button));
-					}
-
-					if(open_project.windows[selected_window].wrapped.template_id == -1) {
-						const char* items[] = { "none", "texture", "bordered texture", "legacy GFX" };
-						temp = int32_t(open_project.windows[i].wrapped.background);
-						ImGui::Combo("Background", &temp, items, 4);
-						open_project.windows[i].wrapped.background = background_type(temp);
-					}
-
-					if(open_project.windows[selected_window].wrapped.template_id == -1) {
-						if(open_project.windows[selected_window].wrapped.background == background_type::existing_gfx) {
-							ImGui::InputText("Texture", &(open_project.windows[i].wrapped.texture));
-						} else if(open_project.windows[i].wrapped.background != background_type::none) {
-							std::string tex = "Texture: " + (open_project.windows[i].wrapped.texture.size() > 0 ? open_project.windows[i].wrapped.texture : std::string("[none]"));
-							ImGui::Text(tex.c_str());
-							ImGui::SameLine();
-							if(ImGui::Button("Change")) {
-								auto new_file = fs::pick_existing_file(L"");
-								//auto breakpt = new_file.find_last_of(L'\\');
-								//open_project.windows[i].wrapped.texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-								open_project.windows[i].wrapped.texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-								open_project.windows[i].wrapped.ogl_texture.unload();
-							}
-							ImGui::Checkbox("Has alternate background", &(open_project.windows[i].wrapped.has_alternate_bg));
-							if(open_project.windows[selected_window].wrapped.has_alternate_bg) {
-								std::string tex = "Alternate texture: " + (open_project.windows[i].wrapped.alternate_bg.size() > 0 ? open_project.windows[i].wrapped.alternate_bg : std::string("[none]"));
-								ImGui::Text(tex.c_str());
-								ImGui::SameLine();
-								if(ImGui::Button("Change Alternate")) {
-									auto new_file = fs::pick_existing_file(L"");
-									//auto breakpt = new_file.find_last_of(L'\\');
-									//open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(new_file.substr(breakpt + 1));
-									open_project.windows[i].wrapped.alternate_bg = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-								}
-							}
-						}
-						if(open_project.windows[selected_window].wrapped.background == background_type::bordered_texture) {
-							temp = open_project.windows[selected_window].wrapped.border_size;
-							ImGui::InputInt("Border size", &temp);
-							open_project.windows[selected_window].wrapped.border_size = int16_t(std::max(0, temp));
-						}
-					}
-					ImGui::Checkbox("Share table highlight", &(open_project.windows[selected_window].wrapped.share_table_highlight));
-					if(open_project.windows[i].wrapped.share_table_highlight) {
-						std::vector<char const*> table_names;
-						table_names.push_back("[none]");
-						int32_t selection = (open_project.windows[selected_window].wrapped.table_connection== "" ? 0 : -1);
-						for(auto& c : open_project.tables) {
-							table_names.push_back(c.name.c_str());
-							if(c.name == open_project.windows[selected_window].wrapped.table_connection) {
-								selection = int32_t(table_names.size() - 1);
-							}
-						}
-
-						temp = selection;
-						ImGui::Combo("Associated table", &selection, table_names.data(), int32_t(table_names.size()));
-						if(temp != selection) {
-							if(selection == 0)
-								open_project.windows[i].wrapped.table_connection = "";
-							else
-								open_project.windows[i].wrapped.table_connection = open_project.tables[selection - 1].name;
-						}
-					}
-					ImGui::Checkbox("Receive updates while hidden", &(open_project.windows[i].wrapped.updates_while_hidden));
-					ImGui::Checkbox("On hide/close action", &(open_project.windows[i].wrapped.on_hide_action));
-					temp = 0;
-					switch(open_project.windows[i].wrapped.orientation) {
-						case orientation::upper_left: temp = 0; break;
-						case orientation::upper_right: temp = 1; break;
-						case orientation::lower_left: temp = 2; break;
-						case orientation::lower_right: temp = 3; break;
-						case orientation::upper_center: temp = 4; break;
-						case orientation::lower_center: temp = 5; break;
-						case orientation::center: temp = 6; break;
-					}
-					{
-						const char* items[] = { "upper left", "upper right", "lower left", "lower right", "upper center", "lower center", "center" };
-						ImGui::Combo("Position in parent", &temp, items, 7);
-					}
-					switch(temp) {
-						case 0: open_project.windows[i].wrapped.orientation = orientation::upper_left; break;
-						case 1: open_project.windows[i].wrapped.orientation = orientation::upper_right; break;
-						case 2: open_project.windows[i].wrapped.orientation = orientation::lower_left; break;
-						case 3: open_project.windows[i].wrapped.orientation = orientation::lower_right; break;
-						case 4: open_project.windows[i].wrapped.orientation = orientation::upper_center; break;
-						case 5: open_project.windows[i].wrapped.orientation = orientation::lower_center; break;
-						case 6: open_project.windows[i].wrapped.orientation = orientation::center; break;
-					}
-					ImGui::Checkbox("Ignore rtl flip", &(open_project.windows[i].wrapped.ignore_rtl));
-					ImGui::Checkbox("Draggable", &(open_project.windows[i].wrapped.draggable));
-
-					ImGui::Text("Member Variables");
-					if(open_project.windows[i].wrapped.members.empty()) {
-						ImGui::Text("[none]");
-					} else {
-						for(uint32_t k = 0; k < open_project.windows[i].wrapped.members.size(); ++k) {
-							ImGui::PushID(int32_t(k));
-							ImGui::Indent();
-							ImGui::InputText("Type", &(open_project.windows[i].wrapped.members[k].type));
-							ImGui::InputText("Name", &(open_project.windows[i].wrapped.members[k].name));
-							if(ImGui::Button("Delete")) {
-								open_project.windows[i].wrapped.members.erase(open_project.windows[i].wrapped.members.begin() + k);
-							}
-							ImGui::Unindent();
-							ImGui::PopID();
-						}
-					}
-					if(ImGui::Button("Add Member Variable")) {
-						open_project.windows[i].wrapped.members.emplace_back();
-					}
-
-					if(open_project.windows[selected_window].wrapped.template_id != -1) {
-						bool has_alt_list = (open_project.windows[selected_window].alternates.empty() == false);
-						if(ImGui::Checkbox("Has alternate template set", &has_alt_list)) {
-							if(has_alt_list && open_project.windows[selected_window].alternates.empty()) {
-								open_project.windows[selected_window].alternates.push_back(template_alternate{ "", -1 });
-							}
-							if(!has_alt_list) {
-								open_project.windows[selected_window].alternates.clear();
-							}
-						}
-						if(has_alt_list) {
-							auto get_alt_id = [&](std::string_view s) {
-								for(auto& alt : open_project.windows[selected_window].alternates) {
-									if(alt.control_name == s)
-										return alt.tempalte_id;
-								}
-								return -1;
-							};
-							auto set_alt_id = [&](std::string_view s, int32_t id) {
-								for(auto& alt : open_project.windows[selected_window].alternates) {
-									if(alt.control_name == s) {
-										alt.tempalte_id = id;
-										return;
-									}
-								}
-								open_project.windows[selected_window].alternates.push_back(template_alternate{ std::string(s), id });
-							};
-							{
-								std::vector<char const*> inner_opts;
-								inner_opts.push_back("--Don't change--");
-								for(auto& i : open_templates.window_t) {
-									inner_opts.push_back(i.display_name.c_str());
-								}
-								int32_t chosen = get_alt_id("") + 1;
-								if(ImGui::Combo("Alternate window template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-									set_alt_id("", chosen - 1);
-								}
-							}
-							for(auto& c : open_project.windows[selected_window].children) {
-								switch(c.ttype) {
-									case template_project::template_type::none:
-										break;
-									case template_project::template_type::label:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.label_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::button:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.button_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::toggle_button:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.toggle_button_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::iconic_button:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.iconic_button_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::mixed_button:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.mixed_button_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::mixed_button_ci:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.mixed_button_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::free_icon:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.icons) {
-											inner_opts.push_back(i.file_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::free_background:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.backgrounds) {
-											inner_opts.push_back(i.file_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::progress_bar:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.progress_bar_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-									case template_project::template_type::drop_down_control:
-									{
-										std::vector<char const*> inner_opts;
-										inner_opts.push_back("--Don't change--");
-										for(auto& i : open_templates.drop_down_t) {
-											inner_opts.push_back(i.display_name.c_str());
-										}
-										int32_t chosen = get_alt_id(c.name) + 1;
-										std::string label = "Alternate template for " + c.name;
-										if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-											set_alt_id(c.name, chosen - 1);
-										}
-									} break;
-								}
-							}
-						}
-					}
-
-					if(open_project.windows[selected_window].wrapped.template_id == -1) {
-						std::string tex = "Page left: " + (open_project.windows[i].wrapped.page_left_texture.size() > 0 ? open_project.windows[i].wrapped.page_left_texture : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change (pl)")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							open_project.windows[i].wrapped.page_left_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						}
-					}
-					if(open_project.windows[selected_window].wrapped.template_id == -1) {
-						std::string tex = "Page right: " + (open_project.windows[i].wrapped.page_right_texture.size() > 0 ? open_project.windows[i].wrapped.page_right_texture : std::string("[none]"));
-						ImGui::Text(tex.c_str());
-						ImGui::SameLine();
-						if(ImGui::Button("Change (pr)")) {
-							auto new_file = fs::pick_existing_file(L"");
-							//auto breakpt = new_file.find_last_of(L'\\');
-							//open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(new_file.substr(breakpt + 1));
-							open_project.windows[i].wrapped.page_right_texture = fs::native_to_utf8(relative_file_name(new_file, open_project.project_directory));
-						}
-					}
-					if(open_project.windows[selected_window].wrapped.template_id == -1) {
-						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-						temp = int32_t(open_project.windows[i].wrapped.page_text_color);
-						ImGui::Combo("Page number text color", &temp, items, 16);
-						open_project.windows[i].wrapped.page_text_color = text_color(temp);
-					}
-				}
-			}
-
-			if (
-				current_edit_target == edit_targets::control
-				&& selected_control > -1
-				&& selected_window > -1
-				&& selected_window < open_project.windows.size()
-			) {
-				auto& win = open_project.windows[selected_window];
-				auto& c = win.children[selected_control];
-
-				control_options(win, c);
-
-			}
+			
 
 			if (
 				current_edit_target == edit_targets::layout_window
@@ -4326,7 +4698,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 								list_it->header = open_project.windows[selection - 1].wrapped.name;
 						}
 
-						// ImGui::Unindent();
+						ImGui::Unindent();
 					}
 					ImGui::PopID();
 					++id2;
@@ -4401,46 +4773,32 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			) {
 				auto& win = open_project.windows[selected_window];
 				auto current_item = &win.layout;
-				for (size_t i = 0; i + 1 < path_to_selected_layout.size(); i++) {
-					current_item = std::get<sub_layout_t>(current_item->contents[path_to_selected_layout[i]]).layout.get();
-				}
-
-				auto& selected_item = std::get<layout_control_t>(current_item->contents[path_to_selected_layout.back()]);
-
-				std::vector<char const*> control_names;
-				control_names.push_back("[none]");
-				int32_t selection = (selected_item.name == "" ? 0 : -1);
-				int32_t temp;
-				for(auto& c : open_project.windows[selected_window].children) {
-					control_names.push_back(c.name.c_str());
-					if(c.name == selected_item.name) {
-						selection = int32_t(control_names.size() - 1);
+				if(!path_to_selected_layout.empty()) {
+					for(size_t i = 0; i + 1 < path_to_selected_layout.size(); i++) {
+						current_item = std::get<sub_layout_t>(current_item->contents[path_to_selected_layout[i]]).layout.get();
 					}
-				}
 
-				temp = selection;
-				ImGui::Combo("Name", &selection, control_names.data(), int32_t(control_names.size()));
-				if(temp != selection) {
-					if(selection == 0)
-						selected_item.name = "";
-					else
-						selected_item.name = open_project.windows[selected_window].children[selection -1].name;
-				}
+					auto& selected_item = std::get<layout_control_t>(current_item->contents[path_to_selected_layout.back()]);
+					auto attached_control = control_from_name(win, selected_item.name);
 
-				ImGui::Checkbox("Absolute position", &(selected_item.absolute_position));
-				if(selected_item.absolute_position) {
-					temp = selected_item.abs_x;
-					ImGui::InputInt("Absolute x position", &temp);
-					selected_item.abs_x = int16_t(temp);
+					ImGui::Checkbox("Absolute position", &(selected_item.absolute_position));
+					if(selected_item.absolute_position) {
+						int32_t temp = selected_item.abs_x;
+						ImGui::InputInt("Absolute x position", &temp);
+						selected_item.abs_x = int16_t(temp);
 
-					temp = selected_item.abs_y;
-					ImGui::InputInt("Absolute y position", &temp);
-					selected_item.abs_y = int16_t(temp);
-				}
+						temp = selected_item.abs_y;
+						ImGui::InputInt("Absolute y position", &temp);
+						selected_item.abs_y = int16_t(temp);
+					}
 
-				if (ImGui::Button("Edit control") && selection > 0) {
-					selected_control = selection - 1;
-					current_edit_target = edit_targets::control;
+					if(attached_control) {
+						control_options(win, *attached_control);
+					}
+				} else { // root window
+					window_options(win);
+					ImGui::Text("--Root layout--");
+					sub_layout_options(&win.layout);
 				}
 			}
 
@@ -4454,123 +4812,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				for (auto i : path_to_selected_layout) {
 					selected_layout = std::get<sub_layout_t>(selected_layout->contents[i]).layout.get();
 				}
-				int temp;
-
-				if (ImGui::BeginMenuBar()) {
-					if (ImGui::BeginMenu("Add")) {
-						if (ImGui::MenuItem("Control")) {
-							selected_layout->contents.emplace_back(layout_control_t{ });
-							path_to_selected_layout.clear();
-							current_edit_target = edit_targets::layout_sublayout;
-						}
-						if (ImGui::MenuItem("Window")) {
-							selected_layout->contents.emplace_back(layout_window_t{ });
-							path_to_selected_layout.clear();
-							current_edit_target = edit_targets::layout_sublayout;
-						}
-						if (ImGui::MenuItem("Glue")) {
-							selected_layout->contents.emplace_back(layout_glue_t{ });
-							path_to_selected_layout.clear();
-							current_edit_target = edit_targets::layout_sublayout;
-						}
-						if (ImGui::MenuItem("Generator")) {
-							selected_layout->contents.emplace_back(generator_t{ });
-							path_to_selected_layout.clear();
-							current_edit_target = edit_targets::layout_sublayout;
-						}
-						if (ImGui::MenuItem("Sublayout")) {
-							selected_layout->contents.emplace_back(sub_layout_t{ });
-							std::get<sub_layout_t>(selected_layout->contents.back()).layout = std::make_unique<layout_level_t>();
-							path_to_selected_layout.clear();
-							current_edit_target = edit_targets::layout_sublayout;
-						}
-						if (ImGui::MenuItem("Texture layer")) {
-							selected_layout->contents.emplace_back(texture_layer_t{ });
-							path_to_selected_layout.clear();
-							current_edit_target = edit_targets::layout_sublayout;
-						}
-						ImGui::EndMenu();
-					}
-					ImGui::EndMenuBar();
+				if(selected_layout == &win.layout) {
+					window_options(win);
+					ImGui::Text("--Root layout--");
 				}
-
-				{
-					temp = int32_t(selected_layout->type);
-					const char* items[] = { "horizontal", "vertical", "overlapped horizontal", "overlapped vertical", "multiline", "multicolumn" };
-					ImGui::Combo("Layout type", &temp, items, 6);
-					selected_layout->type = layout_type(temp);
-				}
-
-				temp = selected_layout->size_x;
-				ImGui::InputInt("Width (-1 for maximal)", &temp);
-				selected_layout->size_x = int16_t(temp);
-
-				temp = selected_layout->size_y;
-				ImGui::InputInt("Height (-1 for maximal)", &temp);
-				selected_layout->size_y = int16_t(temp);
-
-				temp = selected_layout->margin_top;
-				ImGui::InputInt("Top margin", &temp);
-				selected_layout->margin_top = int16_t(temp);
-
-				temp = selected_layout->margin_bottom;
-				ImGui::InputInt("Bottom margin", &temp);
-				selected_layout->margin_bottom = int16_t(temp);
-
-				temp = selected_layout->margin_left;
-				ImGui::InputInt("Left margin", &temp);
-				selected_layout->margin_left = int16_t(temp);
-
-				temp = selected_layout->margin_right;
-				ImGui::InputInt("Right margin", &temp);
-				selected_layout->margin_right = int16_t(temp);
-
-				{
-					std::vector<char const*> inner_opts;
-					inner_opts.push_back("Default");
-					for(auto& i : open_templates.layout_region_t) {
-						inner_opts.push_back(i.display_name.c_str());
-					}
-					int32_t chosen = selected_layout->template_id + 1;
-					if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
-						selected_layout->template_id = int16_t(chosen - 1);
-					}
-				}
-
-				{
-					const char* items[] = { "leading", "trailing", "centered" };
-					temp = int32_t(selected_layout->line_alignment);
-					ImGui::Combo("Line alignment", &temp, items, 3);
-					selected_layout->line_alignment = layout_line_alignment(temp);
-				}
-				{
-					const char* items[] = { "leading", "trailing", "centered" };
-					temp = int32_t(selected_layout->line_internal_alignment);
-					ImGui::Combo("Internal line alignment", &temp, items, 3);
-					selected_layout->line_internal_alignment = layout_line_alignment(temp);
-				}
-				if(selected_layout->type == layout_type::mulitline_horizontal || selected_layout->type == layout_type::multiline_vertical) {
-					temp = selected_layout->interline_spacing;
-					ImGui::InputInt("Interline spacing", &temp);
-					selected_layout->interline_spacing = uint8_t(temp);
-				}
-
-				ImGui::Checkbox("Paged", &(selected_layout->paged));
-				if(selected_layout->paged) {
-					{
-						const char* items[] = { "none", "page turn (left)", "page turn (right)", "page turn (up)", "page turn (middle)" };
-						temp = int32_t(selected_layout->page_animation);
-						ImGui::Combo("Animation", &temp, items, 5);
-						selected_layout->page_animation = animation_type(temp);
-					}
-					/* {
-						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
-						temp = int32_t(selected_layout->page_display_color);
-						ImGui::Combo("Page numbering color", &temp, items, 16);
-						selected_layout->page_display_color = text_color(temp);
-					} */
-				}
-
+				sub_layout_options(selected_layout);
 			}
 			ImGui::End();
 		}
@@ -4599,10 +4845,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 			if (selected_window != selection - 1)
 				switch_to_window(selection - 1);
 
-			if (ImGui::Button("Edit window")) {
-				current_edit_target = edit_targets::window;
-			}
-
 			ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
 			if (ImGui::BeginTabBar("SelectionTabs", tab_bar_flags)) {
 				if (ImGui::BeginTabItem("Tables")) {
@@ -4626,24 +4868,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							open_project.windows[selected_window].layout,
 							{}
 						);
-						ImGui::EndTabItem();
-					}
-					if (win.children.size() > 0 && ImGui::BeginTabItem("Control")) {
-						for(uint32_t j = 0; j < win.children.size(); ++j) {
-							ImGui::PushID(int32_t(j));
-
-							auto name = win.children[j].name;
-							if (hovered_control == int32_t(j)) {
-								name += "(Hovered)";
-							}
-
-							if (ImGui::RadioButton(name.c_str(), &selected_control, j)) {
-								current_edit_target = edit_targets::control;
-								selected_control = j;
-							}
-
-							ImGui::PopID();
-						}
 						ImGui::EndTabItem();
 					}
 				}
@@ -4808,7 +5032,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::TableSetColumnIndex(k + 1);
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						ImGui::InputText("##Column name", &(c.table_columns[k].internal_data.column_name));
 						ImGui::PopID();
 					}
@@ -4824,7 +5048,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 						ImGui::PushID(k);
 						temp = c.table_columns[k].display_data.width;
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						ImGui::InputInt("##Column width", &temp);
 						c.table_columns[k].display_data.width = int16_t(std::max(0, temp));
 						ImGui::PopID();
@@ -4839,7 +5063,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 						ImGui::PushID(k);
 						bool is_spacer = c.table_columns[k].internal_data.cell_type == table_cell_type::spacer;
-						ImGui::SetNextItemWidth(50.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						ImGui::Checkbox("##Spacer column", &is_spacer);
 						c.table_columns[k].internal_data.cell_type = is_spacer ? table_cell_type::spacer : table_cell_type::text;
 						ImGui::PopID();
@@ -4861,7 +5085,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						if(c.template_id == -1) {
 							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
 							temp = int32_t(c.table_columns[k].display_data.cell_text_color);
-							ImGui::SetNextItemWidth(100.f);
+							ImGui::SetNextItemWidth(text_scale * 150.f);
 							ImGui::Combo("##Cell text color", &temp, items, 16);
 							c.table_columns[k].display_data.cell_text_color = text_color(temp);
 						} else {
@@ -4888,7 +5112,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						const char* items[] = { "left (leading)", "right (trailing)", "center" };
 						temp = int32_t(c.table_columns[k].display_data.text_alignment);
 						ImGui::Combo("##Cell text alignment", &temp, items, 3);
@@ -4912,7 +5136,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						const char* items[] = { "left (leading)", "right (trailing)", "none" };
 						temp = int32_t(c.table_columns[k].internal_data.decimal_alignment);
 						ImGui::Combo("##Decimal alignment", &temp, items, 3);
@@ -4936,7 +5160,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						ImGui::Checkbox("##Dynamic cell tooltip", &(c.table_columns[k].internal_data.has_dy_cell_tooltip));
 						ImGui::PopID();
 
@@ -4957,7 +5181,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						if(!c.table_columns[k].internal_data.has_dy_cell_tooltip) {
 							ImGui::InputText("##Cell tooltip key", &(c.table_columns[k].display_data.cell_tooltip_key));
 						} else {
@@ -4983,7 +5207,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						ImGui::Checkbox("##Column is sortable", &(c.table_columns[k].internal_data.sortable));
 						ImGui::PopID();
 
@@ -5004,7 +5228,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						ImGui::InputText("##Header key", &(c.table_columns[k].display_data.header_key));
 						ImGui::PopID();
 						if (is_spacer) {
@@ -5024,7 +5248,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						ImGui::Checkbox("##Header has background", &(c.table_columns[k].internal_data.header_background));
 						ImGui::PopID();
 						if (is_spacer || c.template_id != -1) {
@@ -5044,7 +5268,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						if(c.table_columns[k].internal_data.header_background) {
 							std::string tex = (c.table_columns[k].display_data.header_texture.size() > 0 ? c.table_columns[k].display_data.header_texture : std::string("[none]"));
 							ImGui::Text("%s", tex.c_str());
@@ -5076,7 +5300,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 
 						if(c.template_id == -1) {
 							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
@@ -5107,7 +5331,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 
 						const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };
 						temp = int32_t(c.table_columns[k].display_data.header_text_color);
@@ -5134,7 +5358,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						}
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 
 						if(!c.table_columns[k].internal_data.has_dy_header_tooltip) {
 							ImGui::InputText("##Header tooltip key", &(c.table_columns[k].display_data.header_tooltip_key));
@@ -5157,7 +5381,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						ImGui::TableSetColumnIndex(k + 1);
 
 						ImGui::PushID(k);
-						ImGui::SetNextItemWidth(100.f);
+						ImGui::SetNextItemWidth(text_scale * 150.f);
 						if(ImGui::Button("DEL")) {
 							c.table_columns.erase(c.table_columns.begin() + k);
 							ImGui::PopID();
@@ -5206,7 +5430,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 						auto ct = test_rect_target(io.MousePos.x, io.MousePos.y, c.x_pos, c.y_pos, c.x_size * ui_scale, c.y_size * ui_scale, ui_scale);
 						if(ct != drag_target::none) {
 							selected_control = int32_t(i);
-							current_edit_target = edit_targets::control;
+							current_edit_target = edit_targets::layout_control;
+							path_to_selected_layout.clear();
 							control_drag_target = ct;
 
 							drag_start_x = io.MousePos.x;
@@ -5215,6 +5440,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							if(lc) {
 								base_values.x_pos = lc->abs_x;
 								base_values.y_pos = lc->abs_y;
+								path_to_selected_layout = tree_location_from_control(lc->name, win);
 							} else {
 								base_values.x_pos = c.x_pos;
 								base_values.y_pos = c.y_pos;
@@ -5228,6 +5454,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 					if(selected_control == -1) {
 						auto t = test_rect_target(io.MousePos.x, io.MousePos.y, win.wrapped.x_pos * ui_scale + drag_offset_x, win.wrapped.y_pos * ui_scale + drag_offset_y, win.wrapped.x_size * ui_scale, win.wrapped.y_size * ui_scale, ui_scale);
+						current_edit_target = edit_targets::layout_control;
+						path_to_selected_layout.clear();
 						if(t == drag_target::center) {
 							drag_start_x = io.MousePos.x - drag_offset_x;
 							drag_start_y = io.MousePos.y - drag_offset_y;
