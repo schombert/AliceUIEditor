@@ -2005,18 +2005,36 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 		DTE = punk;
 	}
 
+	constexpr int32_t retry_count = 10;
 
 	CComPtr<EnvDTE::ItemOperations> item_ops;
 	auto result = DTE->get_ItemOperations(&item_ops);
 	if(FAILED(result)) {
+		int32_t i = 0;
+		while((result == RPC_E_CALL_REJECTED || result == RPC_E_CALL_CANCELED) && i < retry_count) {
+			Sleep(100);
+			result = DTE->get_ItemOperations(&item_ops);
+			++i;
+		}
+		
+	}
+	if(FAILED(result)) {
 		OutputDebugStringA("get_ItemOperations failed\n");
 		return false;
 	}
-
 	CComBSTR bstrFileName(filename);
 	CComBSTR bstrKind(EnvDTE::vsViewKindTextView);
 	CComPtr<EnvDTE::Window> window;
 	result = item_ops->OpenFile(bstrFileName, bstrKind, &window);
+	if(FAILED(result)) {
+		int32_t i = 0;
+		while((result == RPC_E_CALL_REJECTED || result == RPC_E_CALL_CANCELED) && i < retry_count) {
+			Sleep(100);
+			result = item_ops->OpenFile(bstrFileName, bstrKind, &window);
+			++i;
+		}
+
+	}
 	if(FAILED(result)) {
 		OutputDebugStringA("OpenFile failed\n");
 		return false;
@@ -2024,6 +2042,14 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 
 	CComPtr<EnvDTE::Document> doc;
 	result = DTE->get_ActiveDocument(&doc);
+	if(FAILED(result)) {
+		int32_t i = 0;
+		while((result == RPC_E_CALL_REJECTED || result == RPC_E_CALL_CANCELED) && i < retry_count) {
+			Sleep(100);
+			result = DTE->get_ActiveDocument(&doc);
+			++i;
+		}
+	}
 	if(FAILED(result)) {
 		OutputDebugStringA("get_ActiveDocument failed\n");
 		return false;
@@ -2045,6 +2071,14 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 	CComPtr<IDispatch> selection_dispatch;
 	result = doc->get_Selection(&selection_dispatch);
 	if(FAILED(result)) {
+		int32_t i = 0;
+		while((result == RPC_E_CALL_REJECTED || result == RPC_E_CALL_CANCELED) && i < retry_count) {
+			Sleep(100);
+			result = doc->get_Selection(&selection_dispatch);
+			++i;
+		}
+	}
+	if(FAILED(result)) {
 		OutputDebugStringA("get_Selection failed\n");
 	}
 
@@ -2052,10 +2086,26 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 		CComPtr<EnvDTE::TextSelection> selection;
 		result = selection_dispatch->QueryInterface(&selection);
 		if(FAILED(result)) {
+			int32_t i = 0;
+			while((result == RPC_E_CALL_REJECTED || result == RPC_E_CALL_CANCELED) && i < retry_count) {
+				Sleep(100);
+				result = selection_dispatch->QueryInterface(&selection);
+				++i;
+			}
+		}
+		if(FAILED(result)) {
 			OutputDebugStringA("TextSelection QueryInterface failed\n");
 		}
 		if(!FAILED(result)) {
 			result = selection->GotoLine(line, false);
+			if(FAILED(result)) {
+				int32_t i = 0;
+				while((result == RPC_E_CALL_REJECTED || result == RPC_E_CALL_CANCELED) && i < retry_count) {
+					Sleep(100);
+					result = selection->GotoLine(line, false);
+					++i;
+				}
+			}
 			if(FAILED(result)) {
 				OutputDebugStringA("GotoLine failed\n");
 			}
@@ -2096,7 +2146,7 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 		line_goto[line_goto.size() - 1].ki.dwFlags = KEYEVENTF_KEYUP;
 		SendInput(line_goto.size(), line_goto.data(), sizeof(INPUT));
 	}
-
+	/*
 	if(OpenClipboard(nullptr)) {
 		if(EmptyClipboard()) {
 
@@ -2120,11 +2170,7 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 		}
 		CloseClipboard();
 	}
-	//result = selection->SelectLine();
-	//if(FAILED(result)) {
-	//	OutputDebugStringA("select line failed\n");
-	//	return false;
-	//}
+	*/
 
 	return true;
 }
