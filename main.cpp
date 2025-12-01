@@ -1020,22 +1020,47 @@ struct index_result {
 	int32_t sub_index = 0;
 };
 
-struct layout_iterator {
-	std::vector<layout_item>& backing;
+struct layout_item_position {
 	int32_t index = 0;
 	int32_t sub_index = 0;
 
-	layout_iterator(std::vector<layout_item>& backing) : backing(backing) { }
+	bool operator==(layout_item_position const& o) const noexcept {
+		return index == o.index && sub_index == o.sub_index;
+	}
+	bool operator!=(layout_item_position const& o) const noexcept {
+		return !(*this == o);
+	}
+	bool operator<=(layout_item_position const& o) const noexcept {
+		return (index < o.index) || (index == o.index && sub_index <= o.sub_index);
+	}
+	bool operator>=(layout_item_position const& o) const noexcept {
+		return (index > o.index) || (index == o.index && sub_index >= o.sub_index);
+	}
+	bool operator<(layout_item_position const& o) const noexcept {
+		return !(*this >= o);
+	}
+	bool operator>(layout_item_position const& o) const noexcept {
+		return !(*this <= o);
+	}
+};
+
+
+struct layout_iterator {
+	std::vector<layout_item>& backing;
+	layout_item_position position;
+
+	layout_iterator(std::vector<layout_item>& backing) : backing(backing) {
+	}
 
 	bool current_is_glue() {
-		return has_more() && std::holds_alternative<layout_glue_t>(backing[index]);
+		return has_more() && std::holds_alternative<layout_glue_t>(backing[position.index]);
 	}
-	measure_result measure_current(window_element_wrapper_t& window, bool glue_horizontal, int32_t max_crosswise) {
+	measure_result measure_current(window_element_wrapper_t& window, bool glue_horizontal, int32_t max_crosswise, bool first_in_section) {
 		if(!has_more())
-			return measure_result{ 0, 0, measure_result::special::none};
-		auto& m = backing[index];
+			return measure_result{ 0, 0, measure_result::special::none };
+		auto& m = backing[position.index];
 
-		if(std::holds_alternative< layout_control_t>(m)) {
+		if(std::holds_alternative<layout_control_t>(m)) {
 			auto& i = std::get<layout_control_t>(m);
 			update_cached_control(i.name, window, i.cached_index);
 
@@ -1043,7 +1068,27 @@ struct layout_iterator {
 				return  measure_result{ 0, 0, measure_result::special::none };
 			}
 			if(i.cached_index != -1) {
-				return  measure_result{ window.children[i.cached_index].x_size, window.children[i.cached_index].y_size, measure_result::special::none };
+				measure_result res;
+				res.other = measure_result::special::none;
+				res.x_space = window.children[i.cached_index].x_size;
+				res.y_space = window.children[i.cached_index].y_size;
+				if(i.fill_x) {
+					if(glue_horizontal) {
+						res.other = measure_result::special::space_consumer;
+						res.x_space = 0;
+					} else {
+						res.x_space = int16_t(max_crosswise);
+					}
+				}
+				if(i.fill_y) {
+					if(!glue_horizontal) {
+						res.other = measure_result::special::space_consumer;
+						res.y_space = 0;
+					} else {
+						res.y_space = int16_t(max_crosswise);
+					}
+				}
+				return res;
 			}
 		} else if(std::holds_alternative<layout_window_t>(m)) {
 			auto& i = std::get<layout_window_t>(m);
@@ -1052,7 +1097,27 @@ struct layout_iterator {
 				return  measure_result{ 0, 0, measure_result::special::none };
 			}
 			if(i.cached_index != -1) {
-				return  measure_result{ open_project.windows[i.cached_index].wrapped.x_size, open_project.windows[i.cached_index].wrapped.y_size, measure_result::special::none };
+				measure_result res;
+				res.other = measure_result::special::none;
+				res.x_space = open_project.windows[i.cached_index].wrapped.x_size;
+				res.y_space = open_project.windows[i.cached_index].wrapped.y_size;
+				if(i.fill_x) {
+					if(glue_horizontal) {
+						res.other = measure_result::special::space_consumer;
+						res.x_space = 0;
+					} else {
+						res.x_space = int16_t(max_crosswise);
+					}
+				}
+				if(i.fill_y) {
+					if(!glue_horizontal) {
+						res.other = measure_result::special::space_consumer;
+						res.y_space = 0;
+					} else {
+						res.y_space = int16_t(max_crosswise);
+					}
+				}
+				return res;
 			}
 		} else if(std::holds_alternative<layout_glue_t>(m)) {
 			auto& i = std::get<layout_glue_t>(m);
@@ -1078,12 +1143,12 @@ struct layout_iterator {
 			for(auto& j : i.inserts) {
 				update_cached_window(j.name, j.cached_index);
 			}
-			if(sub_index < int32_t(i.inserts.size()) && i.inserts[sub_index].cached_index != -1) {
-				return measure_result{ open_project.windows[i.inserts[sub_index].cached_index].wrapped.x_size, open_project.windows[i.inserts[sub_index].cached_index].wrapped.y_size, measure_result::special::none };
+			if(position.sub_index < int32_t(i.inserts.size()) && i.inserts[position.sub_index].cached_index != -1) {
+				return measure_result{ open_project.windows[i.inserts[position.sub_index].cached_index].wrapped.x_size, open_project.windows[i.inserts[position.sub_index].cached_index].wrapped.y_size, measure_result::special::none };
 			} else {
 				return measure_result{ 0, 0, measure_result::special::none };
 			}
-		} else if(std::holds_alternative< sub_layout_t>(m)) {
+		} else if(std::holds_alternative<sub_layout_t>(m)) {
 			auto& i = std::get<sub_layout_t>(m);
 			int32_t x = 0;
 			int32_t y = 0;
@@ -1104,27 +1169,51 @@ struct layout_iterator {
 				else
 					y = max_crosswise;
 			}
-
 			return measure_result{ x, y, consume_fill ? measure_result::special::space_consumer : measure_result::special::none };
 		}
 		return measure_result{ 0, 0, measure_result::special::none };
 	}
-	void render_current(window_element_wrapper_t& window, int layer, float x, float y, int32_t lsz_x, int32_t lsz_y, color3f outline_color, float scale) {
+	void render_current(window_element_wrapper_t& window, int layer, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale, int32_t layout_x, int32_t layout_y) {
 		if(!has_more())
 			return;
-		auto& m = backing[index];
+		auto& m = backing[position.index];
 
-		if(std::holds_alternative< layout_control_t>(m)) {
+		if(std::holds_alternative<layout_control_t>(m)) {
 			auto& i = std::get<layout_control_t>(m);
 			if(i.cached_index != -1) {
-				render_control(window.children[i.cached_index], x, y, i.cached_index == selected_control, scale);
-				window.children[i.cached_index].x_pos = int16_t(x * scale);
-				window.children[i.cached_index].y_pos = int16_t(y * scale);
+				if(i.fill_x)
+					window.children[i.cached_index].x_size = int16_t(width);
+				if(i.fill_y)
+					window.children[i.cached_index].y_size = int16_t(height);
+
+				if(i.absolute_position) {
+					window.children[i.cached_index].x_pos = int16_t((layout_x + i.abs_x) * scale);
+					window.children[i.cached_index].y_pos = int16_t((layout_y + i.abs_y) * scale);
+					render_control(window.children[i.cached_index], layout_x + i.abs_x, layout_y + i.abs_y, i.cached_index == selected_control, scale);
+				} else {
+					window.children[i.cached_index].x_pos = int16_t(x * scale);
+					window.children[i.cached_index].y_pos = int16_t(y * scale);
+					render_control(window.children[i.cached_index], x, y, i.cached_index == selected_control, scale);
+				}
 			}
 		} else if(std::holds_alternative<layout_window_t>(m)) {
 			auto& i = std::get<layout_window_t>(m);
-			if(i.cached_index != -1)
-				render_window(open_project.windows[i.cached_index], x, y, false, scale);
+			if(i.cached_index != -1) {
+				auto in_x = open_project.windows[i.cached_index].wrapped.x_size;
+				auto in_y = open_project.windows[i.cached_index].wrapped.y_size;
+				if(i.fill_x)
+					open_project.windows[i.cached_index].wrapped.x_size = int16_t(width);
+				if(i.fill_y)
+					open_project.windows[i.cached_index].wrapped.y_size = int16_t(height);
+
+				if(i.absolute_position) {
+					render_window(open_project.windows[i.cached_index], x, y, false, scale);
+				} else {
+					render_window(open_project.windows[i.cached_index], x, y, false, scale);
+				}
+				open_project.windows[i.cached_index].wrapped.x_size = in_x;
+				open_project.windows[i.cached_index].wrapped.y_size = in_y;
+			}
 		} else if(std::holds_alternative<layout_glue_t>(m)) {
 
 		} else if(std::holds_alternative<generator_t>(m)) {
@@ -1132,63 +1221,71 @@ struct layout_iterator {
 			for(auto& j : i.inserts) {
 				update_cached_window(j.name, j.cached_index);
 			}
-			if(sub_index < int32_t(i.inserts.size()) && i.inserts[sub_index].cached_index != -1) {
-				render_window(open_project.windows[i.inserts[sub_index].cached_index], x, y, false, scale);
+			if(position.sub_index < int32_t(i.inserts.size()) && i.inserts[position.sub_index].cached_index != -1) {
+				render_window(open_project.windows[i.inserts[position.sub_index].cached_index], x, y, false, scale);
 			}
-		} else if(std::holds_alternative< sub_layout_t>(m)) {
+		} else if(std::holds_alternative<sub_layout_t>(m)) {
 			auto& i = std::get<sub_layout_t>(m);
-			render_layout(window, *(i.layout), layer + 1, x, y, lsz_x, lsz_y, outline_color, scale);
+			render_layout(window, *(i.layout), layer + 1, x, y, width, height, outline_color, scale);
 		}
 	}
 	void move_position(int32_t n) {
 		while(n > 0 && has_more()) {
-			if(std::holds_alternative<generator_t>(backing[index])) {
-				auto& g = std::get<generator_t>(backing[index]);
-				++sub_index;
-				--n;
-				if(sub_index >= int32_t(g.inserts.size())) {
-					sub_index = 0;
-					++index;
+			if(std::holds_alternative<generator_t>(backing[position.index])) {
+				auto& g = std::get<generator_t>(backing[position.index]);
+				auto sub_count = g.inserts.size();
+				if(n >= int32_t(sub_count - position.sub_index)) {
+					n -= int32_t(sub_count - position.sub_index);
+					position.sub_index = 0;
+					++position.index;
+				} else {
+					position.sub_index += n;
+					n = 0;
 				}
 			} else {
-				++index;
+				++position.index;
 				--n;
 			}
 		}
-		while(n < 0 && index >= 0) {
-			if(std::holds_alternative<generator_t>(backing[index])) {
-				auto& g = std::get<generator_t>(backing[index]);
-				--sub_index;
+		while(n < 0 && position.index >= 0) {
+			if(position.index >= int32_t(backing.size())) {
+				position.index = int32_t(backing.size()) - 1;
+				if(backing.size() > 0 && std::holds_alternative<generator_t>(backing[position.index])) {
+					auto& g = std::get<generator_t>(backing[position.index]);
+					position.sub_index = std::max(int32_t(g.inserts.size()) - 1, 0);
+				}
 				++n;
-				if(sub_index < 0) {
-					sub_index = 0;
-					--index;
+			} else if(std::holds_alternative<generator_t>(backing[position.index])) {
+				auto& g = std::get<generator_t>(backing[position.index]);
+				if(-n > position.sub_index) {
+					n += (position.sub_index + 1);
+					--position.index;
 				} else {
-					continue; // to avoid resetting sub index
+					position.sub_index += n;
+					n = 0;
+					break; // don't reset sub index
 				}
 			} else {
-				--index;
-				if(index < 0) {
-					index = 0; return;
-				}
+				--position.index;
 				++n;
 			}
 
-			if(index < 0) {
-				index = 0; return;
+			if(position.index < 0) {
+				position.sub_index = 0;
+				position.index = 0; return;
 			}
-			if(std::holds_alternative<generator_t>(backing[index])) {
-				auto& g = std::get<generator_t>(backing[index]);
-				sub_index = std::max(int32_t(g.inserts.size()) - 1, 0);
+			if(std::holds_alternative<generator_t>(backing[position.index])) {
+				auto& g = std::get<generator_t>(backing[position.index]);
+				position.sub_index = std::max(int32_t(g.inserts.size()) - 1, 0);
 			}
 		}
 	}
 	bool has_more() {
-		return index < int32_t(backing.size());
+		return position.index < int32_t(backing.size());
 	}
 	void reset() {
-		index = 0;
-		sub_index = 0;
+		position.index = 0;
+		position.sub_index = 0;
 	}
 };
 
@@ -1208,6 +1305,177 @@ index_result nth_layout_child(layout_level_t& m, int32_t index) {
 		}
 	}
 	return index_result{ nullptr, 0 };
+}
+
+
+struct layout_box {
+	uint16_t x_dim = 0;
+	uint16_t y_dim = 0;
+	uint16_t item_count = 0;
+	uint16_t space_conumer_count = 0;
+	uint16_t non_glue_count = 0;
+	bool end_page = false;
+};
+
+layout_box measure_horizontal_box(window_element_wrapper_t& win, layout_iterator& source, int32_t max_x, int32_t max_y) {
+	layout_box result{ };
+
+	auto initial_pos = source.position;
+
+	while(source.has_more()) {
+		auto m_result = source.measure_current(win, true, max_y, source.position == initial_pos);
+		bool is_glue = source.current_is_glue();
+		int32_t xdtemp = result.x_dim;
+		bool fits = ((m_result.x_space + result.x_dim) <= max_x) || (source.position == initial_pos) || is_glue;
+
+		if(fits) {
+			result.x_dim = std::min(uint16_t(m_result.x_space + result.x_dim), uint16_t(max_x));
+			int32_t xdtemp2 = result.x_dim;
+			result.y_dim = std::max(result.y_dim, uint16_t(m_result.y_space));
+			if(m_result.other == measure_result::special::space_consumer) {
+				++result.space_conumer_count;
+			}
+			++result.item_count;
+			if(!is_glue)
+				++result.non_glue_count;
+			if(m_result.other == measure_result::special::end_page) {
+				result.end_page = true;
+				source.move_position(1);
+				break;
+			}
+			if(m_result.other == measure_result::special::end_line) {
+				source.move_position(1);
+				break;
+			}
+		} else {
+			break;
+		}
+
+		source.move_position(1);
+	}
+
+	int32_t rollback_count = 0;
+	auto rollback_end_pos = source.position;
+
+	// rollback loop -- drop any items that were glued to the preivous item
+	while(source.position > initial_pos) {
+		source.move_position(-1);
+		auto m_result = source.measure_current(win, true, max_y, source.position == initial_pos);
+		if(m_result.other != measure_result::special::no_break) {
+			source.move_position(1);
+			break;
+		}
+		if(source.current_is_glue()) // don't break just before no break glue
+			source.move_position(-1);
+	}
+
+	if(source.position > initial_pos && rollback_end_pos != (source.position)) { // non trivial rollback
+		result = layout_box{ };
+		auto new_end = source.position;
+		source.position = initial_pos;
+
+		// final measurement loop if rollback was non zero
+		while(source.position < new_end) {
+			auto m_result = source.measure_current(win, true, max_y, source.position == initial_pos);
+			bool is_glue = source.current_is_glue();
+
+			result.x_dim = std::min(uint16_t(m_result.x_space + result.x_dim), uint16_t(max_x));
+			result.y_dim = std::max(result.y_dim, uint16_t(m_result.y_space));
+			if(m_result.other == measure_result::special::space_consumer) {
+				++result.space_conumer_count;
+			}
+			if(!is_glue)
+				++result.non_glue_count;
+			++result.item_count;
+
+			if(m_result.other == measure_result::special::end_page) {
+				result.end_page = true;
+			}
+
+			source.move_position(1);
+		}
+	}
+
+	return result;
+}
+layout_box measure_vertical_box(window_element_wrapper_t& win, layout_iterator& source, int32_t max_x, int32_t max_y) {
+	layout_box result{ };
+
+	auto initial_pos = source.position;
+
+	while(source.has_more()) {
+		auto m_result = source.measure_current(win, false, max_x, source.position == initial_pos);
+		bool is_glue = source.current_is_glue();
+		bool fits = ((m_result.y_space + result.y_dim) <= max_y) || (source.position == initial_pos) || is_glue;
+
+		if(fits) {
+			result.y_dim = std::min(uint16_t(m_result.y_space + result.y_dim), uint16_t(max_y));
+			result.x_dim = std::max(result.x_dim, uint16_t(m_result.x_space));
+			if(m_result.other == measure_result::special::space_consumer) {
+				++result.space_conumer_count;
+			}
+			++result.item_count;
+			if(!is_glue)
+				++result.non_glue_count;
+			if(m_result.other == measure_result::special::end_page) {
+				result.end_page = true;
+				source.move_position(1);
+				break;
+			}
+			if(m_result.other == measure_result::special::end_line) {
+				source.move_position(1);
+				break;
+			}
+		} else {
+			break;
+		}
+
+		source.move_position(1);
+	}
+
+	int32_t rollback_count = 0;
+	auto rollback_end_pos = source.position;
+
+	// rollback loop -- drop any items that were glued to the preivous item
+	while(source.position > initial_pos) {
+		source.move_position(-1);
+		auto m_result = source.measure_current(win, false, max_x, source.position == initial_pos);
+		if(m_result.other != measure_result::special::no_break) {
+			source.move_position(1);
+			break;
+		}
+		if(source.current_is_glue()) // don't break just before no break glue
+			source.move_position(-1);
+	}
+
+	if(source.position > initial_pos && rollback_end_pos != (source.position)) { // non trivial rollback
+		result = layout_box{ };
+		auto new_end = source.position;
+		source.position = initial_pos;
+
+		// final measurement loop if rollback was non zero
+		while(source.position < new_end) {
+			auto m_result = source.measure_current(win, false, max_x, source.position == initial_pos);
+			bool is_glue = source.current_is_glue();
+
+			result.y_dim = std::min(uint16_t(m_result.y_space + result.y_dim), uint16_t(max_y));
+			result.x_dim = std::max(result.x_dim, uint16_t(m_result.x_space));
+			if(m_result.other == measure_result::special::space_consumer) {
+				++result.space_conumer_count;
+			}
+			if(!is_glue)
+				++result.non_glue_count;
+			++result.item_count;
+
+			if(m_result.other == measure_result::special::end_page) {
+				result.end_page = true;
+			}
+
+			source.move_position(1);
+		}
+	}
+
+	return result;
 }
 
 void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int layer, float x, float y, int32_t width, int32_t height, color3f outline_color, float scale) {
@@ -1246,614 +1514,333 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int
 		render_layout_rect(outline_color * 0.5f * layer, ((x + left_margin) * scale), ((y + top_margin) * scale), std::max(1, int32_t(effective_x_size * scale)), std::max(1, int32_t(effective_y_size * scale)));
 	}
 
+	auto& lvl = layout;
 	switch(layout.type) {
 		case layout_type::single_horizontal:
 		{
-			float space_used = 0;
-			int32_t fill_consumer_count = 0;
+			int32_t index_start = 0;
+			layout_iterator it(lvl.contents);
+			it.move_position(index_start);
 
-			layout_iterator it(layout.contents);
+			auto start_pos = it.position;
+			auto box = measure_horizontal_box(window, it, effective_x_size, effective_y_size);
+			it.position = start_pos;
 
-			// measure loop
-			layout.page_starts.clear();
-
-			int32_t page_counter = 0;
-			while(it.has_more()) {
-				auto mr = it.measure_current(window, true, effective_y_size);
-				if(layout.paged && (space_used + mr.x_space > effective_x_size || mr.other == measure_result::special::end_page)) {
-					if(it.current_is_glue()) {
-						++page_counter;
-					}
-					layout.page_starts.push_back(page_counter);
-					//check if previous was glue, and erase
-					if(it.index != 0) {
-						it.move_position(-1);
-						if(it.current_is_glue()) {
-							space_used -= it.measure_current(window, true, effective_y_size).x_space;
-						}
-						it.move_position(1);
-					}
-					if(it.current_is_glue()) {
-						it.move_position(1);
-						// normally: break here
-					}
-					break; // only layout one page
-				}
-
-				if(mr.other == measure_result::special::space_consumer)
-					++fill_consumer_count;
-				space_used += mr.x_space;
-
-				it.move_position(1);
-				++page_counter;
-			}
-			it.reset();
-
-			if(layout.paged) {
-				layout.page_starts.push_back( page_counter);
-			}
+			int32_t space_used = box.x_dim;
+			int32_t fill_consumer_count = box.space_conumer_count;
 			// place / render
 
 			int32_t extra_runlength = int32_t(effective_x_size - space_used);
 			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
 			int32_t extra_lead = 0;
-			switch(layout.line_alignment) {
+			switch(lvl.line_alignment) {
 				case layout_line_alignment::leading: break;
 				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
 				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
 			}
+
 			space_used = x + extra_lead + left_margin;
-			page_counter = 0;
-			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
-				auto mr = it.measure_current(window, true, effective_y_size);
-				float yoff = 0;
-				float xoff = space_used;
-				switch(layout.line_internal_alignment) {
+			bool alternate = true;
+			for(uint16_t i = 0; i < box.item_count; ++i) {
+				auto mr = it.measure_current(window, true, effective_y_size, i == 0);
+				int32_t yoff = 0;
+				int32_t xoff = space_used;
+				switch(lvl.line_internal_alignment) {
 					case layout_line_alignment::leading: yoff = y + top_margin; break;
 					case layout_line_alignment::trailing: yoff = y + top_margin + effective_y_size - mr.y_space; break;
 					case layout_line_alignment::centered: yoff = y + top_margin + (effective_y_size - mr.y_space) / 2;  break;
 				}
-				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-					}
-				} else if(std::holds_alternative< layout_window_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_window_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-					}
-				}
-				it.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+
+				it.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale, x, y);
+				it.move_position(1);
 
 				space_used += mr.x_space;
 				if(mr.other == measure_result::special::space_consumer) {
 					space_used += per_fill_consumer;
 				}
-				it.move_position(1);
-				++page_counter;
 			}
 		} break;
 		case layout_type::single_vertical:
 		{
-			float space_used = 0;
-			int32_t fill_consumer_count = 0;
+			int32_t index_start = 0;
+		
+			layout_iterator it(lvl.contents);
+			it.move_position(index_start);
 
-			layout_iterator it(layout.contents);
+			auto start_pos = it.position;
+			auto box = measure_vertical_box(window, it, effective_x_size, effective_y_size);
+			it.position = start_pos;
 
-			// measure loop
-			layout.page_starts.clear();
-
-			int32_t page_counter = 0;
-			while(it.has_more()) {
-				auto mr = it.measure_current(window, false, effective_x_size);
-				if(layout.paged && (space_used + mr.y_space > effective_y_size || mr.other == measure_result::special::end_page)) {
-					if(it.current_is_glue()) {
-						++page_counter;
-					}
-					layout.page_starts.push_back(page_counter);
-					//check if previous was glue, and erase
-					if(it.index != 0) {
-						it.move_position(-1);
-						if(it.current_is_glue()) {
-							space_used -= it.measure_current(window, false, effective_x_size).y_space;
-						}
-						it.move_position(1);
-					}
-					if(it.current_is_glue()) {
-						it.move_position(1);
-						// normally: break here
-					}
-					break; // only layout one page
-				}
-
-				if(mr.other == measure_result::special::space_consumer)
-					++fill_consumer_count;
-				space_used += mr.y_space;
-
-				it.move_position(1);
-				++page_counter;
-			}
-			it.reset();
-
-			if(layout.paged) {
-				layout.page_starts.push_back(page_counter);
-			}
+			int32_t space_used = box.y_dim;
+			int32_t fill_consumer_count = box.space_conumer_count;
 			// place / render
 
 			int32_t extra_runlength = int32_t(effective_y_size - space_used);
 			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
 			int32_t extra_lead = 0;
-			switch(layout.line_alignment) {
+			switch(lvl.line_alignment) {
 				case layout_line_alignment::leading: break;
 				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
 				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
 			}
+
 			space_used = y + extra_lead + top_margin;
-			page_counter = 0;
-			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
-				auto mr = it.measure_current(window, false, effective_x_size);
-				float xoff = 0;
-				float yoff = space_used;
-				switch(layout.line_internal_alignment) {
+			bool alternate = true;
+			for(uint16_t i = 0; i < box.item_count; ++i) {
+				auto mr = it.measure_current(window, false, effective_x_size, i == 0);
+
+				int32_t xoff = 0;
+				int32_t yoff = space_used;
+				switch(lvl.line_internal_alignment) {
 					case layout_line_alignment::leading: xoff = x + left_margin; break;
 					case layout_line_alignment::trailing: xoff = x + left_margin + effective_x_size - mr.x_space; break;
 					case layout_line_alignment::centered: xoff = x + left_margin + (effective_x_size - mr.x_space) / 2;  break;
 				}
-				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-					}
-				} else if(std::holds_alternative< layout_window_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_window_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-					}
-				}
-				it.render_current(window, layer, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+
+				it.render_current(window, layer, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale, x, y);
+				it.move_position(1);
 
 				space_used += mr.y_space;
 				if(mr.other == measure_result::special::space_consumer) {
 					space_used += per_fill_consumer;
 				}
-				it.move_position(1);
-				++page_counter;
 			}
 		} break;
 		case layout_type::overlapped_horizontal:
 		{
-			float space_used = 0;
-			int32_t fill_consumer_count = 0;
+			layout_iterator place_it(lvl.contents);
+			int32_t index_start = 0;
 
-			layout_iterator it(layout.contents);
+			auto pre_pos = place_it.position;
+			auto box = measure_horizontal_box(window, place_it, std::numeric_limits<int32_t>::max(), effective_y_size);
+			place_it.position = pre_pos;
 
-			// measure loop
-			layout.page_starts.clear();
-
-			int32_t page_counter = 0;
-			int32_t non_glue_count = 0;
-			while(it.has_more()) {
-				auto mr = it.measure_current(window, true, effective_y_size);
-				if(layout.paged && mr.other == measure_result::special::end_page) {
-					if(it.current_is_glue()) {
-						++page_counter;
-					}
-					layout.page_starts.push_back(page_counter);
-					//check if previous was glue, and erase
-					if(it.index != 0) {
-						it.move_position(-1);
-						if(it.current_is_glue()) {
-							space_used -= it.measure_current(window, true, effective_y_size).x_space;
-						}
-						it.move_position(1);
-					}
-					if(it.current_is_glue()) {
-						it.move_position(1);
-						// normally: break here
-					}
-					break; // only layout one page
-				}
-				if(!it.current_is_glue()) {
-					if((std::holds_alternative<layout_control_t>(it.backing[it.index]) && std::get<layout_control_t>(it.backing[it.index]).absolute_position)
-						|| (std::holds_alternative<layout_window_t>(it.backing[it.index]) && std::get<layout_window_t>(it.backing[it.index]).absolute_position)) {
-
-					} else {
-						++non_glue_count;
-					}
-				}
-
-				if(mr.other == measure_result::special::space_consumer)
-					++fill_consumer_count;
-				space_used += mr.x_space;
-
-				it.move_position(1);
-				++page_counter;
-			}
-			it.reset();
-
-			if(layout.paged) {
-				layout.page_starts.push_back(page_counter);
-			}
-			// place / render
+			int32_t space_used = box.x_dim;
+			int32_t fill_consumer_count = box.space_conumer_count;
+			int32_t non_glue_count = box.non_glue_count;
 
 			int32_t extra_runlength = std::max(0, int32_t(effective_x_size - space_used));
 			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
 			int32_t extra_lead = 0;
-			switch(layout.line_alignment) {
+			switch(lvl.line_alignment) {
 				case layout_line_alignment::leading: break;
 				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
 				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
 			}
 			int32_t overlap_subtraction = (non_glue_count > 1 && space_used > effective_x_size) ? int32_t(space_used - effective_x_size) / (non_glue_count - 1) : 0;
 			space_used = x + extra_lead + left_margin;
-			page_counter = 0;
-			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
-				auto mr = it.measure_current(window, true, effective_y_size);
-				float yoff = 0;
-				float xoff = space_used;
-				switch(layout.line_internal_alignment) {
+
+			bool page_first = true;
+			bool alternate = true;
+			while(place_it.has_more()) {
+				auto mr = place_it.measure_current(window, true, effective_y_size, page_first);
+				int32_t yoff = 0;
+				int32_t xoff = space_used;
+				switch(lvl.line_internal_alignment) {
 					case layout_line_alignment::leading: yoff = y + top_margin; break;
 					case layout_line_alignment::trailing: yoff = y + top_margin + effective_y_size - mr.y_space; break;
 					case layout_line_alignment::centered: yoff = y + top_margin + (effective_y_size - mr.y_space) / 2;  break;
 				}
 				bool was_abs = false;
-				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-						was_abs = true;
-					}
-				} else if(std::holds_alternative< layout_window_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_window_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-						was_abs = true;
-					}
+				if(std::holds_alternative< layout_control_t>(lvl.contents[place_it.position.index])) {
+					auto& i = std::get<layout_control_t>(lvl.contents[place_it.position.index]);
+					was_abs = i.absolute_position;
+				} else if(std::holds_alternative< layout_window_t>(lvl.contents[place_it.position.index])) {
+					auto& i = std::get<layout_window_t>(lvl.contents[place_it.position.index]);
+					was_abs = i.absolute_position;
 				}
-				it.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+				place_it.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale, x, y);
+
+				if(!place_it.current_is_glue()) {
+					page_first = false;
+				}
 
 				space_used += mr.x_space;
 				if(mr.other == measure_result::special::space_consumer) {
 					space_used += per_fill_consumer;
 				}
-				if(!it.current_is_glue() && !was_abs)
+				if(!place_it.current_is_glue() && !was_abs)
 					space_used -= overlap_subtraction;
 
-				it.move_position(1);
-				++page_counter;
+				place_it.move_position(1);
 			}
 		} break;
 		case layout_type::overlapped_vertical:
 		{
-			float space_used = 0;
-			int32_t fill_consumer_count = 0;
+			layout_iterator place_it(lvl.contents);
+			int32_t index_start = 0;
+			
+			place_it.move_position(index_start);
+			auto pre_pos = place_it.position;
+			auto box = measure_horizontal_box(window, place_it, effective_x_size, std::numeric_limits<int32_t>::max());
+			place_it.position = pre_pos;
 
-			layout_iterator it(layout.contents);
-
-			// measure loop
-			layout.page_starts.clear();
-
-			int32_t page_counter = 0;
-			int32_t non_glue_count = 0;
-			while(it.has_more()) {
-				auto mr = it.measure_current(window, false, effective_x_size);
-				if(layout.paged && mr.other == measure_result::special::end_page) {
-					if(it.current_is_glue()) {
-						++page_counter;
-					}
-					layout.page_starts.push_back(page_counter);
-					//check if previous was glue, and erase
-					if(it.index != 0) {
-						it.move_position(-1);
-						if(it.current_is_glue()) {
-							space_used -= it.measure_current(window, false, effective_x_size).y_space;
-						}
-						it.move_position(1);
-					}
-					if(it.current_is_glue()) {
-						it.move_position(1);
-						// normally: break here
-					}
-					break; // only layout one page
-				}
-				if(!it.current_is_glue()) {
-					if((std::holds_alternative<layout_control_t>(it.backing[it.index]) && std::get<layout_control_t>(it.backing[it.index]).absolute_position)
-						|| (std::holds_alternative<layout_window_t>(it.backing[it.index]) && std::get<layout_window_t>(it.backing[it.index]).absolute_position)) {
-
-					} else {
-						++non_glue_count;
-					}
-				}
-
-				if(mr.other == measure_result::special::space_consumer)
-					++fill_consumer_count;
-				space_used += mr.y_space;
-
-				it.move_position(1);
-				++page_counter;
-			}
-			it.reset();
-
-			if(layout.paged) {
-				layout.page_starts.push_back(page_counter);
-			}
-			// place / render
+			int32_t space_used = box.y_dim;
+			int32_t fill_consumer_count = box.space_conumer_count;
+			int32_t non_glue_count = box.non_glue_count;
 
 			int32_t extra_runlength = std::max(0, int32_t(effective_y_size - space_used));
 			int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
 			int32_t extra_lead = 0;
-			switch(layout.line_alignment) {
+			switch(lvl.line_alignment) {
 				case layout_line_alignment::leading: break;
 				case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
 				case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
 			}
 			int32_t overlap_subtraction = (non_glue_count > 1 && space_used > effective_y_size) ? int32_t(space_used - effective_y_size) / (non_glue_count - 1) : 0;
 			space_used = y + extra_lead + top_margin;
-			page_counter = 0;
-			while(it.has_more() && (!layout.paged || page_counter < layout.page_starts[0])) {
-				auto mr = it.measure_current(window, false, effective_x_size);
-				float xoff = 0;
-				float yoff = space_used;
-				switch(layout.line_internal_alignment) {
+
+			bool page_first = true;
+			bool alternate = true;
+			while(place_it.has_more()) {
+				auto mr = place_it.measure_current(window, false, effective_x_size, page_first);
+				int32_t xoff = 0;
+				int32_t yoff = space_used;
+				switch(lvl.line_internal_alignment) {
 					case layout_line_alignment::leading: xoff = x + left_margin; break;
 					case layout_line_alignment::trailing: xoff = x + left_margin + effective_x_size - mr.x_space; break;
 					case layout_line_alignment::centered: xoff = x + left_margin + (effective_x_size - mr.x_space) / 2;  break;
 				}
 				bool was_abs = false;
-				if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-						was_abs = true;
-					}
-				} else if(std::holds_alternative< layout_control_t>(layout.contents[it.index])) {
-					auto& i = std::get<layout_control_t>(layout.contents[it.index]);
-					if(i.absolute_position) {
-						xoff = x + i.abs_x;
-						yoff = y + i.abs_y;
-						was_abs = true;
-					}
+				if(std::holds_alternative< layout_control_t>(lvl.contents[place_it.position.index])) {
+					auto& i = std::get<layout_control_t>(lvl.contents[place_it.position.index]);
+					was_abs = i.absolute_position;
+				} else if(std::holds_alternative< layout_window_t>(lvl.contents[place_it.position.index])) {
+					auto& i = std::get<layout_window_t>(lvl.contents[place_it.position.index]);
+					was_abs = i.absolute_position;
 				}
-				it.render_current(window, layer, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+
+				place_it.render_current(window, layer, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale, x, y);
+
+				if(!place_it.current_is_glue()) {
+					page_first = false;
+				}
 
 				space_used += mr.y_space;
 				if(mr.other == measure_result::special::space_consumer) {
 					space_used += per_fill_consumer;
 				}
-				if(!it.current_is_glue() && !was_abs)
+				if(!place_it.current_is_glue() && !was_abs)
 					space_used -= overlap_subtraction;
 
-				it.move_position(1);
-				++page_counter;
+				place_it.move_position(1);
 			}
 		} break;
 		case layout_type::mulitline_horizontal:
 		{
-			layout_iterator it(layout.contents);
+			layout_iterator place_it(lvl.contents);
+			int32_t index_start = 0;
 
-			layout.page_starts.clear();
+			int32_t y_remaining = effective_y_size;
+			bool first = true;
+			while(place_it.has_more()) {
+				auto pre_pos = place_it.position;
 
-			int32_t page_counter = 0;
-			int32_t crosswise_used = 0;
-
-			// loop for page
-			while(it.has_more()) {
-				auto line_start = it;
-				int32_t max_crosswise = 0;
-				float space_used = 0;
-				int32_t fill_consumer_count = 0;
-
-				// loop for line
-				bool page_ended = false;
-				while(it.has_more()) {
-					auto mr = it.measure_current(window, true, effective_y_size - crosswise_used);
-					if((space_used > 0 && (space_used + mr.x_space > effective_x_size || mr.other == measure_result::special::end_line)) || (space_used > 0 && mr.other == measure_result::special::end_page) || (crosswise_used > 0 && mr.other == measure_result::special::end_page) || (layout.paged && crosswise_used + mr.y_space > effective_y_size && crosswise_used > 0)) {
-						if(it.current_is_glue()) {
-							++page_counter;
-						}
-						if(mr.other == measure_result::special::end_page || (crosswise_used + mr.y_space > effective_y_size && crosswise_used > 0)) {
-							page_ended = true;
-						}
-
-						//check if previous was glue, and erase
-						if(it.index != 0) {
-							it.move_position(-1);
-							if(it.current_is_glue()) {
-								space_used -= it.measure_current(window, true, effective_y_size - crosswise_used).x_space;
-							}
-							it.move_position(1);
-						}
-						if(it.current_is_glue()) {
-							it.move_position(1);
-							// normally: break here
-						}
-						break; // only one line
-					}
-
-					max_crosswise = std::max(max_crosswise, mr.y_space);
-					if(mr.other == measure_result::special::space_consumer)
-						++fill_consumer_count;
-					space_used += mr.x_space;
-
-					it.move_position(1);
-					++page_counter;
+				auto box = measure_horizontal_box(window, place_it, effective_x_size, y_remaining);
+				assert(box.item_count > 0);
+				if(box.y_dim > y_remaining && !first) { // end
+					break;
 				}
 
-				// position/render line
-				int32_t extra_runlength = int32_t(effective_x_size - space_used);
-				int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+				place_it.position = pre_pos;
+				bool alternate = true;
+
+				int32_t extra_runlength = int32_t(effective_x_size - box.x_dim);
+				int32_t per_fill_consumer = box.space_conumer_count != 0 ? (extra_runlength / box.space_conumer_count) : 0;
 				int32_t extra_lead = 0;
-				switch(layout.line_alignment) {
+				switch(lvl.line_alignment) {
 					case layout_line_alignment::leading: break;
-					case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
-					case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+					case layout_line_alignment::trailing: extra_lead = extra_runlength - box.space_conumer_count * per_fill_consumer; break;
+					case layout_line_alignment::centered: extra_lead = (extra_runlength - box.space_conumer_count * per_fill_consumer) / 2;  break;
 				}
-				space_used = x + extra_lead + left_margin;
-				page_counter = 0;
+				auto space_used = x + extra_lead + left_margin;
 
-				while(line_start.index < it.index || line_start.sub_index < it.sub_index) {
-					auto mr = line_start.measure_current(window, true, effective_y_size);
-					float yoff = 0;
-					float xoff = space_used;
-					switch(layout.line_internal_alignment) {
-						case layout_line_alignment::leading: yoff = y + crosswise_used + top_margin; break;
-						case layout_line_alignment::trailing: yoff = y + crosswise_used + top_margin + max_crosswise - mr.y_space; break;
-						case layout_line_alignment::centered: yoff = y + crosswise_used + top_margin + (max_crosswise - mr.y_space) / 2;  break;
+				for(uint16_t i = 0; i < box.item_count; ++i) {
+					auto mr = place_it.measure_current(window, false, effective_x_size, i == 0);
+
+					int32_t yoff = 0;
+					int32_t xoff = space_used;
+					switch(lvl.line_internal_alignment) {
+						case layout_line_alignment::leading: yoff = y + top_margin + (effective_y_size - y_remaining); break;
+						case layout_line_alignment::trailing: yoff = y + top_margin + (effective_y_size - y_remaining) + box.y_dim - mr.y_space; break;
+						case layout_line_alignment::centered: yoff = y + top_margin + (effective_y_size - y_remaining) + (box.y_dim - mr.y_space) / 2;  break;
 					}
-					if(std::holds_alternative< layout_control_t>(layout.contents[line_start.index])) {
-						auto& i = std::get<layout_control_t>(layout.contents[line_start.index]);
-						if(i.absolute_position) {
-							xoff = x + i.abs_x;
-							yoff = y + i.abs_y;
-						}
-					} else if(std::holds_alternative< layout_window_t>(layout.contents[line_start.index])) {
-						auto& i = std::get<layout_window_t>(layout.contents[line_start.index]);
-						if(i.absolute_position) {
-							xoff = x + i.abs_x;
-							yoff = y + i.abs_y;
-						}
-					}
-					line_start.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale);
+					place_it.render_current(window, layer, xoff, yoff, mr.x_space, mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale, x, y);
+					place_it.move_position(1);
 
 					space_used += mr.x_space;
 					if(mr.other == measure_result::special::space_consumer) {
 						space_used += per_fill_consumer;
 					}
-					line_start.move_position(1);
 				}
 
-				crosswise_used += max_crosswise;
-				crosswise_used += int32_t(layout.interline_spacing);
-
-				if(layout.paged && (crosswise_used >= effective_y_size || page_ended)) {
-					layout.page_starts.push_back(page_counter);
-					// normally, make new page here ...
+				y_remaining -= int32_t(box.y_dim + lvl.interline_spacing);
+				if(y_remaining <= 0) {
 					break;
 				}
+				if(box.end_page) {
+					break;
+				}
+				first = false;
 			}
-			// last page, if not added
-			if(layout.paged) {
-				if(layout.page_starts.empty() || layout.page_starts.back() != page_counter)
-					layout.page_starts.push_back(page_counter);
-			}
+
 		} break;
 		case layout_type::multiline_vertical:
 		{
-			layout_iterator it(layout.contents);
+			layout_iterator place_it(lvl.contents);
+			int32_t index_start = 0;
+			
+			int32_t x_remaining = effective_x_size;
+			bool first = true;
+			while(place_it.has_more()) {
+				auto pre_pos = place_it.position;
 
-			layout.page_starts.clear();
-
-			int32_t page_counter = 0;
-			int32_t crosswise_used = 0;
-
-			// loop for page
-			while(it.has_more()) {
-				auto line_start = it;
-				int32_t max_crosswise = 0;
-				float space_used = 0;
-				int32_t fill_consumer_count = 0;
-
-				// loop for line
-				bool page_ended = false;
-				while(it.has_more()) {
-					auto mr = it.measure_current(window, false, effective_x_size - crosswise_used);
-					if((space_used > 0 && (space_used + mr.y_space > effective_y_size || mr.other == measure_result::special::end_line)) || (space_used > 0 && mr.other == measure_result::special::end_page) || (crosswise_used > 0 && mr.other == measure_result::special::end_page) || (layout.paged && crosswise_used + mr.x_space > effective_x_size && crosswise_used > 0)) {
-						if(it.current_is_glue()) {
-							++page_counter;
-						}
-						if(mr.other == measure_result::special::end_page || (crosswise_used + mr.x_space > effective_x_size && crosswise_used > 0)) {
-							page_ended = true;
-						}
-
-						//check if previous was glue, and erase
-						if(it.index != 0) {
-							it.move_position(-1);
-							if(it.current_is_glue()) {
-								space_used -= it.measure_current(window, false, effective_x_size - crosswise_used).y_space;
-							}
-							it.move_position(1);
-						}
-						if(it.current_is_glue()) {
-							it.move_position(1);
-							// normally: break here
-						}
-						break; // only one line
-					}
-
-					max_crosswise = std::max(max_crosswise, mr.x_space);
-					if(mr.other == measure_result::special::space_consumer)
-						++fill_consumer_count;
-					space_used += mr.y_space;
-
-					it.move_position(1);
-					++page_counter;
+				auto box = measure_vertical_box(window, place_it, x_remaining, effective_y_size);
+				assert(box.item_count > 0);
+				if(box.x_dim > x_remaining && !first) { // end
+					break;
 				}
 
-				// position/render line
-				int32_t extra_runlength = int32_t(effective_y_size - space_used);
-				int32_t per_fill_consumer = fill_consumer_count != 0 ? (extra_runlength / fill_consumer_count) : 0;
+				place_it.position = pre_pos;
+				bool alternate = true;
+
+				int32_t extra_runlength = int32_t(effective_y_size - box.y_dim);
+				int32_t per_fill_consumer = box.space_conumer_count != 0 ? (extra_runlength / box.space_conumer_count) : 0;
 				int32_t extra_lead = 0;
-				switch(layout.line_alignment) {
+				switch(lvl.line_alignment) {
 					case layout_line_alignment::leading: break;
-					case layout_line_alignment::trailing: extra_lead = extra_runlength - fill_consumer_count * per_fill_consumer; break;
-					case layout_line_alignment::centered: extra_lead = (extra_runlength - fill_consumer_count * per_fill_consumer) / 2;  break;
+					case layout_line_alignment::trailing: extra_lead = extra_runlength - box.space_conumer_count * per_fill_consumer; break;
+					case layout_line_alignment::centered: extra_lead = (extra_runlength - box.space_conumer_count * per_fill_consumer) / 2;  break;
 				}
-				space_used = y + extra_lead + top_margin;
-				page_counter = 0;
+				auto space_used = y + extra_lead + top_margin;
 
-				while(line_start.index < it.index || line_start.sub_index < it.sub_index) {
-					auto mr = line_start.measure_current(window, false, effective_x_size);
-					float xoff = 0;
-					float yoff = space_used;
-					switch(layout.line_internal_alignment) {
-						case layout_line_alignment::leading: xoff = x + crosswise_used + left_margin; break;
-						case layout_line_alignment::trailing: xoff = x + crosswise_used + left_margin + max_crosswise - mr.x_space; break;
-						case layout_line_alignment::centered: xoff = x + crosswise_used + left_margin + (max_crosswise - mr.x_space) / 2;  break;
+				for(uint16_t i = 0; i < box.item_count; ++i) {
+					auto mr = place_it.measure_current(window, false, effective_x_size, i == 0);
+
+					int32_t xoff = 0;
+					int32_t yoff = space_used;
+					switch(lvl.line_internal_alignment) {
+						case layout_line_alignment::leading: xoff = x + left_margin + (effective_x_size - x_remaining); break;
+						case layout_line_alignment::trailing: xoff = x + left_margin + (effective_x_size - x_remaining) + box.x_dim - mr.x_space; break;
+						case layout_line_alignment::centered: xoff = x + left_margin + (effective_x_size - x_remaining) + (box.x_dim - mr.x_space) / 2;  break;
 					}
-					if(std::holds_alternative< layout_control_t>(layout.contents[line_start.index])) {
-						auto& i = std::get<layout_control_t>(layout.contents[line_start.index]);
-						if(i.absolute_position) {
-							xoff = x + i.abs_x;
-							yoff = y + i.abs_y;
-						}
-					} else if(std::holds_alternative< layout_window_t>(layout.contents[line_start.index])) {
-						auto& i = std::get<layout_window_t>(layout.contents[line_start.index]);
-						if(i.absolute_position) {
-							xoff = x + i.abs_x;
-							yoff = y + i.abs_y;
-						}
-					}
-					line_start.render_current(window, layer, xoff, yoff, mr.x_space , mr.y_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), outline_color, scale);
+					place_it.render_current(window, layer, xoff, yoff, mr.x_space + (mr.other == measure_result::special::space_consumer ? per_fill_consumer : 0), mr.y_space, outline_color, scale, x, y);
+					place_it.move_position(1);
 
 					space_used += mr.y_space;
 					if(mr.other == measure_result::special::space_consumer) {
 						space_used += per_fill_consumer;
 					}
-					line_start.move_position(1);
 				}
 
-				crosswise_used += max_crosswise;
-				crosswise_used += int32_t(layout.interline_spacing);
-
-				if(layout.paged && (crosswise_used >= effective_x_size || page_ended)) {
-					layout.page_starts.push_back(page_counter);
-					// normally, make new page here ...
+				x_remaining -= int32_t(box.x_dim + lvl.interline_spacing);
+				if(x_remaining <= 0)
 					break;
-				}
+				if(box.end_page)
+					break;
+				first = false;
 			}
-			// last page, if not added
-			if(layout.paged) {
-				if(layout.page_starts.empty() || layout.page_starts.back() != page_counter)
-					layout.page_starts.push_back(page_counter);
-			}
+
 		} break;
 	}
 }
@@ -3019,7 +3006,7 @@ void window_options(window_element_wrapper_t& win) {
 	}
 }
 
-void control_options(window_element_wrapper_t& win, ui_element_t& c) {
+void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_control_t& lc) {
 	ImGui::InputText("Name", &(c.temp_name));
 	if(!ImGui::IsItemActiveAsInputText()) {
 		if(c.temp_name == c.name) {
@@ -3048,16 +3035,38 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c) {
 		}
 	}
 
-
 	int32_t temp = 0;
 
-	temp = c.x_size;
-	ImGui::InputInt("Width", &temp);
-	c.x_size = int16_t(std::max(0, temp));
 
-	temp = c.y_size;
-	ImGui::InputInt("Height", &temp);
-	c.y_size = int16_t(std::max(0, temp));
+	ImGui::Checkbox("Absolute position", &(lc.absolute_position));
+	if(lc.absolute_position) {
+		temp = lc.abs_x;
+		ImGui::InputInt("Absolute x position", &temp);
+		lc.abs_x = int16_t(temp);
+
+		temp = lc.abs_y;
+		ImGui::InputInt("Absolute y position", &temp);
+		lc.abs_y = int16_t(temp);
+	}
+
+	if(lc.absolute_position) {
+		lc.fill_x = false;
+		lc.fill_y = false;
+	}
+	if(!lc.absolute_position)
+		ImGui::Checkbox("Fill horizontal space", &(lc.fill_x));
+	if(!lc.fill_x) {
+		temp = c.x_size;
+		ImGui::InputInt("Width", &temp);
+		c.x_size = int16_t(std::max(0, temp));
+	}
+	if(!lc.absolute_position)
+		ImGui::Checkbox("Fill vertical space", &(lc.fill_y));
+	if(!lc.fill_y) {
+		temp = c.y_size;
+		ImGui::InputInt("Height", &temp);
+		c.y_size = int16_t(std::max(0, temp));
+	}
 
 	ImVec4 ccolor{ c.rectangle_color.r, c.rectangle_color.b, c.rectangle_color.g, 1.0f };
 	ImGui::ColorEdit3("Outline color", (float*)&ccolor);
@@ -4827,19 +4836,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					auto& selected_item = std::get<layout_control_t>(current_item->contents[path_to_selected_layout.back()]);
 					auto attached_control = control_from_name(win, selected_item.name);
 
-					ImGui::Checkbox("Absolute position", &(selected_item.absolute_position));
-					if(selected_item.absolute_position) {
-						int32_t temp = selected_item.abs_x;
-						ImGui::InputInt("Absolute x position", &temp);
-						selected_item.abs_x = int16_t(temp);
-
-						temp = selected_item.abs_y;
-						ImGui::InputInt("Absolute y position", &temp);
-						selected_item.abs_y = int16_t(temp);
-					}
-
 					if(attached_control) {
-						control_options(win, *attached_control);
+						control_options(win, *attached_control, selected_item);
 					}
 				} else { // root window
 					window_options(win);

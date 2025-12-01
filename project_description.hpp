@@ -358,6 +358,8 @@ struct layout_control_t {
 	int16_t abs_x = 0;
 	int16_t abs_y = 0;
 	bool absolute_position = false;
+	bool fill_x = false;
+	bool fill_y = false;
 };
 struct layout_window_t {
 	std::string name;
@@ -365,6 +367,8 @@ struct layout_window_t {
 	int16_t abs_x = 0;
 	int16_t abs_y = 0;
 	bool absolute_position = false;
+	bool fill_x = false;
+	bool fill_y = false;
 };
 struct layout_glue_t {
 	glue_type type = glue_type::standard;

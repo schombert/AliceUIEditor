@@ -6,7 +6,7 @@
 #include "filesystem.hpp"
 
 enum class layout_item_types : uint8_t {
-	control, window, glue, generator, layout, texture_layer
+	control, window, glue, generator, layout, texture_layer, control2, window2
 };
 
 void layout_to_bytes(layout_level_t const& layout, serialization::out_buffer& buffer) {
@@ -32,19 +32,23 @@ void layout_to_bytes(layout_level_t const& layout, serialization::out_buffer& bu
 		if(holds_alternative<layout_control_t>(m)) {
 			auto& i = get<layout_control_t>(m);
 
-			buffer.write(layout_item_types::control);
+			buffer.write(layout_item_types::control2);
 			buffer.write(i.name);
 			buffer.write(i.abs_x);
 			buffer.write(i.abs_y);
 			buffer.write(i.absolute_position);
+			buffer.write(i.fill_x);
+			buffer.write(i.fill_y);
 		} else if(holds_alternative<layout_window_t>(m)) {
 			auto& i = get<layout_window_t>(m);
 
-			buffer.write(layout_item_types::window);
+			buffer.write(layout_item_types::window2);
 			buffer.write(i.name);
 			buffer.write(i.abs_x);
 			buffer.write(i.abs_y);
 			buffer.write(i.absolute_position);
+			buffer.write(i.fill_x);
+			buffer.write(i.fill_y);
 		} else if(holds_alternative<layout_glue_t>(m)) {
 			auto& i = get<layout_glue_t>(m);
 
@@ -122,6 +126,28 @@ void bytes_to_layout(layout_level_t& layout, serialization::in_buffer& buffer) {
 				main_section.read(temp.abs_x);
 				main_section.read(temp.abs_y);
 				main_section.read(temp.absolute_position);
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+			case layout_item_types::control2:
+			{
+				layout_control_t temp;
+				main_section.read(temp.name);
+				main_section.read(temp.abs_x);
+				main_section.read(temp.abs_y);
+				main_section.read(temp.absolute_position);
+				main_section.read(temp.fill_x);
+				main_section.read(temp.fill_y);
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+			case layout_item_types::window2:
+			{
+				layout_window_t temp;
+				main_section.read(temp.name);
+				main_section.read(temp.abs_x);
+				main_section.read(temp.abs_y);
+				main_section.read(temp.absolute_position);
+				main_section.read(temp.fill_x);
+				main_section.read(temp.fill_y);
 				layout.contents.emplace_back(std::move(temp));
 			} break;
 			case layout_item_types::glue:

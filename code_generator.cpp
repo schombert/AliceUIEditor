@@ -3650,6 +3650,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "\t" "buffer.read(temp.texture);\n";
 			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
 			result += "\t" "\t" "\t" "} break;\n";
+
+			/*
 			result += "\t" "\t" "\t" "case layout_item_types::control:\n";
 			result += "\t" "\t" "\t" "{\n";
 			result += "\t" "\t" "\t" "\t" "layout_control temp;\n";
@@ -3676,7 +3678,38 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
 			result += "\t" "\t" "\t" "} break;\n";
+			*/
 
+			result += "\t" "\t" "\t" "case layout_item_types::control2:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "layout_control temp;\n";
+			result += "\t" "\t" "\t" "\t" "std::string_view cname = buffer.read<std::string_view>();\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_x);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_y);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.absolute_position);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.fill_x);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.fill_y);\n";
+			result += "\t" "\t" "\t" "\t" "temp.ptr = nullptr;\n";
+			for(auto& c : win.children) {
+				if(!is_lua_element(c)) {
+					result += "\t" "\t" "\t" "\t" "if(cname == \"" + c.name + "\") {\n";
+					result += "\t" "\t" "\t" "\t" "\t" "temp.ptr = " + c.name + ".get();\n";
+					result += "\t" "\t" "\t" "\t" "} else\n";
+				}
+			}
+			{
+				result += "\t" "\t" "\t" "\t" "{\n";
+				result += "\t" "\t" "\t" "\t" "\t" "std::string str_cname {cname};\n";
+				result += "\t" "\t" "\t" "\t" "\t" "auto found = scripted_elements.find(str_cname);\n";
+				result += "\t" "\t" "\t" "\t" "\t" "if (found != scripted_elements.end()) {\n";
+				result += "\t" "\t" "\t" "\t" "\t" "\t" "temp.ptr = found->second.get();\n";
+				result += "\t" "\t" "\t" "\t" "\t" "}\n";
+				result += "\t" "\t" "\t" "\t" "}\n";
+			}
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
+
+			/*
 			result += "\t" "\t" "\t" "case layout_item_types::window:\n";
 			result += "\t" "\t" "\t" "{\n";
 			result += "\t" "\t" "\t" "\t" "layout_window temp;\n";
@@ -3684,6 +3717,24 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_x);\n";
 			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_y);\n";
 			result += "\t" "\t" "\t" "\t" "buffer.read(temp.absolute_position);\n";
+			for(auto& c : proj.windows) {
+				result += "\t" "\t" "\t" "\t" "if(cname == \"" + c.wrapped.name + "\") {\n";
+				result += "\t" "\t" "\t" "\t" "\t" "temp.ptr = make_" + project_name + "_" + c.wrapped.name + "(state);\n";
+				result += "\t" "\t" "\t" "\t" "}\n";
+			}
+			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
+			result += "\t" "\t" "\t" "} break;\n";
+			*/
+
+			result += "\t" "\t" "\t" "case layout_item_types::window2:\n";
+			result += "\t" "\t" "\t" "{\n";
+			result += "\t" "\t" "\t" "\t" "layout_window temp;\n";
+			result += "\t" "\t" "\t" "\t" "std::string_view cname = buffer.read<std::string_view>();\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_x);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.abs_y);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.absolute_position);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.fill_x);\n";
+			result += "\t" "\t" "\t" "\t" "buffer.read(temp.fill_y);\n";
 			for(auto& c : proj.windows) {
 				result += "\t" "\t" "\t" "\t" "if(cname == \"" + c.wrapped.name + "\") {\n";
 				result += "\t" "\t" "\t" "\t" "\t" "temp.ptr = make_" + project_name + "_" + c.wrapped.name + "(state);\n";
