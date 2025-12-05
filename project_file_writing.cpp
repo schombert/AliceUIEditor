@@ -6,7 +6,7 @@
 #include "filesystem.hpp"
 
 enum class layout_item_types : uint8_t {
-	control, window, glue, generator, layout, texture_layer, control2, window2
+	control, window, glue, generator, layout, texture_layer, control2, window2, generator2
 };
 
 void layout_to_bytes(layout_level_t const& layout, serialization::out_buffer& buffer) {
@@ -58,13 +58,14 @@ void layout_to_bytes(layout_level_t const& layout, serialization::out_buffer& bu
 		} else if(holds_alternative<generator_t>(m)) {
 			auto& i = get<generator_t>(m);
 
-			buffer.write(layout_item_types::generator);
+			buffer.write(layout_item_types::generator2);
 			buffer.write(i.name);
 
 			buffer.start_section();
 			for(auto& j : i.inserts) {
 				buffer.write(j.name);
 				buffer.write(j.header);
+				buffer.write(j.child_of);
 				buffer.write(j.inter_item_space);
 				buffer.write(j.glue);
 				buffer.write(j.sortable);
@@ -168,6 +169,25 @@ void bytes_to_layout(layout_level_t& layout, serialization::in_buffer& buffer) {
 					temp.inserts.emplace_back();
 					contents.read(temp.inserts.back().name);
 					contents.read(temp.inserts.back().header);
+					contents.read(temp.inserts.back().inter_item_space);
+					contents.read(temp.inserts.back().glue);
+					contents.read(temp.inserts.back().sortable);
+				}
+
+				layout.contents.emplace_back(std::move(temp));
+			} break;
+			case layout_item_types::generator2:
+			{
+				generator_t temp;
+
+				main_section.read(temp.name);
+
+				auto contents = main_section.read_section();
+				while(contents) {
+					temp.inserts.emplace_back();
+					contents.read(temp.inserts.back().name);
+					contents.read(temp.inserts.back().header);
+					contents.read(temp.inserts.back().child_of);
 					contents.read(temp.inserts.back().inter_item_space);
 					contents.read(temp.inserts.back().glue);
 					contents.read(temp.inserts.back().sortable);

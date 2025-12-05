@@ -9,7 +9,7 @@
 namespace template_project {
 
 enum class template_type : uint8_t {
-	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button, toggle_button, table, table_header, table_row, mixed_button_ci, stacked_bar_chart, table_highlights, free_icon, free_background, drop_down_control, edit_control
+	none, background, color, icon, label, button, progress_bar, window, iconic_button, layout_region, mixed_button, toggle_button, table, table_header, table_row, mixed_button_ci, stacked_bar_chart, table_highlights, free_icon, free_background, drop_down_control, edit_control, legacy_control
 };
 
 }
@@ -389,6 +389,7 @@ step 4: particular page is generated:
 struct generator_item {
 	std::string name;
 	std::string header;
+	std::string child_of;
 	int16_t cached_index = -1;
 	int16_t inter_item_space = 0;
 	glue_type glue = glue_type::standard;
