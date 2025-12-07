@@ -3380,7 +3380,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					}
 
 					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.x = int16_t(x);\n";
-					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.y = int16_t(y +  " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ");\n";
+					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.y = int16_t(y +  " + inserts.header + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ");\n";
 					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->parent = destination;\n";
 					result += "\t" "\t" "\t" "\t" "destination->children.push_back(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get());\n";
 

@@ -2233,6 +2233,19 @@ void make_goto_button(window_element_wrapper_t& for_window, ui_element_t& for_el
 		ImGui::PopID();
 	}
 }
+void make_goto_button(window_element_wrapper_t& for_window, generator_t& for_element, std::string const& function, int32_t extra_id = 0) {
+	if(chosen_attachement_vs_window) {
+		ImGui::SameLine();
+		ImGui::PushID(&for_element);
+		ImGui::PushID(extra_id);
+		if(ImGui::Button(">>")) {
+			auto find_string = for_window.wrapped.name + "::" + for_element.name + "::" + function;
+			update_file_contents_and_open_to(find_string);
+		}
+		ImGui::PopID();
+		ImGui::PopID();
+	}
+}
 void make_goto_button(window_element_wrapper_t& for_window, std::string const& function, int32_t extra_id = 0) {
 	if(chosen_attachement_vs_window) {
 		ImGui::SameLine();
@@ -4804,6 +4817,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					}
 					ImGui::PopID();
 					++id2;
+				}
+
+				if(chosen_attachement_vs_window) {
+					ImGui::Text("on create");
+					make_goto_button(win, i, "on_create", 1);
+					ImGui::Text("on update");
+					make_goto_button(win, i, "update", 2);
 				}
 			}
 
