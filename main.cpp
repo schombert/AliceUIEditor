@@ -32,6 +32,7 @@
 #include "templateproject.hpp"
 #include <uiautomation.h>
 #include <atlbase.h>
+#include <ranges>
 
 // import EnvDTE
 #pragma warning(disable : 4278)
@@ -4783,21 +4784,22 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 						std::vector<char const*> window_names;
 						window_names.push_back("[none]");
-						int32_t selection = (list_it->header == "" ? 0 : -1);
-						int32_t parent_choice = (list_it->child_of == "" ? 0 : -1);
-						for(auto& win : open_project.windows) {
+						int32_t selection = 0;
+						int32_t parent_choice = 0;
+
+						for(auto [idx, win] : std::views::enumerate(open_project.windows)) {
 							window_names.push_back(win.wrapped.name.c_str());
 							if(win.wrapped.name == list_it->header) {
-								selection = int32_t(window_names.size() - 1);
+								selection = int32_t(idx + 1);
 							}
 							if(win.wrapped.name == list_it->child_of) {
-								parent_choice = int32_t(window_names.size() - 1);
+								parent_choice = int32_t(idx + 1);
 							}
 						}
 
 						temp = selection;
 						ImGui::Combo("Header", &selection, window_names.data(), int32_t(window_names.size()));
-						if(temp != selection && selection != selected_window) {
+						if(temp != selection) {
 							if(selection == 0)
 								list_it->header = "";
 							else
@@ -4806,7 +4808,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 						temp = parent_choice;
 						ImGui::Combo("Sub item of:", &parent_choice, window_names.data(), int32_t(window_names.size()));
-						if(temp != parent_choice && parent_choice != selected_window) {
+						if(temp != parent_choice) {
 							if(parent_choice == 0)
 								list_it->child_of = "";
 							else
