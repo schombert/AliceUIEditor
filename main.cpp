@@ -850,6 +850,10 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 		return;
 	}
+	if(c.ttype == template_project::template_type::drag_and_drop_target) {
+		render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		return;
+	}
 	if(c.ttype == template_project::template_type::stacked_bar_chart) {
 		if(c.template_id != -1) {
 			auto bg = open_templates.stacked_bar_t[c.template_id].overlay_bg;
@@ -2306,6 +2310,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Drop down control");
 	opts.push_back("Edit control");
 	opts.push_back("Legacy element");
+	opts.push_back("Drag and drop target");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -2341,6 +2346,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 14; break;
 		case template_project::template_type::legacy_control:
 			current = 15; break;
+		case template_project::template_type::drag_and_drop_target:
+			current = 16; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -2377,6 +2384,8 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::edit_control; break;
 			case 15:
 				ttype = template_project::template_type::legacy_control; break;
+			case 16:
+				ttype = template_project::template_type::drag_and_drop_target; break;
 			default:
 				break;
 		}
@@ -3520,6 +3529,14 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 
 			ImGui::Text("on select action");
 			make_goto_button(win, c, "on_selection", 7);
+		} break;
+		case template_project::template_type::drag_and_drop_target:
+		{
+			ImGui::InputText("Drag and drop data type", &(c.text_key));
+
+			//recieve
+			ImGui::Text("on recieve action");
+			make_goto_button(win, c, "recieve", 5);
 		} break;
 		default:
 		{

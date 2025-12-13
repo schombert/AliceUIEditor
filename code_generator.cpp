@@ -218,6 +218,8 @@ bool element_needs_class(ui_element_t const& c) {
 			return true;
 		case template_project::template_type::edit_control:
 			return true;
+		case template_project::template_type::drag_and_drop_target:
+			return true;
 		default:
 			return true;
 	}
@@ -247,6 +249,12 @@ std::string element_class_name(std::string const& project_name, window_element_w
 		case template_project::template_type::free_icon:
 			if(!c.dynamic_text && !c.dynamic_tooltip)
 				return "template_icon_graphic";
+			break;
+		case template_project::template_type::legacy_control:
+			if(c.template_id == 0) {
+				if(!c.dynamic_text && !c.dynamic_tooltip)
+					return "alice_ui::legacy_commodity_icon";
+			}
 			break;
 		default:
 			break;
@@ -358,6 +366,10 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 		} break;
+		case template_project::template_type::drag_and_drop_target:
+		{
+			result += "\t" "\t" "\t"  "cptr->supported_data_type = ui::drag_and_drop_data::" + c.text_key + ";\n";
+		} break;
 		case template_project::template_type::drop_down_control:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
@@ -455,6 +467,9 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				break;
 			case template_project::template_type::drop_down_control:
 				base_type = "alice_ui::template_drop_down_control";
+				break;
+			case template_project::template_type::drag_and_drop_target:
+				base_type = "alice_ui::drag_and_drop_target_control";
 				break;
 			default:
 				break;
@@ -811,6 +826,10 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				
 				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::drag_and_drop_target:
+			{
+				result += "\t" "bool recieve_drag_and_drop(sys::state& state, std::any& data, ui::drag_and_drop_data data_type, ui::drag_and_drop_target sub_target, bool shift_held_down) noexcept override;\n";
 			} break;
 			default: break;
 		}
@@ -1648,6 +1667,19 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "}\n";
 				}
 
+			} break;
+			case template_project::template_type::drag_and_drop_target:
+			{
+				result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::recieve_drag_and_drop(sys::state& state, std::any& data, ui::drag_and_drop_data data_type, ui::drag_and_drop_target sub_target, bool shift_held_down) noexcept  {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::recieve\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::recieve"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "\treturn true;\n";
+				result += "}\n";
 			} break;
 			case template_project::template_type::drop_down_control:
 			{
@@ -3405,7 +3437,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 					std::string stick_conditions;
 					for(auto& other_inserts : g->inserts) {
-						if(other_inserts.child_of == inserts.name || other_inserts.child_of == inserts.child_of) {
+						if(other_inserts.child_of == inserts.name || (other_inserts.child_of != "" && other_inserts.child_of == inserts.child_of)) {
 							stick_conditions += "|| std::holds_alternative<" + other_inserts.name + "_option>(values[index + 1])";
 						}
 					}
@@ -3454,7 +3486,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 
 				std::string stick_conditions;
 				for(auto& other_inserts : g->inserts) {
-					if(other_inserts.child_of == inserts.name || other_inserts.child_of == inserts.child_of) {
+					if(other_inserts.child_of == inserts.name || (other_inserts.child_of != "" && other_inserts.child_of == inserts.child_of)) {
 						stick_conditions += "|| std::holds_alternative<" + other_inserts.name + "_option>(values[index + 1])";
 					}
 				}
