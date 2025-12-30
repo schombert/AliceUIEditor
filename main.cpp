@@ -4690,6 +4690,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				if(open_project.grid_size < 1) {
 					open_project.grid_size = 1;
 				}
+				ImGui::Checkbox("Omit lua support code", &open_project.omit_lua);
 			}
 			ImGui::End();
 		}

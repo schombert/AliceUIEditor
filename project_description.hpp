@@ -453,6 +453,7 @@ struct open_project_t {
 	std::wstring project_directory;
 	std::wstring source_path;
 	int32_t grid_size = 9;
+	bool omit_lua = false;
 	std::vector<window_element_wrapper_t> windows;
 	std::vector<table_definition> tables;
 };

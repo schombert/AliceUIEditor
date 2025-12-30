@@ -219,6 +219,7 @@ void project_to_bytes(open_project_t const& p, serialization::out_buffer& buffer
 	buffer.start_section(); // header
 	buffer.write(p.grid_size);
 	buffer.write(p.source_path);
+	buffer.write(p.omit_lua);
 	buffer.finish_section();
 
 	for(auto& win : p.windows) {
@@ -586,6 +587,7 @@ open_project_t bytes_to_project(serialization::in_buffer& buffer) {
 	auto header_section = buffer.read_section();
 	header_section.read(result.grid_size);
 	header_section.read(result.source_path);
+	header_section.read(result.omit_lua);
 
 	while(buffer) {
 		auto window_section = buffer.read_section(); // essential section

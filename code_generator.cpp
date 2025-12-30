@@ -3038,7 +3038,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		for(auto& dm : win.wrapped.members) {
 			result += "\t" + dm.type + " " + dm.name + ";\n";
 		}
-		result += "\tankerl::unordered_dense::map<std::string, std::unique_ptr<ui::lua_scripted_element>> scripted_elements;\n";
+		if(!proj.omit_lua)
+			result += "\tankerl::unordered_dense::map<std::string, std::unique_ptr<ui::lua_scripted_element>> scripted_elements;\n";
+
 		for(auto& c : win.children) {
 			if (!is_lua_element(c))
 				result += "\t" "std::unique_ptr<" + element_class_name(project_name, win, c) + "> " + c.name + ";\n";
@@ -3996,7 +3998,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "pending_children.pop_back(); continue;\n";
 			result += "\t" "\t" "} else \n";
 		}
-		{
+		if(!proj.omit_lua) {
 			result += "\t" "\t" "if (child_data.is_lua) { \n";
 			result += "\t" "\t" "\t" "std::string str_name {child_data.name};\n";
 			result += "\t" "\t" "\t" "scripted_elements[str_name] = std::make_unique<ui::lua_scripted_element>();\n";
@@ -4019,6 +4021,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "children.push_back(cptr);\n";
 			result += "\t" "\t" "\t" "pending_children.pop_back(); continue;\n";
 			result += "\t" "\t" "}\n";
+		} else {
+			result += "\t" "\t" "{ } \n";
 		}
 		result += "\t" "\t" "pending_children.pop_back();\n";
 		result += "\t" "}\n";
