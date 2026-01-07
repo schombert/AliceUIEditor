@@ -204,6 +204,8 @@ bool element_needs_class(ui_element_t const& c) {
 			return true;
 		case template_project::template_type::mixed_button_ci:
 			return true;
+		case template_project::template_type::iconic_button_ci:
+			return true;
 		case template_project::template_type::toggle_button:
 			return true;
 		case template_project::template_type::table_header:
@@ -333,6 +335,14 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			result += "\t" "\t" "\t"  "if(child_data.text_key.length() > 0)\n";
 			result += "\t" "\t" "\t" "\t" "cptr->default_text = state.lookup_key(child_data.text_key);\n";
 		} break;
+		case template_project::template_type::iconic_button_ci:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+			result += "\t" "\t" "\t"  "cptr->icon = child_data.icon_id;\n";
+			result += "\t" "\t" "\t"  "cptr->icon_color = child_data.table_divider_color;\n";
+			result += "\t" "\t" "\t"  "if(child_data.tooltip_text_key.length() > 0)\n";
+			result += "\t" "\t" "\t" "\t" "cptr->default_tooltip = state.lookup_key(child_data.tooltip_text_key);\n";
+		} break;
 		case template_project::template_type::free_icon:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
@@ -461,6 +471,9 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				break;
 			case template_project::template_type::mixed_button_ci:
 				base_type = "alice_ui::template_mixed_button_ci";
+				break;
+			case template_project::template_type::iconic_button_ci:
+				base_type = "alice_ui::template_icon_button_ci";
 				break;
 			case template_project::template_type::toggle_button:
 				base_type = "alice_ui::template_toggle_button";
@@ -603,6 +616,32 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
 			case template_project::template_type::iconic_button:
+			{
+				if(c.dynamic_tooltip) {
+					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+					result += "\t" "}\n";
+					result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				}
+				if(c.left_click_action) {
+					result += "\t"  "bool button_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.right_click_action) {
+					result += "\t"  "bool button_right_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.shift_click_action) {
+					result += "\t"  "bool button_shift_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.hotkey.size() > 0) {
+					result += "\t" "ui::message_result on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept override;\n";
+				}
+				if(c.hover_activation) {
+					result += "\t"  "void button_on_hover(sys::state& state) noexcept override;\n";
+					result += "\t"  "void button_on_hover_end(sys::state& state) noexcept override;\n";
+				}
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::iconic_button_ci:
 			{
 				if(c.dynamic_tooltip) {
 					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
@@ -1440,6 +1479,98 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "// END\n";
 					result +="\t" "return true;\n";
 					result +="}\n";
+				}
+				if(c.shift_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_shift_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::lbutton_shift_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::lbutton_shift_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.hotkey.size() > 0) {
+					result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept {\n";
+					result += "\t" "if(key == sys::virtual_key::" + c.hotkey + " && !disabled) {\n";
+					result += "\t" "\t" "on_lbutton_down(state, 0, 0, mods);\n";
+					result += "\t" "\t" "return ui::message_result::consumed;\n";
+					result += "\t" "}\n";
+					result += "\t" "return ui::message_result::unseen;\n";
+					result += "}\n";
+				}
+				if(c.hover_activation) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_on_hover(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_on_hover_end(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover_end\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover_end"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+
+			} break;
+			case template_project::template_type::iconic_button_ci:
+			{
+				if(c.dynamic_tooltip) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+				if(c.left_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::lbutton_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::lbutton_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.right_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_right_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::rbutton_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::rbutton_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
 				}
 				if(c.shift_click_action) {
 					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_shift_action(sys::state& state) noexcept {\n";
@@ -3812,11 +3943,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 			{
 				result += "\t" "\t" "\t" "\t" "{\n";
-				result += "\t" "\t" "\t" "\t" "\t" "std::string str_cname {cname};\n";
-				result += "\t" "\t" "\t" "\t" "\t" "auto found = scripted_elements.find(str_cname);\n";
-				result += "\t" "\t" "\t" "\t" "\t" "if (found != scripted_elements.end()) {\n";
-				result += "\t" "\t" "\t" "\t" "\t" "\t" "temp.ptr = found->second.get();\n";
-				result += "\t" "\t" "\t" "\t" "\t" "}\n";
+				if(!proj.omit_lua) {
+					result += "\t" "\t" "\t" "\t" "\t" "std::string str_cname {cname};\n";
+					result += "\t" "\t" "\t" "\t" "\t" "auto found = scripted_elements.find(str_cname);\n";
+					result += "\t" "\t" "\t" "\t" "\t" "if (found != scripted_elements.end()) {\n";
+					result += "\t" "\t" "\t" "\t" "\t" "\t" "temp.ptr = found->second.get();\n";
+					result += "\t" "\t" "\t" "\t" "\t" "}\n";
+				}
 				result += "\t" "\t" "\t" "\t" "}\n";
 			}
 			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
