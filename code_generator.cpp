@@ -194,6 +194,8 @@ bool element_needs_class(ui_element_t const& c) {
 			return c.dynamic_text || c.dynamic_tooltip;
 		case template_project::template_type::free_background:
 			return c.dynamic_text || c.dynamic_tooltip;
+		case template_project::template_type::legacy_control:
+			return c.dynamic_text || c.dynamic_tooltip;
 		case template_project::template_type::button:
 			return true;
 		case template_project::template_type::iconic_button:
@@ -201,6 +203,8 @@ bool element_needs_class(ui_element_t const& c) {
 		case template_project::template_type::mixed_button:
 			return true;
 		case template_project::template_type::mixed_button_ci:
+			return true;
+		case template_project::template_type::iconic_button_ci:
 			return true;
 		case template_project::template_type::toggle_button:
 			return true;
@@ -215,6 +219,8 @@ bool element_needs_class(ui_element_t const& c) {
 		case template_project::template_type::drop_down_control:
 			return true;
 		case template_project::template_type::edit_control:
+			return true;
+		case template_project::template_type::drag_and_drop_target:
 			return true;
 		default:
 			return true;
@@ -245,6 +251,12 @@ std::string element_class_name(std::string const& project_name, window_element_w
 		case template_project::template_type::free_icon:
 			if(!c.dynamic_text && !c.dynamic_tooltip)
 				return "template_icon_graphic";
+			break;
+		case template_project::template_type::legacy_control:
+			if(c.template_id == 0) {
+				if(!c.dynamic_text && !c.dynamic_tooltip)
+					return "alice_ui::legacy_commodity_icon";
+			}
 			break;
 		default:
 			break;
@@ -323,12 +335,24 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 			result += "\t" "\t" "\t"  "if(child_data.text_key.length() > 0)\n";
 			result += "\t" "\t" "\t" "\t" "cptr->default_text = state.lookup_key(child_data.text_key);\n";
 		} break;
+		case template_project::template_type::iconic_button_ci:
+		{
+			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+			result += "\t" "\t" "\t"  "cptr->icon = child_data.icon_id;\n";
+			result += "\t" "\t" "\t"  "cptr->icon_color = child_data.table_divider_color;\n";
+			result += "\t" "\t" "\t"  "if(child_data.tooltip_text_key.length() > 0)\n";
+			result += "\t" "\t" "\t" "\t" "cptr->default_tooltip = state.lookup_key(child_data.tooltip_text_key);\n";
+		} break;
 		case template_project::template_type::free_icon:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
 			result += "\t" "\t" "\t"  "cptr->color = child_data.table_divider_color;\n";
 			result += "\t" "\t" "\t"  "if(child_data.tooltip_text_key.length() > 0)\n";
 			result += "\t" "\t" "\t" "\t" "cptr->default_tooltip = state.lookup_key(child_data.tooltip_text_key);\n";
+		} break;
+		case template_project::template_type::legacy_control:
+		{
+
 		} break;
 		case template_project::template_type::free_background:
 		{
@@ -351,6 +375,10 @@ std::string element_initialize_child(std::string const& project_name, window_ele
 		case template_project::template_type::stacked_bar_chart:
 		{
 			result += "\t" "\t" "\t"  "cptr->template_id = child_data.template_id;\n";
+		} break;
+		case template_project::template_type::drag_and_drop_target:
+		{
+			result += "\t" "\t" "\t"  "cptr->supported_data_type = ui::drag_and_drop_data::" + c.text_key + ";\n";
 		} break;
 		case template_project::template_type::drop_down_control:
 		{
@@ -431,6 +459,10 @@ std::string element_type_declarations(std::string const& project_name, window_el
 			case template_project::template_type::button:
 				base_type = "alice_ui::template_text_button";
 				break;
+			case template_project::template_type::legacy_control:
+				if(c.template_id == 0)
+					base_type = "alice_ui::legacy_commodity_icon";
+				break;
 			case template_project::template_type::edit_control:
 				base_type = "ui::edit_box_element_base";
 				break;
@@ -440,11 +472,17 @@ std::string element_type_declarations(std::string const& project_name, window_el
 			case template_project::template_type::mixed_button_ci:
 				base_type = "alice_ui::template_mixed_button_ci";
 				break;
+			case template_project::template_type::iconic_button_ci:
+				base_type = "alice_ui::template_icon_button_ci";
+				break;
 			case template_project::template_type::toggle_button:
 				base_type = "alice_ui::template_toggle_button";
 				break;
 			case template_project::template_type::drop_down_control:
 				base_type = "alice_ui::template_drop_down_control";
+				break;
+			case template_project::template_type::drag_and_drop_target:
+				base_type = "alice_ui::drag_and_drop_target_control";
 				break;
 			default:
 				break;
@@ -491,6 +529,18 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				}
 			} break;
 			case template_project::template_type::free_icon:
+			{
+				if(c.dynamic_tooltip) {
+					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+					result += "\t" "}\n";
+					result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				}
+				if(c.dynamic_text || c.dynamic_tooltip) {
+					result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+				}
+			} break;
+			case template_project::template_type::legacy_control:
 			{
 				if(c.dynamic_tooltip) {
 					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
@@ -566,6 +616,32 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
 			case template_project::template_type::iconic_button:
+			{
+				if(c.dynamic_tooltip) {
+					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
+					result += "\t" "\t" "return ui::tooltip_behavior::variable_tooltip;\n";
+					result += "\t" "}\n";
+					result += "\t"  "void update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept override;\n";
+				}
+				if(c.left_click_action) {
+					result += "\t"  "bool button_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.right_click_action) {
+					result += "\t"  "bool button_right_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.shift_click_action) {
+					result += "\t"  "bool button_shift_action(sys::state& state) noexcept override;\n";
+				}
+				if(c.hotkey.size() > 0) {
+					result += "\t" "ui::message_result on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept override;\n";
+				}
+				if(c.hover_activation) {
+					result += "\t"  "void button_on_hover(sys::state& state) noexcept override;\n";
+					result += "\t"  "void button_on_hover_end(sys::state& state) noexcept override;\n";
+				}
+				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::iconic_button_ci:
 			{
 				if(c.dynamic_tooltip) {
 					result += "\t" "ui::tooltip_behavior has_tooltip(sys::state & state) noexcept override {\n";
@@ -789,6 +865,10 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				
 				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
+			} break;
+			case template_project::template_type::drag_and_drop_target:
+			{
+				result += "\t" "bool recieve_drag_and_drop(sys::state& state, std::any& data, ui::drag_and_drop_data data_type, ui::drag_and_drop_target sub_target, bool shift_held_down) noexcept override;\n";
 			} break;
 			default: break;
 		}
@@ -1068,6 +1148,32 @@ std::string element_member_functions(std::string const& project_name, window_ele
 				}
 			} break;
 			case template_project::template_type::free_icon:
+			{
+				if(c.dynamic_tooltip) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+				if(c.dynamic_text || c.dynamic_tooltip) {
+					//UPDATE
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+			} break;
+			case template_project::template_type::legacy_control:
 			{
 				if(c.dynamic_tooltip) {
 					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
@@ -1417,6 +1523,98 @@ std::string element_member_functions(std::string const& project_name, window_ele
 				}
 
 			} break;
+			case template_project::template_type::iconic_button_ci:
+			{
+				if(c.dynamic_tooltip) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::update_tooltip(sys::state& state, int32_t x, int32_t y, text::columnar_layout& contents) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+
+				//UPDATE
+				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::update\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::update"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "}\n";
+
+				if(c.left_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::lbutton_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::lbutton_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.right_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_right_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::rbutton_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::rbutton_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.shift_click_action) {
+					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_shift_action(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::lbutton_shift_action\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::lbutton_shift_action"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "\t" "return true;\n";
+					result += "}\n";
+				}
+				if(c.hotkey.size() > 0) {
+					result += "ui::message_result " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_key_down(sys::state& state, sys::virtual_key key, sys::key_modifiers mods) noexcept {\n";
+					result += "\t" "if(key == sys::virtual_key::" + c.hotkey + " && !disabled) {\n";
+					result += "\t" "\t" "on_lbutton_down(state, 0, 0, mods);\n";
+					result += "\t" "\t" "return ui::message_result::consumed;\n";
+					result += "\t" "}\n";
+					result += "\t" "return ui::message_result::unseen;\n";
+					result += "}\n";
+				}
+				if(c.hover_activation) {
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_on_hover(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+					result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_on_hover_end(sys::state& state) noexcept {\n";
+					make_parent_var_text();
+					result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::on_hover_end\n";
+					if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::on_hover_end"); it != old_code.found_code.end()) {
+						it->second.used = true;
+						result += it->second.text;
+					}
+					result += "// END\n";
+					result += "}\n";
+				}
+
+			} break;
 			case template_project::template_type::mixed_button:
 			{
 				if(c.dynamic_tooltip) {
@@ -1600,6 +1798,19 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "}\n";
 				}
 
+			} break;
+			case template_project::template_type::drag_and_drop_target:
+			{
+				result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::recieve_drag_and_drop(sys::state& state, std::any& data, ui::drag_and_drop_data data_type, ui::drag_and_drop_target sub_target, bool shift_held_down) noexcept  {\n";
+				make_parent_var_text();
+				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::recieve\n";
+				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::recieve"); it != old_code.found_code.end()) {
+					it->second.used = true;
+					result += it->second.text;
+				}
+				result += "// END\n";
+				result += "\treturn true;\n";
+				result += "}\n";
 			} break;
 			case template_project::template_type::drop_down_control:
 			{
@@ -2860,6 +3071,14 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		}
 	}
 	std::string result;
+
+	result += "// BEGIN prelude\n";
+	if(auto it = old_code.found_code.find("prelude"); it != old_code.found_code.end()) {
+		it->second.used = true;
+		result += it->second.text;
+	}
+	result += "// END\n";
+	result += "\n";
 	result += "namespace alice_ui {\n";
 
 	auto project_name = fs::native_to_utf8(proj.project_name);
@@ -2950,7 +3169,9 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 		for(auto& dm : win.wrapped.members) {
 			result += "\t" + dm.type + " " + dm.name + ";\n";
 		}
-		result += "\tankerl::unordered_dense::map<std::string, std::unique_ptr<ui::lua_scripted_element>> scripted_elements;\n";
+		if(!proj.omit_lua)
+			result += "\tankerl::unordered_dense::map<std::string, std::unique_ptr<ui::lua_scripted_element>> scripted_elements;\n";
+
 		for(auto& c : win.children) {
 			if (!is_lua_element(c))
 				result += "\t" "std::unique_ptr<" + element_class_name(project_name, win, c) + "> " + c.name + ";\n";
@@ -3324,7 +3545,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					}
 
 					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.x = int16_t(x);\n";
-					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.y = int16_t(y +  " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ");\n";
+					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->base_data.position.y = int16_t(y +  " + inserts.header + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ");\n";
 					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool[" + inserts.name + "_pool_used]->parent = destination;\n";
 					result += "\t" "\t" "\t" "\t" "destination->children.push_back(" + inserts.name + "_pool[" + inserts.name + "_pool_used].get());\n";
 
@@ -3347,7 +3568,18 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					result += "\t" "\t" "\t" "\t" + inserts.name + "_pool_used++;\n";
 					result += "\t" "\t" "\t" "}\n";
 
-					result += "\t" "\t" "\t" "return measure_result{std::max(" + inserts.header + "_pool[0]->base_data.size.x, " + inserts.name + "_pool[0]->base_data.size.x), " + inserts.header + "_pool[0]->base_data.size.y + " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space * 2) + ", measure_result::special::" + std::string(special_type_to_str(inserts.glue)) + "};\n";
+					std::string stick_conditions;
+					for(auto& other_inserts : g->inserts) {
+						if(other_inserts.child_of == inserts.name || (other_inserts.child_of != "" && other_inserts.child_of == inserts.child_of)) {
+							stick_conditions += "|| std::holds_alternative<" + other_inserts.name + "_option>(values[index + 1])";
+						}
+					}
+					if(!stick_conditions.empty())
+						result += "\t \t \t" "bool stick_to_next = (index + 1) < values.size() && (false " + stick_conditions + ");\n";
+					else
+						result += "\t \t \t" "bool stick_to_next = false;\n";
+
+					result += "\t" "\t" "\t" "return measure_result{std::max(" + inserts.header + "_pool[0]->base_data.size.x, " + inserts.name + "_pool[0]->base_data.size.x), " + inserts.header + "_pool[0]->base_data.size.y + " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space * 2) + ", stick_to_next ? measure_result::special::no_break : measure_result::special::" + std::string(special_type_to_str(inserts.glue)) + "};\n";
 					result += "\t" "\t" "}\n";
 				}
 
@@ -3384,7 +3616,19 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 					else
 						result += "\t" "\t" "alternate = true;\n";
 				}
-				result += "\t" "\t" "return measure_result{ " + inserts.name + "_pool[0]->base_data.size.x, " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ", measure_result::special::" + std::string(special_type_to_str(inserts.glue)) + "};\n";
+
+				std::string stick_conditions;
+				for(auto& other_inserts : g->inserts) {
+					if(other_inserts.child_of == inserts.name || (other_inserts.child_of != "" && other_inserts.child_of == inserts.child_of)) {
+						stick_conditions += "|| std::holds_alternative<" + other_inserts.name + "_option>(values[index + 1])";
+					}
+				}
+				if(!stick_conditions.empty())
+					result += "\t \t \t" "bool stick_to_next = (index + 1) < values.size() && (false " + stick_conditions + ");\n";
+				else
+					result += "\t \t \t" "bool stick_to_next = false;\n";
+
+				result += "\t" "\t" "return measure_result{ " + inserts.name + "_pool[0]->base_data.size.x, " + inserts.name + "_pool[0]->base_data.size.y + " + std::to_string(inserts.inter_item_space) + ", stick_to_next ? measure_result::special::no_break : measure_result::special::" + std::string(special_type_to_str(inserts.glue)) + "};\n";
 				result += "\t" "}\n";
 			}
 			result += "\t" "return measure_result{0,0,measure_result::special::none};\n";
@@ -3699,11 +3943,13 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			}
 			{
 				result += "\t" "\t" "\t" "\t" "{\n";
-				result += "\t" "\t" "\t" "\t" "\t" "std::string str_cname {cname};\n";
-				result += "\t" "\t" "\t" "\t" "\t" "auto found = scripted_elements.find(str_cname);\n";
-				result += "\t" "\t" "\t" "\t" "\t" "if (found != scripted_elements.end()) {\n";
-				result += "\t" "\t" "\t" "\t" "\t" "\t" "temp.ptr = found->second.get();\n";
-				result += "\t" "\t" "\t" "\t" "\t" "}\n";
+				if(!proj.omit_lua) {
+					result += "\t" "\t" "\t" "\t" "\t" "std::string str_cname {cname};\n";
+					result += "\t" "\t" "\t" "\t" "\t" "auto found = scripted_elements.find(str_cname);\n";
+					result += "\t" "\t" "\t" "\t" "\t" "if (found != scripted_elements.end()) {\n";
+					result += "\t" "\t" "\t" "\t" "\t" "\t" "temp.ptr = found->second.get();\n";
+					result += "\t" "\t" "\t" "\t" "\t" "}\n";
+				}
 				result += "\t" "\t" "\t" "\t" "}\n";
 			}
 			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
@@ -3751,7 +3997,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
 			result += "\t" "\t" "\t" "} break;\n";
 
-			result += "\t" "\t" "\t" "case layout_item_types::generator:\n";
+			result += "\t" "\t" "\t" "case layout_item_types::generator2:\n";
 			result += "\t" "\t" "\t" "{\n";
 			result += "\t" "\t" "\t" "\t" "generator_instance temp;\n";
 			result += "\t" "\t" "\t" "\t" "std::string_view cname = buffer.read<std::string_view>();\n";
@@ -3885,7 +4131,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "pending_children.pop_back(); continue;\n";
 			result += "\t" "\t" "} else \n";
 		}
-		{
+		if(!proj.omit_lua) {
 			result += "\t" "\t" "if (child_data.is_lua) { \n";
 			result += "\t" "\t" "\t" "std::string str_name {child_data.name};\n";
 			result += "\t" "\t" "\t" "scripted_elements[str_name] = std::make_unique<ui::lua_scripted_element>();\n";
@@ -3908,6 +4154,8 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "children.push_back(cptr);\n";
 			result += "\t" "\t" "\t" "pending_children.pop_back(); continue;\n";
 			result += "\t" "\t" "}\n";
+		} else {
+			result += "\t" "\t" "{ } \n";
 		}
 		result += "\t" "\t" "pending_children.pop_back();\n";
 		result += "\t" "}\n";

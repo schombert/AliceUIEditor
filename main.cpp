@@ -32,6 +32,7 @@
 #include "templateproject.hpp"
 #include <uiautomation.h>
 #include <atlbase.h>
+#include <ranges>
 
 // import EnvDTE
 #pragma warning(disable : 4278)
@@ -800,6 +801,10 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		}
 		return;
 	}
+	if(c.ttype == template_project::template_type::legacy_control) {
+		render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+		return;
+	}
 	if(c.ttype == template_project::template_type::edit_control) {
 		if(c.template_id != -1) {
 			auto bg = open_templates.button_t[c.template_id].primary.bg;
@@ -843,6 +848,10 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		} else {
 			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::drag_and_drop_target) {
+		render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		return;
 	}
 	if(c.ttype == template_project::template_type::stacked_bar_chart) {
@@ -941,6 +950,35 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 			}
 		} else {
 			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
+		}
+		return;
+	}
+	if(c.ttype == template_project::template_type::iconic_button_ci) {
+		if(c.template_id != -1) {
+			auto bg = open_templates.iconic_button_t[c.template_id].primary.bg;
+			if(bg != -1)
+				render_asvg_rect(open_templates.backgrounds[bg].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
+			else
+				render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
+
+			auto vcursor = y * ui_scale;
+			auto hcursor = x * ui_scale;
+			if(c.icon_id != -1) {
+				auto l = open_templates.iconic_button_t[c.template_id].primary.icon_left.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto t = open_templates.iconic_button_t[c.template_id].primary.icon_top.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+				auto r = open_templates.iconic_button_t[c.template_id].primary.icon_right.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + hcursor;
+				auto b = open_templates.iconic_button_t[c.template_id].primary.icon_bottom.resolve(float(c.x_size), float(c.y_size), open_project.grid_size) * ui_scale + vcursor;
+
+				hcursor = l;
+				vcursor = t;
+
+				render_svg_rect(open_templates.icons[c.icon_id].renders,
+					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
+					c.table_divider_color);
+
+			}
+		} else {
+			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
 		return;
 	}
@@ -2229,6 +2267,19 @@ void make_goto_button(window_element_wrapper_t& for_window, ui_element_t& for_el
 		ImGui::PopID();
 	}
 }
+void make_goto_button(window_element_wrapper_t& for_window, generator_t& for_element, std::string const& function, int32_t extra_id = 0) {
+	if(chosen_attachement_vs_window) {
+		ImGui::SameLine();
+		ImGui::PushID(&for_element);
+		ImGui::PushID(extra_id);
+		if(ImGui::Button(">>")) {
+			auto find_string = for_window.wrapped.name + "::" + for_element.name + "::" + function;
+			update_file_contents_and_open_to(find_string);
+		}
+		ImGui::PopID();
+		ImGui::PopID();
+	}
+}
 void make_goto_button(window_element_wrapper_t& for_window, std::string const& function, int32_t extra_id = 0) {
 	if(chosen_attachement_vs_window) {
 		ImGui::SameLine();
@@ -2287,6 +2338,9 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 	opts.push_back("Background image");
 	opts.push_back("Drop down control");
 	opts.push_back("Edit control");
+	opts.push_back("Legacy element");
+	opts.push_back("Drag and drop target");
+	opts.push_back("Icon button (color icon)");
 
 	int32_t current = 0;
 	switch(ttype) {
@@ -2320,6 +2374,12 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			current = 13; break;
 		case template_project::template_type::edit_control:
 			current = 14; break;
+		case template_project::template_type::legacy_control:
+			current = 15; break;
+		case template_project::template_type::drag_and_drop_target:
+			current = 16; break;
+		case template_project::template_type::iconic_button_ci:
+			current = 17; break;
 	}
 
 	if(ImGui::Combo("Template type", &current, opts.data(), int32_t(opts.size()))) {
@@ -2354,6 +2414,12 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				ttype = template_project::template_type::drop_down_control; break;
 			case 14:
 				ttype = template_project::template_type::edit_control; break;
+			case 15:
+				ttype = template_project::template_type::legacy_control; break;
+			case 16:
+				ttype = template_project::template_type::drag_and_drop_target; break;
+			case 17:
+				ttype = template_project::template_type::iconic_button_ci; break;
 			default:
 				break;
 		}
@@ -2388,6 +2454,18 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 				template_id = int16_t(chosen - 1);
 			}
 		} break;
+		case template_project::template_type::legacy_control:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			inner_opts.push_back("Commodity icon");
+			
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(0)));
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Type", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
 		case template_project::template_type::edit_control:
 		{
 			std::vector<char const*> inner_opts;
@@ -2402,6 +2480,19 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			}
 		} break;
 		case template_project::template_type::iconic_button:
+		{
+			std::vector<char const*> inner_opts;
+			inner_opts.push_back("None");
+			for(auto& i : open_templates.iconic_button_t) {
+				inner_opts.push_back(i.display_name.c_str());
+			}
+			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(int32_t(open_templates.iconic_button_t.size()) - 1)));
+			int32_t chosen = template_id + 1;
+			if(ImGui::Combo("Template", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+				template_id = int16_t(chosen - 1);
+			}
+		} break;
+		case template_project::template_type::iconic_button_ci:
 		{
 			std::vector<char const*> inner_opts;
 			inner_opts.push_back("None");
@@ -2896,6 +2987,19 @@ void window_options(window_element_wrapper_t& win) {
 								set_alt_id(c.name, chosen - 1);
 							}
 						} break;
+						case template_project::template_type::iconic_button_ci:
+						{
+							std::vector<char const*> inner_opts;
+							inner_opts.push_back("--Don't change--");
+							for(auto& i : open_templates.iconic_button_t) {
+								inner_opts.push_back(i.display_name.c_str());
+							}
+							int32_t chosen = get_alt_id(c.name) + 1;
+							std::string label = "Alternate template for " + c.name;
+							if(ImGui::Combo(label.c_str(), &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+								set_alt_id(c.name, chosen - 1);
+							}
+						} break;
 						case template_project::template_type::mixed_button:
 						{
 							std::vector<char const*> inner_opts;
@@ -3310,6 +3414,54 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 			make_goto_button(win, c, "update", 5);
 		} break;
+		case template_project::template_type::iconic_button_ci:
+		{
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
+			if(c.left_click_action)
+				make_goto_button(win, c, "lbutton_action", 0);
+			ImGui::Checkbox("Right-click action", &(c.right_click_action));
+			if(c.right_click_action)
+				make_goto_button(win, c, "rbutton_action", 1);
+			ImGui::Checkbox("Shift+left-click action", &(c.shift_click_action));
+			if(c.shift_click_action)
+				make_goto_button(win, c, "lbutton_shift_action", 2);
+			if(c.left_click_action || c.right_click_action || c.shift_click_action) {
+				ImGui::InputText("Hotkey", &(c.hotkey));
+			}
+			ImGui::Checkbox("Hover activation", &(c.hover_activation));
+			if(c.hover_activation)
+				make_goto_button(win, c, "on_hover", 3);
+
+			{
+				{
+					float ccolor[3] = { c.table_divider_color.r, c.table_divider_color.g, c.table_divider_color.b };
+					ImGui::ColorEdit3("Default icon color", ccolor);
+					c.table_divider_color.r = ccolor[0];
+					c.table_divider_color.g = ccolor[1];
+					c.table_divider_color.b = ccolor[2];
+				}
+			}
+			{
+				std::vector<char const*> inner_opts;
+				inner_opts.push_back("None");
+				for(auto& i : open_templates.icons) {
+					inner_opts.push_back(i.file_name.c_str());
+				}
+				int32_t chosen = c.icon_id + 1;
+				if(ImGui::Combo("Default icon", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
+					c.icon_id = int16_t(chosen - 1);
+				}
+			}
+
+			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+			if(!c.dynamic_tooltip)
+				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
+			else
+				make_goto_button(win, c, "update_tooltip", 5);
+
+			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+			make_goto_button(win, c, "update", 5);
+		} break;
 		case template_project::template_type::free_icon:
 		{
 			{
@@ -3332,6 +3484,19 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
 			make_goto_button(win, c, "update", 6);
+		} break;
+		case template_project::template_type::legacy_control:
+		{
+			if(c.template_id == 0) {
+				ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
+				if(c.dynamic_tooltip)
+					make_goto_button(win, c, "update_tooltip", 5);
+				ImGui::Checkbox("Other dynamic behavior", &(c.dynamic_text));
+				make_goto_button(win, c, "update", 5);
+
+				ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
+				make_goto_button(win, c, "update", 6);
+			}
 		} break;
 		case template_project::template_type::free_background:
 		{
@@ -3472,6 +3637,14 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 
 			ImGui::Text("on select action");
 			make_goto_button(win, c, "on_selection", 7);
+		} break;
+		case template_project::template_type::drag_and_drop_target:
+		{
+			ImGui::InputText("Drag and drop data type", &(c.text_key));
+
+			//recieve
+			ImGui::Text("on recieve action");
+			make_goto_button(win, c, "recieve", 5);
 		} break;
 		default:
 		{
@@ -4625,6 +4798,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 				if(open_project.grid_size < 1) {
 					open_project.grid_size = 1;
 				}
+				ImGui::Checkbox("Omit lua support code", &open_project.omit_lua);
 			}
 			ImGui::End();
 		}
@@ -4712,7 +4886,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					ImGui::Checkbox(win.wrapped.name.c_str(), &temp_option);
 
 					if(temp_option && !already_in_list) {
-						i.inserts.push_back(generator_item{ win.wrapped.name, "", -1, false });
+						i.inserts.push_back(generator_item{ win.wrapped.name, "", "", -1, false });
 					} else if(!temp_option && already_in_list) {
 						i.inserts.erase(list_it);
 						ImGui::PopID();
@@ -4736,27 +4910,48 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 						std::vector<char const*> window_names;
 						window_names.push_back("[none]");
-						int32_t selection = (list_it->header == "" ? 0 : -1);
-						for(auto& win : open_project.windows) {
+						int32_t selection = 0;
+						int32_t parent_choice = 0;
+
+						for(auto [idx, win] : std::views::enumerate(open_project.windows)) {
 							window_names.push_back(win.wrapped.name.c_str());
 							if(win.wrapped.name == list_it->header) {
-								selection = int32_t(window_names.size() - 1);
+								selection = int32_t(idx + 1);
+							}
+							if(win.wrapped.name == list_it->child_of) {
+								parent_choice = int32_t(idx + 1);
 							}
 						}
 
 						temp = selection;
 						ImGui::Combo("Header", &selection, window_names.data(), int32_t(window_names.size()));
-						if(temp != selection && selection != selected_window) {
+						if(temp != selection) {
 							if(selection == 0)
 								list_it->header = "";
 							else
 								list_it->header = open_project.windows[selection - 1].wrapped.name;
 						}
 
+						temp = parent_choice;
+						ImGui::Combo("Sub item of:", &parent_choice, window_names.data(), int32_t(window_names.size()));
+						if(temp != parent_choice) {
+							if(parent_choice == 0)
+								list_it->child_of = "";
+							else
+								list_it->child_of = open_project.windows[parent_choice - 1].wrapped.name;
+						}
+
 						ImGui::Unindent();
 					}
 					ImGui::PopID();
 					++id2;
+				}
+
+				if(chosen_attachement_vs_window) {
+					ImGui::Text("on create");
+					make_goto_button(win, i, "on_create", 1);
+					ImGui::Text("on update");
+					make_goto_button(win, i, "update", 2);
 				}
 			}
 
