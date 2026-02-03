@@ -34,12 +34,14 @@
 #include <atlbase.h>
 #include <ranges>
 
+#ifndef NO_JUMPS_TO_SOURCE
 // import EnvDTE
 #pragma warning(disable : 4278)
 #pragma warning(disable : 4146)
 #import "libid:80cc9f66-e7d8-4ddd-85b6-d9e6cd0e93e2" version("8.0") lcid("0") raw_interfaces_only named_guids
 #pragma warning(default : 4146)
 #pragma warning(default : 4278)
+#endif
 
 namespace edit_targets {
 	inline constexpr int layout_sublayout = 2;
@@ -788,7 +790,7 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
 		}
 		return;
-	} 
+	}
 	if(c.ttype == template_project::template_type::button) {
 		if(c.template_id != -1) {
 			auto bg = open_templates.button_t[c.template_id].primary.bg;
@@ -818,7 +820,7 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 		return;
 	}
 	if(c.ttype == template_project::template_type::free_background) {
-		if(c.template_id != -1) 
+		if(c.template_id != -1)
 			render_asvg_rect(open_templates.backgrounds[c.template_id].renders, (x * ui_scale), (y * ui_scale), c.x_size, c.y_size, open_project.grid_size);
 		else
 			render_empty_rect(c.rectangle_color * (highlighted ? 1.0f : 0.8f), (x * ui_scale), (y * ui_scale), std::max(1, int32_t(c.x_size * ui_scale)), std::max(1, int32_t(c.y_size * ui_scale)));
@@ -888,7 +890,7 @@ void render_control(ui_element_t& c, float x, float y, bool highlighted, float u
 				render_svg_rect(open_templates.icons[c.icon_id].renders,
 					hcursor, vcursor, int32_t((r - l) / ui_scale), int32_t((b - t) / ui_scale),
 					open_templates.colors[open_templates.iconic_button_t[c.template_id].primary.icon_color]);
-				
+
 			}
 		} else {
 			render_empty_rect(c.rectangle_color* (highlighted ? 1.0f : 0.8f), (x* ui_scale), (y* ui_scale), std::max(1, int32_t(c.x_size* ui_scale)), std::max(1, int32_t(c.y_size* ui_scale)));
@@ -1525,7 +1527,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int
 	auto right_margin = layout.margin_right != -1 ? int32_t(layout.margin_right) : left_margin;
 	auto effective_x_size = base_x_size - (left_margin + right_margin);
 	auto effective_y_size = base_y_size - (top_margin + bottom_margin);
-	
+
 	auto id = layout.template_id;
 	if(id == -1 && window.wrapped.template_id != -1) {
 		id = open_templates.window_t[window.wrapped.template_id].layout_region_definition;
@@ -1601,7 +1603,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int
 		case layout_type::single_vertical:
 		{
 			int32_t index_start = 0;
-		
+
 			layout_iterator it(lvl.contents);
 			it.move_position(index_start);
 
@@ -1707,7 +1709,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int
 		{
 			layout_iterator place_it(lvl.contents);
 			int32_t index_start = 0;
-			
+
 			place_it.move_position(index_start);
 			auto pre_pos = place_it.position;
 			auto box = measure_horizontal_box(window, place_it, effective_x_size, std::numeric_limits<int32_t>::max());
@@ -1827,7 +1829,7 @@ void render_layout(window_element_wrapper_t& window, layout_level_t& layout, int
 		{
 			layout_iterator place_it(lvl.contents);
 			int32_t index_start = 0;
-			
+
 			int32_t x_remaining = effective_x_size;
 			bool first = true;
 			while(place_it.has_more()) {
@@ -1954,9 +1956,9 @@ struct found_vs_window {
 std::vector< found_vs_window> open_vs_windows;
 HWND chosen_attachement_vs_window = nullptr;
 
-
+#ifndef NO_JUMPS_TO_SOURCE
 static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) {
-	
+
 	IRunningObjectTable* rot = nullptr;
 	IEnumMoniker* monikerEnumerator = nullptr;
 
@@ -2006,8 +2008,8 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 		monikerEnumerator->Release();
 	if(rot)
 		rot->Release();
-	
-	
+
+
 	if(!DTE) {
 		OutputDebugStringA("Unable to find DTE in ROT; using fallback\n");
 
@@ -2041,7 +2043,7 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 			result = DTE->get_ItemOperations(&item_ops);
 			++i;
 		}
-		
+
 	}
 	if(FAILED(result)) {
 		OutputDebugStringA("get_ItemOperations failed\n");
@@ -2200,7 +2202,6 @@ static bool visual_studio_open_file(wchar_t const* filename, unsigned int line) 
 	return true;
 }
 
-
 void open_file_and_line(int32_t line) {
 	if(!chosen_attachement_vs_window)
 		return;
@@ -2253,16 +2254,19 @@ void update_file_contents_and_open_to(std::string const& target_name) {
 		MessageBoxW(nullptr, L"Text not found in generated file", L"Not found", MB_OK);
 	}
 }
+#endif
 
 void make_goto_button(window_element_wrapper_t& for_window, ui_element_t& for_element, std::string const& function, int32_t extra_id = 0) {
 	if(chosen_attachement_vs_window) {
 		ImGui::SameLine();
 		ImGui::PushID(&for_element);
 		ImGui::PushID(extra_id);
+#ifndef NO_JUMPS_TO_SOURCE
 		if(ImGui::Button(">>")) {
 			auto find_string = for_window.wrapped.name + "::" + for_element.name + "::" + function;
 			update_file_contents_and_open_to(find_string);
 		}
+#endif
 		ImGui::PopID();
 		ImGui::PopID();
 	}
@@ -2272,10 +2276,12 @@ void make_goto_button(window_element_wrapper_t& for_window, generator_t& for_ele
 		ImGui::SameLine();
 		ImGui::PushID(&for_element);
 		ImGui::PushID(extra_id);
+#ifndef NO_JUMPS_TO_SOURCE
 		if(ImGui::Button(">>")) {
 			auto find_string = for_window.wrapped.name + "::" + for_element.name + "::" + function;
 			update_file_contents_and_open_to(find_string);
 		}
+#endif
 		ImGui::PopID();
 		ImGui::PopID();
 	}
@@ -2285,10 +2291,12 @@ void make_goto_button(window_element_wrapper_t& for_window, std::string const& f
 		ImGui::SameLine();
 		ImGui::PushID(&for_window);
 		ImGui::PushID(extra_id);
+#ifndef NO_JUMPS_TO_SOURCE
 		if(ImGui::Button(">>")) {
 			auto find_string = for_window.wrapped.name + "::" + function;
 			update_file_contents_and_open_to(find_string);
 		}
+#endif
 		ImGui::PopID();
 		ImGui::PopID();
 	}
@@ -2459,7 +2467,7 @@ void template_type_options(template_project::template_type& ttype, int16_t& temp
 			std::vector<char const*> inner_opts;
 			inner_opts.push_back("None");
 			inner_opts.push_back("Commodity icon");
-			
+
 			template_id = int16_t(std::clamp(template_id, int16_t(-1), int16_t(0)));
 			int32_t chosen = template_id + 1;
 			if(ImGui::Combo("Type", &chosen, inner_opts.data(), int32_t(inner_opts.size()))) {
@@ -3193,7 +3201,7 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 			}
 
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
-			if(!c.dynamic_tooltip) 
+			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
 			else
 				make_goto_button(win, c, "update_tooltip", 1);
@@ -3202,7 +3210,7 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 		} break;
 		case template_project::template_type::button:
 		{
-			ImGui::Checkbox("Left-click action", &(c.left_click_action)); 
+			ImGui::Checkbox("Left-click action", &(c.left_click_action));
 			if(c.left_click_action)
 				make_goto_button(win, c, "lbutton_action", 0);
 			ImGui::Checkbox("Right-click action", &(c.right_click_action));
@@ -3235,9 +3243,9 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 		} break;
 		case template_project::template_type::edit_control:
 		{
-			ImGui::Checkbox("Edit on update event", &(c.dynamic_text)); 
+			ImGui::Checkbox("Edit on update event", &(c.dynamic_text));
 			make_goto_button(win, c, "edit_update");
-			ImGui::Checkbox("Intercept edit commands", &(c.dynamic_tooltip)); 
+			ImGui::Checkbox("Intercept edit commands", &(c.dynamic_tooltip));
 			make_goto_button(win, c, "edit_command");
 
 			ImGui::Checkbox("Receive updates while hidden", &(c.updates_while_hidden));
@@ -3473,7 +3481,7 @@ void control_options(window_element_wrapper_t& win, ui_element_t& c, layout_cont
 					c.table_divider_color.b = ccolor[2];
 				}
 			}
-			
+
 			ImGui::Checkbox("Dynamic tooltip", &(c.dynamic_tooltip));
 			if(!c.dynamic_tooltip)
 				ImGui::InputText("Tooltip key", &(c.tooltip_text_key));
@@ -4033,11 +4041,11 @@ bool update_tree_dnd(layout_level_t& root, layout_level_t& layout, std::string& 
 			path_to_selected_layout.clear();
 			current_edit_target = edit_targets::layout_sublayout;
 			result = true;
-			
+
 			ImGui::EndPopup();
 			return true;
 		}
-		
+
 		auto& buffer = win.buffer;
 		if (ImGui::Selectable("Move to buffer")) {
 			if(std::holds_alternative<layout_control_t>(layout.contents[current_location.index])) {
@@ -4687,7 +4695,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 					} while(true);
 				}
 
-			
+
 				ImGui::EndMenu();
 			}
 
@@ -4809,7 +4817,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
 			ImGui::Begin("Edit", NULL, ImGuiWindowFlags_MenuBar);
 
-			
+
 
 			if (
 				current_edit_target == edit_targets::layout_window
@@ -5319,7 +5327,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 							ImGui::BeginDisabled();
 						}
 
-						ImGui::PushID(k); 
+						ImGui::PushID(k);
 
 						if(c.template_id == -1) {
 							const char* items[] = { "black", "white", "red", "green", "yellow", "unspecified", "light blue", "dark blue", "orange", "lilac", "light gray", "dark gray", "dark green", "gold", "reset", "brown" };

@@ -1,4 +1,4 @@
-cflags = -std=c++20 -O0 -DUNICODE -D_UNICODE -DWIN32 -D_AMD64_ -I./GLFW -I./imgui -I./imgui/misc/cpp -I./imgui/backends -I. -I./lunasvg -I./plutovg
+cflags = -std=c++23 -O0 -DREMOVE_RANDOM_ABORT -DNO_JUMPS_TO_SOURCE -DUNICODE -D_UNICODE -DWIN32 -D_AMD64_ -I./GLFW -I./imgui -I./imgui/misc/cpp -I./imgui/backends -I. -I./lunasvg -I./plutovg
 debug_flags = -g -gdwarf-3 -gcodeview
 debug_flags_link = -g -gdwarf-3
 
