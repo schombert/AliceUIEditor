@@ -102,8 +102,6 @@ hand_written_sections parse_existing_code(open_project_t& input, std::string cod
 
 		if (last_token != user_section_end) break;
 
-		printf("%s", key.c_str());
-
 		result.sections[key] = code.substr(start_user_section, cursor - start_user_section);
 	}
 
