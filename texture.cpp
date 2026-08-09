@@ -28,7 +28,9 @@ namespace ogl {
 
 texture::~texture() {
 	if(texture_handle != 0 && loaded) {
+#ifndef HEADLESS
 		glDeleteTextures(1, &texture_handle);
+#endif
 	}
 }
 
@@ -61,6 +63,7 @@ void texture::load(std::wstring const& file_name) {
 	loaded = true;
 	texture_handle = 0;
 	if(data) {
+#ifndef HEADLESS
 		glGenTextures(1, &texture_handle);
 		if(texture_handle) {
 			glBindTexture(GL_TEXTURE_2D, texture_handle);
@@ -74,13 +77,16 @@ void texture::load(std::wstring const& file_name) {
 
 			glBindTexture(GL_TEXTURE_2D, 0);
 		}
+#endif
 		STBI_FREE(data);
 	}
-	
+
 }
 void texture::unload() {
 	if(texture_handle != 0 && loaded) {
+#ifndef HEADLESS
 		glDeleteTextures(1, &texture_handle);
+#endif
 	}
 	loaded = false;
 	texture_handle = 0;
