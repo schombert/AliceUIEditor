@@ -719,7 +719,7 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				}
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
-			case template_project::template_type::table_row: 
+			case template_project::template_type::table_row:
 			{
 				result += "\t" "int32_t template_id = -1;\n";
 				auto t = table_from_name(proj, c.table_connection);
@@ -857,12 +857,12 @@ std::string element_type_declarations(std::string const& project_name, window_el
 				result += "\t" "std::unique_ptr<" + project_name + "_" + c.child_window + "_t> label_window_internal;\n";
 
 				result += "\t" "void add_item(" + insert_params + ");\n";
-				
+
 				result += "\t" "ui::element_base* get_nth_item(sys::state& state, int32_t id, int32_t pool_id) override;\n";
 				result += "\t" "void quiet_on_selection(sys::state& state, int32_t id);\n";
 				result += "\t" "void on_selection(sys::state& state, int32_t id) override;\n";
 				result += "\t" "void clear_list();\n";
-				
+
 				result += "\t" "void on_create(sys::state& state) noexcept override;\n";
 				result += "\t"  "void on_update(sys::state& state) noexcept override;\n";
 			} break;
@@ -1260,7 +1260,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "// END\n";
 					result += "}\n";
 				}
-				
+
 				//UPDATE
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
 				make_parent_var_text();
@@ -1271,7 +1271,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 				}
 				result += "// END\n";
 				result += "}\n";
-				
+
 				if(c.left_click_action) {
 					result += "bool " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::button_action(sys::state& state) noexcept {\n";
 					make_parent_var_text();
@@ -1940,7 +1940,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					for(auto& col : t->table_columns) {
 						if(col.internal_data.cell_type == table_cell_type::text) {
 							result += "\t" "if(x >=  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x <  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start +  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
-							
+
 							if(col.internal_data.has_dy_cell_tooltip) {
 								make_parent_var_text();
 								result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::column_tooltip\n";
@@ -2021,7 +2021,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					}
 				}
 
-				
+
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
 				if(t) {
 					result += "\t" "auto fh = text::make_font_id(state, false, 1.0f * " + std::to_string(proj.grid_size * 2) + ");\n";
@@ -2069,7 +2069,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 
 				}
 				result += "}\n";
-			
+
 				//UPDATE
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
 				make_parent_var_text();
@@ -2190,7 +2190,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					for(auto& col : t->table_columns) {
 						if(col.internal_data.cell_type == table_cell_type::text) {
 							result += "\t" "if(x >=  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start && x <  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_start +  table_source->" + t->name + "_" + col.internal_data.column_name + "_column_width) {\n";
-							
+
 							if(col.internal_data.has_dy_header_tooltip) {
 								make_parent_var_text();
 								result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::" + col.internal_data.column_name + "::header_tooltip\n";
@@ -2226,7 +2226,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "}\n";
 				}
 
-				
+
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::render(sys::state & state, int32_t x, int32_t y) noexcept {\n";
 				if(t) {
 					result += "\t" "auto fh = text::make_font_id(state, false, 1.0f * " + std::to_string(proj.grid_size * 2) + ");\n";
@@ -2280,7 +2280,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 									"state.ui_templates.icons[icon].renders.get_render(state, " + std::to_string(proj.grid_size * 1) + ", " + std::to_string(proj.grid_size * 2) + ", state.user_settings.ui_scale, ink_color.r, ink_color.g, ink_color.b)"
 									"); \n";
 								result += "\t" "}\n";
-							
+
 								result += "\t" "if(table_source->" + t->name + "_" + col.internal_data.column_name + "_sort_direction < 0) {\n";
 								result += "\t" "\t" "auto icon = template_id != -1 ? state.ui_templates.table_t[template_id].arrow_decreasing : -1;\n";
 								result += "\t" "\t" "if(icon != -1)\n";
@@ -2289,7 +2289,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 								"); \n";
 								result += "\t" "}\n";
 							}
-							
+
 
 							if(col.display_data.header_key.size() > 0) {
 								result += "\t"  "if(!" + col.internal_data.column_name + "_internal_layout.contents.empty() && linesz > 0.0f) {\n";
@@ -2307,7 +2307,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 					result += "\t" "}\n";
 				}
 				result += "}\n";
-			
+
 				//UPDATE
 				result += "void " + project_name + "_" + win.wrapped.name + "_" + c.name + "_t::on_update(sys::state& state) noexcept {\n";
 				make_parent_var_text();
@@ -2382,7 +2382,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 				result += "\t" "for(auto& p : graph_content) { if(temp_offset <= p.amount) break; temp_offset -= p.amount; ++temp_index; }\n";
 				result += "\t" "if(temp_index < int32_t(graph_content.size())) {\n";
 				result += "\t" "\t" "auto& selected_key = graph_content[temp_index].key;\n";
-				
+
 				result += "// BEGIN " + win.wrapped.name + "::" + c.name + "::tooltip\n";
 				if(auto it = old_code.found_code.find(win.wrapped.name + "::" + c.name + "::tooltip"); it != old_code.found_code.end()) {
 					it->second.used = true;
@@ -2402,7 +2402,7 @@ std::string element_member_functions(std::string const& project_name, window_ele
 				result += "\t" "auto bg_id = state.ui_templates.stacked_bar_t[template_id].overlay_bg;\n";
 				result += "\t" "if(bg_id != -1)\n";
 				result += "\t" "\t" "ogl::render_textured_rect_direct(state, float(x), float(y), float(base_data.size.x), float(base_data.size.y), state.ui_templates.backgrounds[bg_id].renders.get_render(state, float(base_data.size.x) / float(par->grid_size), float(base_data.size.y) / float(par->grid_size), int32_t(par->grid_size), state.user_settings.ui_scale));\n";
-				
+
 				result += "}\n";
 
 
@@ -3251,7 +3251,7 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "void render(sys::state & state, int32_t x, int32_t y) noexcept override;\n";
 		if(win.wrapped.template_id != -1 && !win.alternates.empty())
 			result += "\t" "void set_alternate(bool alt) noexcept;\n";
-		if(win.wrapped.on_hide_action) 
+		if(win.wrapped.on_hide_action)
 			result += "\t" "void on_hide(sys::state& state) noexcept override;\n";
 
 		if(win.wrapped.background != background_type::none || win.wrapped.template_id != -1) {
@@ -3887,6 +3887,12 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "layout_item_types t;\n";
 			result += "\t" "\t" "buffer.read(t);\n";
 			result += "\t" "\t" "switch(t) {\n";
+
+			result += "\t" "\t" "\t" "case layout_item_types::control:\n";
+			result += "\t" "\t" "\t" "case layout_item_types::window:\n";
+			result += "\t" "\t" "\t" "case layout_item_types::generator:\n";
+			result += "\t" "\t" "\t" "\t" "abort();\n";
+
 			result += "\t" "\t" "\t" "case layout_item_types::texture_layer:\n";
 			result += "\t" "\t" "\t" "{\n";
 			result += "\t" "\t" "\t" "\t" "texture_layer temp;\n";
@@ -3894,7 +3900,6 @@ std::string generate_project_code(open_project_t& proj, code_snippets& old_code)
 			result += "\t" "\t" "\t" "\t" "buffer.read(temp.texture);\n";
 			result += "\t" "\t" "\t" "\t" "lvl.contents.emplace_back(std::move(temp));\n";
 			result += "\t" "\t" "\t" "} break;\n";
-
 			/*
 			result += "\t" "\t" "\t" "case layout_item_types::control:\n";
 			result += "\t" "\t" "\t" "{\n";
