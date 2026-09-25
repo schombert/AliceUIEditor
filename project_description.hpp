@@ -404,12 +404,10 @@ struct sub_layout_t {
 	std::unique_ptr<layout_level_t> layout;
 
 	sub_layout_t() noexcept = default;
-	sub_layout_t(sub_layout_t const& o) noexcept {
-		std::abort();
-	}
+	sub_layout_t(sub_layout_t const& o) noexcept;
 	sub_layout_t(sub_layout_t&& o) noexcept = default;
 	sub_layout_t& operator=(sub_layout_t&& o) noexcept = default;
-	~sub_layout_t() = default;
+	~sub_layout_t();
 };
 
 using layout_item = std::variant<std::monostate, layout_control_t, layout_window_t, layout_glue_t, generator_t, texture_layer_t, sub_layout_t>;
@@ -433,6 +431,11 @@ struct layout_level_t {
 	uint8_t interline_spacing = 0;
 	bool paged = false;
 };
+
+inline sub_layout_t::~sub_layout_t() = default;
+inline sub_layout_t::sub_layout_t(sub_layout_t const& o) noexcept {
+        std::abort();
+}
 
 struct template_alternate {
 	std::string control_name;
